@@ -1,129 +1,90 @@
 "use client"
 
-import { useState, useTransition } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Users, FilePlus, UserRoundSearch, ClipboardList, X } from "lucide-react"
+import { Users, FilePlus, UserRoundSearch, ClipboardList, X, CreditCard } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { DashboardFilter } from "@/components/dashboard/dashboard-filter"
 import { CustomLineChart } from "@/components/dashboard/charts/line-chart"
 import { CustomPieChart } from "@/components/dashboard/charts/pie-chart"
 import { PaymentsTable } from "@/components/dashboard/payments-table"
-import { getDashboardStats } from "@/actions/dashboard"
-import { DateRange } from "react-day-picker"
-import { subDays } from "date-fns"
 
-interface DashboardStats {
-    collected: number
-    pending: number
-    totalExpenses: number
-    netProfit: number
-    unpaid: number
-    collectable: number
+interface StaffDashboardStats {
+    myCollectionToday: number
+    myCollectionMonth: number
+    myCollectionLastMonth: number
+    myCollectionYesterday: number
+    myPendingCount: number
+    studentsAdmittedToday: number
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recentSales: any[]
+    recentTransactions: any[]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    overview: any[]
+    monthlyCollections: any[] // For line chart
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    classWise: any[]
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    unpaidStudents: any[]
-    revenueChange: number
-    pendingChange: number
+    globalPendingTrend: any[] // For second line chart
+    totalCollected: number
+    totalPending: number
+    totalRejected: number
 }
 
-interface DashboardContentProps {
-    initialStats: DashboardStats
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    attendanceStats: any
-    classes: { id: string; name: string }[]
-    totalStaff: number
-    totalStudents: number
+interface StaffDashboardContentProps {
+    stats: StaffDashboardStats
 }
 
-export function DashboardContent({ 
-    initialStats, 
-    classes,
-}: DashboardContentProps) {
-    const [stats, setStats] = useState<DashboardStats>(initialStats)
-    const [isPending, startTransition] = useTransition()
+export function StaffDashboardContent({ 
+    stats, 
+}: StaffDashboardContentProps) {
     
-    const [date, setDate] = useState<DateRange | undefined>({
-        from: subDays(new Date(), 30),
-        to: new Date(),
-    })
-    const [classId, setClassId] = useState("all")
-
-    const handleFilterChange = (newDate: DateRange | undefined, newClassId: string) => {
-        setDate(newDate)
-        setClassId(newClassId)
-        
-        startTransition(async () => {
-            const newStats = await getDashboardStats({
-                startDate: newDate?.from,
-                endDate: newDate?.to,
-                classId: newClassId
-            })
-            setStats(newStats)
-        })
-    }
-
-    // Map overview data for charts
+    // Map data for charts
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const collectedData = stats.overview.map((item: any) => ({
+    const collectedData = stats.monthlyCollections.map((item: any) => ({
         name: item.name,
-        value: item.collected
+        value: item.value
     }))
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pendingData = stats.overview.map((item: any) => ({
+    const pendingData = stats.globalPendingTrend.map((item: any) => ({
         name: item.name,
-        value: item.pending
+        value: item.value
     }))
 
-    const profitData = [
-        { name: 'Income', value: stats.collected, color: '#22c55e' },
-        { name: 'Expense', value: stats.totalExpenses, color: '#ef4444' }
-    ]
-
-    // Approximation for Total Collection vs Should be Collected
-    // We don't have exact "Should be Collected" per month in the overview data structure easily accessible for a line chart without backend changes,
-    // but we can show the aggregate status.
     const collectionStatusData = [
-        { name: 'Collected', value: stats.collected, color: '#22c55e' },
-        { name: 'Pending', value: stats.pending, color: '#eab308' },
-        { name: 'Unpaid (Deficit)', value: stats.unpaid, color: '#ef4444' }
+        { name: 'Verified', value: stats.totalCollected, color: '#22c55e' },
+        { name: 'Pending', value: stats.totalPending, color: '#eab308' },
+        { name: 'Rejected', value: stats.totalRejected, color: '#ef4444' }
     ]
 
-    const revenueChange = stats.revenueChange
-    const pendingChange = stats.pendingChange
+    // Placeholder for "Income vs Expense" - Staff doesn't see expense.
+    // Let's show "My Verified vs Pending"
+    const myPerformanceData = [
+        { name: 'Verified', value: stats.totalCollected, color: '#22c55e' },
+        { name: 'Pending', value: stats.totalPending, color: '#eab308' }
+    ]
+
+    const monthChange = stats.myCollectionLastMonth > 0 
+        ? Math.round(((stats.myCollectionMonth - stats.myCollectionLastMonth) / stats.myCollectionLastMonth) * 100) 
+        : (stats.myCollectionMonth > 0 ? 100 : 0);
+
+    const dayChange = stats.myCollectionYesterday > 0
+        ? Math.round(((stats.myCollectionToday - stats.myCollectionYesterday) / stats.myCollectionYesterday) * 100)
+        : (stats.myCollectionToday > 0 ? 100 : 0);
+
+    const pendingChange = 0; // Not tracking history of pending count yet
 
     return (
         <div className="flex-1 space-y-4 p-8 pt-6 bg-background">
             {/* Header Controls */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 mb-6">
-                <h2 className="text-2xl font-bold tracking-tight">Dashboard Overview</h2>
-                
-                <div className="flex flex-wrap items-center gap-2">
-                    <DashboardFilter 
-                        classes={classes} 
-                        date={date}
-                        setDate={(d) => handleFilterChange(d, classId)}
-                        classId={classId}
-                        setClassId={(c) => handleFilterChange(date, c)}
-                        isLoading={isPending}
-                    />
-                </div>
+                <h2 className="text-2xl font-bold tracking-tight">Staff Dashboard Overview</h2>
             </div>
             
-            <div className={`grid gap-4 md:grid-cols-2 lg:grid-cols-4 ${isPending ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 
                 {/* Row 1 */}
-                {/* Total Amount Collected Chart - Large Card */}
+                {/* My Monthly Collections Chart - Large Card */}
                 <Card className="col-span-2 row-span-1 shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-base font-bold">Total amount collected each month</CardTitle>
+                    <CardTitle className="text-base font-bold">My Collections (Last 12 Months)</CardTitle>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
                         Total Collection Recorded
@@ -134,47 +95,47 @@ export function DashboardContent({
                   </CardContent>
                 </Card>
 
-                {/* Total Revenue */}
+                {/* My Collections This Month */}
                 <Card className="shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-bold">Total Revenue</CardTitle>
+                    <CardTitle className="text-sm font-bold">My Collections (Month)</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">₹{stats.collected.toLocaleString()}</div>
+                    <div className="text-3xl font-bold">₹{stats.myCollectionMonth.toLocaleString()}</div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Income
+                      {monthChange > 0 ? '+' : ''}{monthChange}% from last month
                     </p>
-                    <Progress value={revenueChange} className="mt-4 h-2" />
+                    <Progress value={Math.max(0, Math.min(100, monthChange + 100))} className="mt-4 h-2" />
                   </CardContent>
                 </Card>
 
-                {/* Pending This Month */}
+                {/* My Pending Approvals */}
                 <Card className="shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-bold">Pending This Month</CardTitle>
+                    <CardTitle className="text-sm font-bold">My Pending Approvals</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">₹{stats.pending.toLocaleString()}</div>
+                    <div className="text-3xl font-bold">{stats.myPendingCount}</div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Awaiting Verification
+                      Transactions awaiting verification
                     </p>
-                     <Progress value={pendingChange} className="mt-4 h-2" />
+                     <Progress value={100} className="mt-4 h-2" />
                   </CardContent>
                 </Card>
 
                 {/* Row 2 */}
                 
-                {/* Reminders (Unpaid) */}
+                {/* My Collections Today */}
                 <Card className="shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-bold">Reminders</CardTitle>
+                    <CardTitle className="text-sm font-bold">My Collections (Today)</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">₹{stats.unpaid.toLocaleString()}</div>
+                    <div className="text-3xl font-bold">₹{stats.myCollectionToday.toLocaleString()}</div>
                      <p className="text-xs text-muted-foreground mt-1">
-                      Total Unpaid / Deficit
+                      {dayChange > 0 ? '+' : ''}{dayChange}% from yesterday
                     </p>
-                     <Progress value={pendingChange} className="mt-4 h-2" />
+                     <Progress value={Math.max(0, Math.min(100, dayChange + 100))} className="mt-4 h-2" />
                   </CardContent>
                 </Card>
 
@@ -191,15 +152,15 @@ export function DashboardContent({
                     </Link>
                 </Card>
 
-                {/* New Class */}
+                {/* Collect Fee (Replaces New Class) */}
                 <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                     <Link href="/admin/classes" className="block h-full">
+                     <Link href="/fees/collect" className="block h-full">
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-bold">New Class</CardTitle>
+                        <CardTitle className="text-sm font-bold">Collect Fee</CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-col items-center justify-center py-6">
-                        <FilePlus className="h-10 w-10 mb-2" strokeWidth={1.5} />
-                        <span className="text-sm font-medium">Add new Class</span>
+                        <CreditCard className="h-10 w-10 mb-2" strokeWidth={1.5} />
+                        <span className="text-sm font-medium">Collect Fee</span>
                       </CardContent>
                     </Link>
                 </Card>
@@ -219,15 +180,15 @@ export function DashboardContent({
 
                 {/* Row 3 */}
 
-                {/* Report */}
+                {/* Transactions (Replaces Report) */}
                 <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                     <Link href="/admin/reports" className="block h-full">
+                     <Link href="/fees/transactions" className="block h-full">
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-bold">Report</CardTitle>
+                        <CardTitle className="text-sm font-bold">Transactions</CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-col items-center justify-center py-6">
                         <ClipboardList className="h-10 w-10 mb-2" strokeWidth={1.5} />
-                        <span className="text-sm font-medium text-center">Generate and Print Report</span>
+                        <span className="text-sm font-medium text-center">View All Transactions</span>
                       </CardContent>
                     </Link>
                 </Card>
@@ -235,10 +196,10 @@ export function DashboardContent({
                 {/* Pending Fees Breakdown Chart - Large Card */}
                 <Card className="col-span-3 row-span-1 shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-base font-bold">Pending Fees Breakdown</CardTitle>
+                    <CardTitle className="text-base font-bold">Global Pending Fees Breakdown</CardTitle>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
-                        Total Collection Recorded
+                        Total Pending Recorded
                     </div>
                   </CardHeader>
                   <CardContent className="pl-0">
@@ -248,20 +209,20 @@ export function DashboardContent({
                 
                 {/* Row 4 - New Charts */}
                 
-                {/* Income vs Expense */}
+                {/* My Performance */}
                 <Card className="col-span-2 shadow-sm">
                     <CardHeader>
-                        <CardTitle className="text-base font-bold">Income vs Expense</CardTitle>
+                        <CardTitle className="text-base font-bold">My Performance</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <CustomPieChart data={profitData} height={250} />
+                        <CustomPieChart data={myPerformanceData} height={250} />
                     </CardContent>
                 </Card>
 
                 {/* Collection Status */}
                 <Card className="col-span-2 shadow-sm">
                     <CardHeader>
-                        <CardTitle className="text-base font-bold">Total Fee Collection Breakdown</CardTitle>
+                        <CardTitle className="text-base font-bold">My Collection Status</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <CustomPieChart data={collectionStatusData} height={250} />
@@ -273,11 +234,11 @@ export function DashboardContent({
             {/* Payments Table */}
             <Card className="col-span-4 shadow-sm mt-4">
                 <CardHeader>
-                  <CardTitle className="text-base font-bold">Payments</CardTitle>
-                  <CardDescription>Most recent paid fees.</CardDescription>
+                  <CardTitle className="text-base font-bold">Recent Payments</CardTitle>
+                  <CardDescription>Most recent paid fees by you.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <PaymentsTable payments={stats.recentSales} />
+                  <PaymentsTable payments={stats.recentTransactions} />
                 </CardContent>
             </Card>
         </div>

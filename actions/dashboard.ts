@@ -6,7 +6,7 @@ import Student from "@/models/Student"
 import ClassFee from "@/models/ClassFee"
 import Expense from "@/models/Expense"
 import Attendance from "@/models/Attendance"
-import { startOfDay, endOfDay, startOfMonth, endOfMonth, eachMonthOfInterval, format } from "date-fns"
+import { startOfDay, endOfDay, startOfMonth, endOfMonth, eachMonthOfInterval, format, subMonths, subWeeks, subDays } from "date-fns"
 import { Types } from "mongoose"
 
 interface DashboardFilter {
@@ -76,6 +76,23 @@ interface StudentDoc {
     createdAt: Date;
     photo?: string;
     contacts?: { mobile?: string[] };
+}
+
+interface SaleDoc {
+    _id: { toString: () => string };
+    amount: number;
+    studentId?: {
+        name: string;
+        contacts?: { mobile?: string[] };
+        photo?: string;
+    };
+    status: string;
+}
+
+interface ClassWiseDoc {
+    _id: string;
+    collected: number;
+    pending: number;
 }
 
 export async function getDashboardStats(filter: DashboardFilter) {
@@ -381,23 +398,6 @@ export async function getDashboardStats(filter: DashboardFilter) {
         { $sort: { collected: -1 } }
     ]);
 
-    interface SaleDoc {
-        _id: { toString: () => string };
-        amount: number;
-        studentId?: {
-            name: string;
-            contacts?: { mobile?: string[] };
-            photo?: string;
-        };
-        status: string;
-    }
-
-    interface ClassWiseDoc {
-        _id: string;
-        collected: number;
-        pending: number;
-    }
-
     // Calculate Expenses
     const expenseQuery: Record<string, unknown> = { status: 'active' };
     if (filter.startDate && filter.endDate) {
@@ -415,6 +415,61 @@ export async function getDashboardStats(filter: DashboardFilter) {
     const totalExpenses = expenseResult[0]?.total || 0;
     const netProfit = collected - totalExpenses;
 
+    // Calculate Revenue Change (Current vs Last Week)
+    // For simplicity, we compare "current period" vs "previous period of same duration"
+    // But UI says "from last week". Let's calculate Last Week vs This Week for now if no filter, or Period vs Previous Period.
+    // Default filter is last 30 days. Let's assume standard behavior:
+    // "Revenue" usually means collected.
+    // Compare (EndDate - 7 days) to EndDate VS (EndDate - 14 days) to (EndDate - 7 days)
+    
+    const today = new Date();
+    const lastWeekStart = subWeeks(today, 1);
+    const twoWeeksAgoStart = subWeeks(today, 2);
+
+    const revenueThisWeekResult = await FeeTransaction.aggregate([
+        { $match: { transactionDate: { $gte: lastWeekStart, $lte: today }, status: 'verified' } },
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+    const revenueLastWeekResult = await FeeTransaction.aggregate([
+        { $match: { transactionDate: { $gte: twoWeeksAgoStart, $lt: lastWeekStart }, status: 'verified' } },
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+
+    const revenueThisWeek = revenueThisWeekResult[0]?.total || 0;
+    const revenueLastWeek = revenueLastWeekResult[0]?.total || 0;
+    
+    let revenueChange = 0;
+    if (revenueLastWeek > 0) {
+        revenueChange = Math.round(((revenueThisWeek - revenueLastWeek) / revenueLastWeek) * 100);
+    } else if (revenueThisWeek > 0) {
+        revenueChange = 100;
+    }
+
+    // Calculate Pending Change (Current Month vs Last Month)
+    const thisMonthStart = startOfMonth(today);
+    const lastMonthStart = startOfMonth(subMonths(today, 1));
+    const lastMonthEnd = endOfMonth(subMonths(today, 1));
+
+    const pendingThisMonthResult = await FeeTransaction.aggregate([
+        { $match: { transactionDate: { $gte: thisMonthStart, $lte: today }, status: 'pending' } },
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+    const pendingLastMonthResult = await FeeTransaction.aggregate([
+        { $match: { transactionDate: { $gte: lastMonthStart, $lte: lastMonthEnd }, status: 'pending' } },
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+
+    const pendingThisMonth = pendingThisMonthResult[0]?.total || 0;
+    const pendingLastMonth = pendingLastMonthResult[0]?.total || 0;
+
+    let pendingChange = 0;
+    if (pendingLastMonth > 0) {
+        pendingChange = Math.round(((pendingThisMonth - pendingLastMonth) / pendingLastMonth) * 100);
+    } else if (pendingThisMonth > 0) {
+        pendingChange = 100;
+    }
+
+
     return {
         collected,
         pending,
@@ -424,6 +479,8 @@ export async function getDashboardStats(filter: DashboardFilter) {
         collectable: totalExpected,
         recentSales: recentSales.map((sale: unknown) => {
             const s = sale as SaleDoc;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const sAny = s as any; 
             return {
                 id: s._id.toString(),
                 amount: s.amount,
@@ -431,6 +488,10 @@ export async function getDashboardStats(filter: DashboardFilter) {
                 contactNumber: s.studentId?.contacts?.mobile?.[0] || 'N/A',
                 studentPhoto: s.studentId?.photo,
                 status: s.status,
+                type: sAny.feeType,
+                month: sAny.month,
+                year: sAny.year,
+                transactionDate: sAny.transactionDate
             };
         }),
         overview: processedOverview,
@@ -442,7 +503,9 @@ export async function getDashboardStats(filter: DashboardFilter) {
                 pending: cls.pending
             };
         }),
-        unpaidStudents: unpaidList.sort((a, b) => b.amount - a.amount).slice(0, 10)
+        unpaidStudents: unpaidList.sort((a, b) => b.amount - a.amount).slice(0, 10),
+        revenueChange,
+        pendingChange
     };
 }
 
@@ -509,5 +572,142 @@ export async function getAttendanceStats() {
             name,
             ...stats
         }))
+    };
+}
+
+export async function getStaffDashboardStats(userId: string) {
+    await dbConnect();
+
+    const todayStart = startOfDay(new Date());
+    const todayEnd = endOfDay(new Date());
+    const monthStart = startOfMonth(new Date());
+    const monthEnd = endOfMonth(new Date());
+
+    // 1. My Collection Today
+    const collectionTodayResult = await FeeTransaction.aggregate([
+        { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: todayStart, $lte: todayEnd }, status: 'verified' } },
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+    const myCollectionToday = collectionTodayResult[0]?.total || 0;
+
+    // 2. My Collection This Month
+    const collectionMonthResult = await FeeTransaction.aggregate([
+        { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: monthStart, $lte: monthEnd }, status: 'verified' } },
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+    const myCollectionMonth = collectionMonthResult[0]?.total || 0;
+
+    // 3. My Pending Count
+    const myPendingCount = await FeeTransaction.countDocuments({
+        collectedBy: userId,
+        status: 'pending'
+    });
+
+    // 4. Students Admitted Today (Global)
+    const studentsAdmittedToday = await Student.countDocuments({
+        createdAt: { $gte: todayStart, $lte: todayEnd }
+    });
+
+    // 5. Recent Transactions
+    const recentTransactions = await FeeTransaction.find({ collectedBy: userId })
+        .sort({ transactionDate: -1 })
+        .limit(5)
+        .populate('studentId', 'name contacts photo')
+        .lean();
+
+    // 6. Monthly Collections (Last 12 Months) for Line Chart
+    const end = new Date();
+    const start = subMonths(new Date(), 11);
+    const monthsToCheck = eachMonthOfInterval({ start, end });
+
+    const monthlyCollections = await Promise.all(monthsToCheck.map(async (date) => {
+        const s = startOfMonth(date);
+        const e = endOfMonth(date);
+        const result = await FeeTransaction.aggregate([
+            { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: s, $lte: e }, status: 'verified' } },
+            { $group: { _id: null, total: { $sum: "$amount" } } }
+        ]);
+        return {
+            name: format(date, 'MMM'),
+            value: result[0]?.total || 0
+        };
+    }));
+
+    // 7. Global Pending Trend (Last 12 Months) for Line Chart
+    // NOTE: This is GLOBAL pending, not just for this user, as requested layout shows "Global Pending Fees Breakdown"
+    const globalPendingTrend = await Promise.all(monthsToCheck.map(async (date) => {
+        const s = startOfMonth(date);
+        const e = endOfMonth(date);
+        const result = await FeeTransaction.aggregate([
+            { $match: { transactionDate: { $gte: s, $lte: e }, status: 'pending' } },
+            { $group: { _id: null, total: { $sum: "$amount" } } }
+        ]);
+        return {
+            name: format(date, 'MMM'),
+            value: result[0]?.total || 0
+        };
+    }));
+
+    // 8. Total Stats for User (Lifetime)
+    const totalStats = await FeeTransaction.aggregate([
+        { $match: { collectedBy: new Types.ObjectId(userId) } },
+        { $group: { 
+            _id: "$status", 
+            total: { $sum: "$amount" },
+            count: { $sum: 1 }
+        }}
+    ]);
+
+    const totalCollected = totalStats.find(s => s._id === 'verified')?.total || 0;
+    const totalPending = totalStats.find(s => s._id === 'pending')?.total || 0;
+    const totalRejected = totalStats.find(s => s._id === 'rejected')?.total || 0;
+
+    // Comparisons for Staff
+    const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
+    const lastMonthEnd = endOfMonth(subMonths(new Date(), 1));
+    const collectionLastMonthResult = await FeeTransaction.aggregate([
+        { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: lastMonthStart, $lte: lastMonthEnd }, status: 'verified' } },
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+    const myCollectionLastMonth = collectionLastMonthResult[0]?.total || 0;
+
+    const yesterdayStart = startOfDay(subDays(new Date(), 1));
+    const yesterdayEnd = endOfDay(subDays(new Date(), 1));
+    const collectionYesterdayResult = await FeeTransaction.aggregate([
+        { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: yesterdayStart, $lte: yesterdayEnd }, status: 'verified' } },
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+    const myCollectionYesterday = collectionYesterdayResult[0]?.total || 0;
+
+
+    return {
+        myCollectionToday,
+        myCollectionMonth,
+        myCollectionLastMonth,
+        myCollectionYesterday,
+        myPendingCount,
+        studentsAdmittedToday,
+        recentTransactions: recentTransactions.map((sale: unknown) => {
+             const s = sale as SaleDoc;
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             const sAny = s as any; 
+             return {
+                 id: s._id.toString(),
+                 amount: s.amount,
+                 studentName: s.studentId?.name || 'Unknown',
+                 contactNumber: s.studentId?.contacts?.mobile?.[0] || 'N/A',
+                 studentPhoto: s.studentId?.photo,
+                 status: s.status,
+                 type: sAny.feeType,
+                 month: sAny.month,
+                 year: sAny.year,
+                 transactionDate: sAny.transactionDate
+             };
+         }),
+        monthlyCollections,
+        globalPendingTrend,
+        totalCollected,
+        totalPending,
+        totalRejected
     };
 }
