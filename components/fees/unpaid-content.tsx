@@ -7,6 +7,7 @@ import { UnpaidStudentList } from "@/components/fees/unpaid-student-list"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
+import { BackButton } from "@/components/ui/back-button"
 
 interface UnpaidStudent {
     id: string;
@@ -66,6 +67,7 @@ export function UnpaidContent({
 
   return (
     <div className="p-6 space-y-6">
+        <BackButton />
         <div>
             <h1 className="text-3xl font-bold">Unpaid Students</h1>
             <p className="text-muted-foreground">

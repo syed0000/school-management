@@ -46,7 +46,7 @@ export function AttendanceContent({
   }
 
   return (
-    <div className="flex-1 space-y-4">
+    <div className="flex-1 space-y-4">      
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-2 md:space-y-0">
         <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Attendance Reports</h2>
         <div className="flex flex-wrap items-center gap-2">

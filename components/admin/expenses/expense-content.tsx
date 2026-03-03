@@ -7,6 +7,7 @@ import { ExpenseDialog } from "@/components/admin/expenses/expense-dialog"
 import { ExpenseFilters } from "@/components/admin/expenses/expense-filters"
 import { ExportButton } from "@/components/admin/expenses/export-button"
 import { Pagination } from "@/components/admin/expenses/pagination"
+import { BackButton } from "@/components/ui/back-button"
 
 interface ExpenseContentProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,6 +66,7 @@ export function ExpenseContent({ initialExpenses, initialTotalPages, formattedTe
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
+      <BackButton />
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Expense Management</h2>
         <div className="flex items-center space-x-2">

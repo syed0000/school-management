@@ -35,7 +35,7 @@ export default async function StaffLayout({
                   priority
                 />
              </div>
-             <X className="h-5 w-5 text-purple-600 font-bold stroke-[3]" />
+             <X className="h-5 w-5 text-purple-600 font-bold stroke-3" />
              <div className="font-bold text-lg tracking-tight hidden md:block">
                 Modern Nursery School
              </div>

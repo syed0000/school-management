@@ -6,6 +6,7 @@ import { TransactionList } from "@/components/fees/transaction-list"
 import { TransactionFilters } from "@/components/fees/transaction-filters"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle, Clock, XCircle } from 'lucide-react'
+import { BackButton } from "../ui/back-button"
 
 interface Transaction {
   id: string;
@@ -119,7 +120,7 @@ export function TransactionContent({
         <h1 className="text-3xl font-bold">Fee Transactions</h1>
         <p className="text-muted-foreground">View and manage all fee transactions</p>
       </div>
-
+      <BackButton />
       <div className={`grid gap-4 md:grid-cols-3 ${isPending ? 'opacity-50' : ''}`}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useForm, Resolver } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useState } from "react"
@@ -30,7 +30,7 @@ import { addClassFee } from "@/actions/class"
 
 const formSchema = z.object({
   type: z.enum(['monthly', 'examination', 'admissionFees', 'registrationFees']),
-  amount: z.string().transform((val) => Number(val)), // Input type="number" returns string usually
+  amount: z.string(),
   effectiveFrom: z.string().min(1, "Effective Date is required"),
 })
 
@@ -44,11 +44,11 @@ export function UpdateFeeDialog({ classId, className }: UpdateFeeDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
-    // @ts-expect-error Zod types mismatch
-    resolver: zodResolver(formSchema) as Resolver<z.infer<typeof formSchema>>,
+    
+    resolver: zodResolver(formSchema),
     defaultValues: {
       type: "monthly",
-      amount: 0,
+      amount: "0",
       effectiveFrom: new Date().toISOString().split('T')[0],
     },
   })
@@ -58,7 +58,8 @@ export function UpdateFeeDialog({ classId, className }: UpdateFeeDialogProps) {
     try {
       const payload = {
         classId,
-        ...values
+        ...values,
+        amount: Number(values.amount)
       }
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

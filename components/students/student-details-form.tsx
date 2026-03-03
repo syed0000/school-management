@@ -100,7 +100,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
   const [photo, setPhoto] = useState<string | null>(student.photo || null)
 
   const form = useForm<z.infer<typeof formSchema>>({
-    // @ts-expect-error Zod types mismatch
+    
     resolver: zodResolver(formSchema) as Resolver<z.infer<typeof formSchema>>,
     defaultValues: {
       registrationNumber: student.registrationNumber || "",

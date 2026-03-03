@@ -83,6 +83,11 @@ export function MainNav({
       label: "Reports",
       active: pathname.startsWith("/admin/reports"),
     },
+    {
+      href: "/attendance/dashboard",
+      label: "Attendance",
+      active: pathname.startsWith("/attendance/dashboard"),
+    },
   ]
 
   const staffRoutes = [

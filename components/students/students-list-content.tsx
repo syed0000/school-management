@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Plus, Search } from "lucide-react"
 import Link from "next/link"
 import { useDebounce } from "@/hooks/use-debounce"
+import { BackButton } from "@/components/ui/back-button"
 import {
   Select,
   SelectContent,
@@ -41,6 +42,7 @@ export function StudentsListContent({ initialStudents, classes, isAdmin = false 
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
+      <BackButton />
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Students</h2>
         <div className="flex items-center space-x-2">

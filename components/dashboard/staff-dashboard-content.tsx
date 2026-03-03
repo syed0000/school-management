@@ -1,9 +1,8 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Users, FilePlus, UserRoundSearch, ClipboardList, X, CreditCard } from "lucide-react"
+import { Users, UserRoundSearch, ClipboardList, CreditCard } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
-import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { CustomLineChart } from "@/components/dashboard/charts/line-chart"
 import { CustomPieChart } from "@/components/dashboard/charts/pie-chart"
@@ -68,8 +67,6 @@ export function StaffDashboardContent({
     const dayChange = stats.myCollectionYesterday > 0
         ? Math.round(((stats.myCollectionToday - stats.myCollectionYesterday) / stats.myCollectionYesterday) * 100)
         : (stats.myCollectionToday > 0 ? 100 : 0);
-
-    const pendingChange = 0; // Not tracking history of pending count yet
 
     return (
         <div className="flex-1 space-y-4 p-8 pt-6 bg-background">

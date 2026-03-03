@@ -31,7 +31,7 @@ export default async function AdminLayout({
                   priority
                 />
              </div>
-             <X className="h-5 w-5 text-purple-600 font-bold stroke-[3]" />
+             <X className="h-5 w-5 text-purple-600 font-bold stroke-3" />
              <div className="font-bold text-xl tracking-tight">
                 Modern Nursery School
              </div>

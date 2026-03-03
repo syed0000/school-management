@@ -1,6 +1,6 @@
 "use client"
 
-import { useForm, Resolver } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useState, useEffect } from "react"
@@ -35,7 +35,7 @@ import { createExpense, updateExpense } from "@/actions/expense"
 const formSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
-  amount: z.string().transform((val) => Number(val)),
+  amount: z.string(),
   expenseDate: z.string(),
   category: z.enum(['Salary', 'Maintenance', 'Supplies', 'Utilities', 'Others']),
   teacherId: z.string().optional(),
@@ -90,9 +90,8 @@ export function ExpenseDialog({ mode = "create", expense, teachers }: ExpenseDia
     salaryYear: expense?.salaryYear?.toString() || new Date().getFullYear().toString(),
   }
 
-  const form = useForm<z.input<typeof formSchema>>({
-    // @ts-expect-error Zod types mismatch
-    resolver: zodResolver(formSchema) as Resolver<z.input<typeof formSchema>>,
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues,
   })
 
@@ -137,7 +136,7 @@ export function ExpenseDialog({ mode = "create", expense, teachers }: ExpenseDia
       
       if (values.title) formData.append('title', values.title);
       if (values.description) formData.append('description', values.description);
-      formData.append('amount', values.amount.toString());
+      formData.append('amount', values.amount);
       formData.append('expenseDate', values.expenseDate);
       formData.append('category', values.category);
       

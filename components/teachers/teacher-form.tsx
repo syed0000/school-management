@@ -1,6 +1,6 @@
 "use client"
 
-import { useForm, useFieldArray, Resolver } from "react-hook-form"
+import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useState } from "react"
@@ -44,7 +44,7 @@ const formSchema = z.object({
   }),
 
   salary: z.object({
-    amount: z.coerce.number().min(1, "Salary amount is required"),
+    amount: z.coerce.number().min(0, "Salary amount is required").default(0),
     effectiveDate: z.string().default(new Date().toISOString().split('T')[0]),
   }),
 
@@ -70,9 +70,8 @@ export function TeacherForm({ teacher, isEdit = false }: TeacherFormProps) {
   const [experienceLetterFile, setExperienceLetterFile] = useState<File | null>(null)
   const [documentFiles, setDocumentFiles] = useState<{ index: number, file: File | null }[]>([])
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    // @ts-expect-error Zod types mismatch
-    resolver: zodResolver(formSchema) as Resolver<z.infer<typeof formSchema>>,
+  const form = useForm<z.input<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       name: teacher?.name || "",
       email: teacher?.email || "",
@@ -88,7 +87,7 @@ export function TeacherForm({ teacher, isEdit = false }: TeacherFormProps) {
         motherName: teacher?.parents?.motherName || "",
       },
       salary: {
-        amount: teacher?.salary?.amount || 0,
+        amount: teacher?.salary?.amount || "",
         effectiveDate: teacher?.salary?.effectiveDate ? new Date(teacher.salary.effectiveDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       },
       documents: teacher?.documents || [],
@@ -110,7 +109,7 @@ export function TeacherForm({ teacher, isEdit = false }: TeacherFormProps) {
       });
   };
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.input<typeof formSchema>) {
     setIsLoading(true)
     try {
       const formData = new FormData();
@@ -128,8 +127,8 @@ export function TeacherForm({ teacher, isEdit = false }: TeacherFormProps) {
       if (values.parents.motherName) formData.append('motherName', values.parents.motherName);
       
       // Salary
-      formData.append('salaryAmount', values.salary.amount.toString());
-      formData.append('salaryEffectiveDate', values.salary.effectiveDate);
+      formData.append('salaryAmount', String(values.salary.amount));
+      formData.append('salaryEffectiveDate', values.salary.effectiveDate || new Date().toISOString().split('T')[0]);
       
       // Experience
       if (values.pastExperience?.totalExperience) {
@@ -195,7 +194,7 @@ export function TeacherForm({ teacher, isEdit = false }: TeacherFormProps) {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" noValidate>
             
             {/* Personal Details */}
             <div className="space-y-4">
@@ -332,7 +331,7 @@ export function TeacherForm({ teacher, isEdit = false }: TeacherFormProps) {
                         <FormItem>
                         <FormLabel>Salary Amount</FormLabel>
                         <FormControl>
-                            <Input type="number" placeholder="50000" {...field} />
+                            <Input type="number" placeholder="50000" {...field} value={Number(field.value) || ""} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>

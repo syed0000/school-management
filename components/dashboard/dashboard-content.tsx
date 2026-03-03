@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Users, FilePlus, UserRoundSearch, ClipboardList, MessageCircle, Phone } from "lucide-react"
+import { Users, FilePlus, UserRoundSearch, ClipboardList, MessageCircle, Phone, CalendarCheck } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -338,6 +338,19 @@ export function DashboardContent({
             <CardContent className="flex flex-col items-center justify-center py-6">
               <ClipboardList className="h-10 w-10 mb-2" strokeWidth={1.5} />
               <span className="text-sm font-medium text-center">Generate and Print Report</span>
+            </CardContent>
+          </Link>
+        </Card>
+
+        {/* Attendance */}
+        <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+          <Link href="/attendance/dashboard" className="block h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-bold">Attendance</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center py-6">
+              <CalendarCheck className="h-10 w-10 mb-2" strokeWidth={1.5} />
+              <span className="text-sm font-medium text-center">Manage Attendance</span>
             </CardContent>
           </Link>
         </Card>

@@ -5,6 +5,7 @@ import { UserNav } from "@/components/dashboard/user-nav";
 import { MainNav } from "@/components/dashboard/main-nav";
 import Image from "next/image";
 import { X } from "lucide-react";
+import { BackButton } from "@/components/ui/back-button";
 
 export default async function TeachersLayout({
   children,
@@ -43,6 +44,7 @@ export default async function TeachersLayout({
         </div>
       </header>
       <main className="flex-1 space-y-4 p-8 pt-6">
+        <BackButton />
         {children}
       </main>
     </div>

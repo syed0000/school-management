@@ -52,7 +52,7 @@ export function HolidayManager({ holidays: initialHolidays }: HolidayListProps) 
   const holidays = initialHolidays;
 
   const form = useForm<z.infer<typeof formSchema>>({
-    // @ts-expect-error Zod types mismatch
+    
     resolver: zodResolver(formSchema) as Resolver<z.infer<typeof formSchema>>,
     defaultValues: {
       date: new Date(),

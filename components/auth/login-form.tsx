@@ -49,7 +49,7 @@ export function LoginForm({ type }: LoginFormProps) {
   }
 
   const form = useForm<FormValues>({
-    // @ts-expect-error Zod types mismatch
+    
     resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: {
       username: "",

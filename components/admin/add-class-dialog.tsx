@@ -1,6 +1,6 @@
 "use client"
 
-import { useForm, Resolver } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useState } from "react"
@@ -36,8 +36,7 @@ export function AddClassDialog() {
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
-    // @ts-expect-error Zod types mismatch
-    resolver: zodResolver(formSchema) as Resolver<z.infer<typeof formSchema>>,
+    resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
     },
@@ -69,7 +68,7 @@ export function AddClassDialog() {
           Add Class
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-106.25">
         <DialogHeader>
           <DialogTitle>Add New Class</DialogTitle>
           <DialogDescription>

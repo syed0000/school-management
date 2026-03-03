@@ -13,21 +13,21 @@ export default async function FeeCollectionPage() {
   // Better: fetch classes, and students.
   const students = await getStudents()
   const classes = await getClasses()
-  
+
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
+    <div className="flex-1 space-y-4">
+      <div className="flex items-baseline gap-2">
         <h2 className="text-3xl font-bold tracking-tight">Collect Fee</h2>
       </div>
-      <FeeCollectionForm 
+      <FeeCollectionForm
         students={students.map(s => ({
           id: s.id,
           name: s.name,
           registrationNumber: s.registrationNumber,
           className: s.className
-        }))} 
+        }))}
         classes={classes}
-        userId={session.user.id} 
+        userId={session.user.id}
       />
     </div>
   )

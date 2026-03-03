@@ -357,7 +357,7 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
                       }>
                         {student.percentage}%
                       </span>
-                    </TableCell>.toString()
+                    </TableCell>
                   </TableRow>
                 ))
               )}

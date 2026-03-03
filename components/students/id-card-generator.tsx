@@ -1,6 +1,6 @@
 "use client"
 
-import { useForm, Resolver } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useState } from "react"
@@ -43,6 +43,7 @@ import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Image from "next/image"
+import { BackButton } from "../ui/back-button"
 
 const singleFormSchema = z.object({
   studentId: z.string().min(1, "Student is required"),
@@ -77,16 +78,14 @@ export function IDCardGenerator({ students, classes }: IDCardGeneratorProps) {
   const [session, setSession] = useState("2026-27")
 
   const singleForm = useForm<z.infer<typeof singleFormSchema>>({
-    // @ts-expect-error Zod types mismatch
-    resolver: zodResolver(singleFormSchema) as Resolver<z.infer<typeof singleFormSchema>>,
+    resolver: zodResolver(singleFormSchema),
     defaultValues: {
       studentId: "",
     },
   })
 
   const bulkForm = useForm<z.infer<typeof bulkFormSchema>>({
-    // @ts-expect-error Zod types mismatch
-    resolver: zodResolver(bulkFormSchema) as Resolver<z.infer<typeof bulkFormSchema>>,
+    resolver: zodResolver(bulkFormSchema),
     defaultValues: {
       classId: "",
     },
@@ -101,7 +100,7 @@ export function IDCardGenerator({ students, classes }: IDCardGeneratorProps) {
         toast.success("ID Card generated successfully")
       }
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (error) {
+    } catch (error) {
       toast.error("Failed to generate ID Card")
     } finally {
       setIsLoading(false)
@@ -119,7 +118,7 @@ export function IDCardGenerator({ students, classes }: IDCardGeneratorProps) {
         toast.error(result.error || "Failed to generate ID Cards")
       }
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (error) {
+    } catch (error) {
       toast.error("Failed to generate ID Cards")
     } finally {
       setIsLoading(false)
@@ -132,6 +131,9 @@ export function IDCardGenerator({ students, classes }: IDCardGeneratorProps) {
 
   return (
     <div className="space-y-8">
+      <div className="no-print">
+        <BackButton />
+      </div>
       <Card className="no-print">
         <CardHeader>
           <CardTitle>Generate Student ID Cards</CardTitle>

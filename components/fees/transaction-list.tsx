@@ -20,6 +20,7 @@ import {
 import { deleteFeeTransaction } from '@/actions/fee-transactions'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { BackButton } from "@/components/ui/back-button"
 
 interface Transaction {
   id: string
@@ -114,6 +115,7 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
 
   return (
     <div className="space-y-4">
+      <BackButton />
       <div className="rounded-md border">
         <Table>
           <TableHeader>

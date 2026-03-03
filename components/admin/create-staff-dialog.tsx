@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useForm, Resolver, SubmitHandler } from "react-hook-form"
+import { useForm, SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useState } from "react"
@@ -40,15 +40,10 @@ const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(['staff', 'attendance_staff']).default('staff'),
+  role: z.enum(['staff', 'attendance_staff']),
 })
 
-interface StaffFormValues {
-  name: string
-  email: string
-  password: string
-  role: "staff" | "attendance_staff"
-}
+type StaffFormValues = z.infer<typeof formSchema>
 
 export function CreateStaffDialog() {
   const [open, setOpen] = useState(false)
@@ -56,8 +51,7 @@ export function CreateStaffDialog() {
   const router = useRouter()
 
   const form = useForm<StaffFormValues>({
-    // @ts-expect-error Zod version mismatch
-    resolver: zodResolver(formSchema) as Resolver<StaffFormValues>,
+    resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       email: "",

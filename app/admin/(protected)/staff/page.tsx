@@ -3,12 +3,14 @@ import { getStaffList } from "@/actions/admin"
 import { CreateStaffDialog } from "@/components/admin/create-staff-dialog"
 import { StaffActions } from "@/components/admin/staff-actions"
 import { format } from "date-fns"
+import { BackButton } from "@/components/ui/back-button"
 
 export default async function AdminStaffPage() {
   const staffList = await getStaffList()
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
+      <BackButton />
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Staff Management</h2>
         <CreateStaffDialog />

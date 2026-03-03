@@ -44,7 +44,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
   const [isLoading, setIsLoading] = useState(false)
 
   const profileForm = useForm<z.infer<typeof profileFormSchema>>({
-    // @ts-expect-error Zod types mismatch
+    
     resolver: zodResolver(profileFormSchema) as Resolver<z.infer<typeof profileFormSchema>>,
     defaultValues: {
       name: user.name,
@@ -53,7 +53,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
   })
 
   const passwordForm = useForm<z.infer<typeof passwordFormSchema>>({
-    // @ts-expect-error Zod types mismatch
+    
     resolver: zodResolver(passwordFormSchema) as Resolver<z.infer<typeof passwordFormSchema>>,
     defaultValues: {
       currentPassword: "",

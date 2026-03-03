@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useForm, Resolver } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { format } from "date-fns"
@@ -35,6 +35,7 @@ import { toast } from "sonner"
 import { getStudentsForAttendance, saveAttendance, StudentForAttendance } from "@/actions/attendance"
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { BackButton } from "../ui/back-button"
 
 const formSchema = z.object({
   date: z.date(),
@@ -67,8 +68,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
   const [holidayReason, setHolidayReason] = useState<string | null>(null)
 
   const form = useForm<z.infer<typeof formSchema>>({
-    // @ts-expect-error Zod types mismatch
-    resolver: zodResolver(formSchema) as Resolver<z.infer<typeof formSchema>>,
+    resolver: zodResolver(formSchema),
     defaultValues: {
       date: searchParams.get("date") ? new Date(searchParams.get("date")!) : new Date(),
       classId: searchParams.get("classId") || "",
@@ -207,6 +207,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
 
   return (
     <div className="space-y-6">
+      <BackButton />
       {isHoliday && (
         <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded-md" role="alert">
           <p className="font-bold">Holiday: {holidayReason}</p>

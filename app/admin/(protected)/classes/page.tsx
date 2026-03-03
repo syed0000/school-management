@@ -2,12 +2,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getClassesWithFees } from "@/actions/class"
 import { AddClassDialog } from "@/components/admin/add-class-dialog"
 import { UpdateFeeDialog } from "@/components/admin/update-fee-dialog"
+import { BackButton } from "@/components/ui/back-button"
 
 export default async function ClassesPage() {
   const classes = await getClassesWithFees()
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
+      <BackButton />
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Classes & Fees</h2>
         <AddClassDialog />
