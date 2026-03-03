@@ -2,6 +2,9 @@
 
 import dbConnect from "@/lib/db"
 import FeeTransaction from "@/models/FeeTransaction"
+// Ensure Student and Class models are registered before populating
+import "@/models/Student"
+import "@/models/Class"
 import { revalidatePath } from "next/cache"
 
 export async function getPendingFees() {

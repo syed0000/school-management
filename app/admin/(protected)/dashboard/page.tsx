@@ -6,6 +6,8 @@ import { getClasses } from "@/actions/student"
 import { DashboardContent } from "@/components/dashboard/dashboard-content"
 import { subDays } from "date-fns"
 
+export const dynamic = 'force-dynamic'
+
 export default async function AdminDashboardPage() {
   await dbConnect();
 

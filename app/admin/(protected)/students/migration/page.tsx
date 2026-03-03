@@ -1,6 +1,8 @@
 import { StudentMigration } from "@/components/admin/student-migration"
 import { getClasses } from "@/actions/student"
 
+export const dynamic = 'force-dynamic'
+
 export default async function StudentMigrationPage() {
   const classes = await getClasses()
 

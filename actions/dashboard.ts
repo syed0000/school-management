@@ -8,6 +8,7 @@ import Expense from "@/models/Expense"
 import Attendance from "@/models/Attendance"
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, eachMonthOfInterval, format, subMonths, subWeeks, subDays } from "date-fns"
 import { Types } from "mongoose"
+import logger from "@/lib/logger"
 
 interface DashboardFilter {
     startDate?: Date;
@@ -104,6 +105,7 @@ interface ClassWiseDoc {
 }
 
 export async function getDashboardStats(filter: DashboardFilter) {
+    try {
     await dbConnect();
 
     const query: FeeQuery = {};
@@ -554,6 +556,25 @@ export async function getDashboardStats(filter: DashboardFilter) {
         pendingChange,
         expenseChange
     };
+    } catch (error) {
+        logger.error(error, "Failed to get dashboard stats");
+        // Return default/empty stats instead of crashing
+        return {
+            collected: 0,
+            pending: 0,
+            totalExpenses: 0,
+            netProfit: 0,
+            unpaid: 0,
+            collectable: 0,
+            recentSales: [],
+            overview: [],
+            classWise: [],
+            unpaidStudents: [],
+            revenueChange: 0,
+            pendingChange: 0,
+            expenseChange: 0
+        };
+    }
 }
 
 export async function getAttendanceStats() {

@@ -8,6 +8,8 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
 export async function getClasses() {
+  await dbConnect();
+
   interface ClassDoc {
     _id: { toString: () => string };
     name: string;

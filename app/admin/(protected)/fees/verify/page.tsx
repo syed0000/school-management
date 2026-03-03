@@ -2,6 +2,8 @@ import { getPendingFees } from "@/actions/fee"
 import { FeeVerificationTable } from "@/components/admin/fee-verification-table"
 import { BackButton } from "@/components/ui/back-button"
 
+export const dynamic = 'force-dynamic'
+
 export default async function FeeVerificationPage() {
   const pendingFees = await getPendingFees()
 
