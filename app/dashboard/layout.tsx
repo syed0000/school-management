@@ -6,6 +6,8 @@ import { MainNav } from "@/components/dashboard/main-nav";
 import Image from "next/image";
 import { X } from "lucide-react";
 
+export const dynamic = 'force-dynamic'
+
 export default async function StaffLayout({
   children,
 }: {

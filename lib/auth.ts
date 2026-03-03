@@ -68,20 +68,27 @@ export const authOptions: NextAuthOptions = {
       
       // On subsequent calls, check if user is still active
       if (token.id) {
-        await dbConnect();
-        const dbUser = await User.findById(token.id);
-        if (!dbUser || !dbUser.isActive) {
-           // Return null or empty token to invalidate?
-           // Actually, returning null here might cause issues. 
-           // Better to throw error or handle in session callback?
-           // NextAuth doesn't handle errors well in jwt callback (it just logs them).
-           // But if we return an invalid token, session will be invalid.
-           // Let's set an error flag.
-           return { ...token, error: "AccountInactive" };
+        try {
+          await dbConnect();
+          const dbUser = await User.findById(token.id);
+          if (!dbUser || !dbUser.isActive) {
+             // Return null or empty token to invalidate?
+             // Actually, returning null here might cause issues. 
+             // Better to throw error or handle in session callback?
+             // NextAuth doesn't handle errors well in jwt callback (it just logs them).
+             // But if we return an invalid token, session will be invalid.
+             // Let's set an error flag.
+             return { ...token, error: "AccountInactive" };
+          }
+          // Update token with latest user data if needed
+          token.role = dbUser.role;
+          token.requiresPasswordChange = dbUser.requiresPasswordChange;
+        } catch (error) {
+          console.error("Error checking user status:", error);
+          // If DB fails, we might want to let the user continue with existing token
+          // or force logout. For safety, let's keep the token but maybe log the error.
+          // Returning existing token allows temporary DB glitches without logging out users immediately.
         }
-        // Update token with latest user data if needed
-        token.role = dbUser.role;
-        token.requiresPasswordChange = dbUser.requiresPasswordChange;
       }
       
       return token;

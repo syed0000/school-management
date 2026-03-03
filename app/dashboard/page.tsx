@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth"
 import { getStaffDashboardStats } from "@/actions/dashboard"
 import { StaffDashboardContent } from "@/components/dashboard/staff-dashboard-content"
 
+export const dynamic = 'force-dynamic'
+
 export default async function StaffDashboardPage() {
   await dbConnect();
   const session = await getServerSession(authOptions);
