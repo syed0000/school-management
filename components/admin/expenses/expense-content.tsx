@@ -15,9 +15,10 @@ interface ExpenseContentProps {
   initialTotalPages: number
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   formattedTeachers: any[]
+  userRole?: string
 }
 
-export function ExpenseContent({ initialExpenses, initialTotalPages, formattedTeachers }: ExpenseContentProps) {
+export function ExpenseContent({ initialExpenses, initialTotalPages, formattedTeachers, userRole }: ExpenseContentProps) {
   const [expenses, setExpenses] = useState(initialExpenses)
   const [totalPages, setTotalPages] = useState(initialTotalPages)
   const [page, setPage] = useState(1)
@@ -90,6 +91,7 @@ export function ExpenseContent({ initialExpenses, initialTotalPages, formattedTe
             <ExpenseTable 
               data={expenses} 
               teachers={formattedTeachers}
+              userRole={userRole}
             />
             
             {totalPages > 1 && (

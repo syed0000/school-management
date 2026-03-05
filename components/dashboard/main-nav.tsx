@@ -126,6 +126,11 @@ export function MainNav({
       label: "Teachers",
       active: pathname.startsWith("/teachers"),
     },
+    {
+      href: "/admin/expenses",
+      label: "Expenses",
+      active: pathname.startsWith("/admin/expenses"),
+    },
   ]
 
   const routes = role === "admin" ? adminRoutes : staffRoutes

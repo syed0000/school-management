@@ -55,7 +55,7 @@ export function ThermalReceipt({ receiptData }: ReceiptProps) {
                     src="/dark-logo.jpeg" 
                     alt="School Logo" 
                     className="w-auto"
-                    style={{ maxHeight: '60px' }}
+                    style={{ maxHeight: '120px' }}
                 />
             </div>
 

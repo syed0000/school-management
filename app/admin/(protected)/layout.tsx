@@ -6,6 +6,8 @@ import { MainNav } from "@/components/dashboard/main-nav";
 import Image from "next/image";
 import { X } from "lucide-react";
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminLayout({
   children,
 }: {
@@ -13,7 +15,12 @@ export default async function AdminLayout({
 }) {
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user.role !== "admin") {
+  if (!session || !session.user) {
+    redirect("/admin/login");
+  }
+
+  const role = session.user.role;
+  if (role !== "admin" && role !== "staff") {
     redirect("/admin/login");
   }
 
@@ -41,7 +48,7 @@ export default async function AdminLayout({
           </div>
         </div>
         <div className="border-t px-4 py-2 overflow-x-auto">
-          <MainNav role="admin" />
+          <MainNav role={session.user.role as "admin" | "staff"} />
         </div>
       </header>
       <main className="flex-1 space-y-4 p-8 pt-6">

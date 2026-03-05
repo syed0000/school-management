@@ -165,6 +165,8 @@ export async function createExpense(formData: FormData) {
 
     revalidatePath("/admin/expenses");
     revalidatePath("/admin/dashboard");
+    revalidatePath("/dashboard/expenses");
+    revalidatePath("/dashboard");
     return { success: true };
   } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to create expense";
@@ -270,6 +272,8 @@ export async function updateExpense(id: string, formData: FormData) {
     
     revalidatePath("/admin/expenses");
     revalidatePath("/admin/dashboard");
+    revalidatePath("/dashboard/expenses");
+    revalidatePath("/dashboard");
     return { success: true };
 
   } catch (error: unknown) {
@@ -285,6 +289,11 @@ export async function deleteExpense(id: string) {
         return { success: false, error: "Unauthorized" };
     }
     const userId = session.user.id;
+    
+    // Only admin can delete expenses
+    if (session.user.role !== 'admin') {
+      return { success: false, error: "Only admins can delete expenses" };
+    }
 
     await dbConnect();
     const expense = await Expense.findById(id);
@@ -304,6 +313,8 @@ export async function deleteExpense(id: string) {
 
     revalidatePath("/admin/expenses");
     revalidatePath("/admin/dashboard");
+    revalidatePath("/dashboard/expenses");
+    revalidatePath("/dashboard");
     return { success: true };
   } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to delete expense";

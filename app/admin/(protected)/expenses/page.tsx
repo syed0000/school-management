@@ -44,6 +44,7 @@ export default async function ExpensesPage() {
         initialExpenses={expenses}
         initialTotalPages={totalPages}
         formattedTeachers={formattedTeachers}
+        userRole={session.user.role}
     />
   )
 }

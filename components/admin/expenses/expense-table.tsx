@@ -44,9 +44,10 @@ interface Expense {
 interface ExpenseTableProps {
   data: Expense[]
   teachers: { id: string; name: string; salary?: { amount: number } }[]
+  userRole?: string
 }
 
-export function ExpenseTable({ data, teachers }: ExpenseTableProps) {
+export function ExpenseTable({ data, teachers, userRole }: ExpenseTableProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const handleDelete = async () => {
@@ -130,14 +131,16 @@ export function ExpenseTable({ data, teachers }: ExpenseTableProps) {
                         expense={expense} 
                         teachers={teachers} 
                       />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive"
-                        onClick={() => setDeleteId(expense.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {userRole === 'admin' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => setDeleteId(expense.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

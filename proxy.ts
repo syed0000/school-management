@@ -36,6 +36,11 @@ export default withAuth(
       
       // For other admin routes, check role
       if (token?.role !== "admin") {
+        // Allow staff to access expenses
+        if (token?.role === "staff" && path.startsWith("/admin/expenses")) {
+             return NextResponse.next();
+        }
+
         // Non-admin trying to access admin pages
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }
