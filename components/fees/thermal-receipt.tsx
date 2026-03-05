@@ -52,7 +52,7 @@ export function ThermalReceipt({ receiptData }: ReceiptProps) {
             {/* School Logo/Emblem */}
             <div className="flex justify-center mb-4">
                 <img 
-                    src="/android-chrome-512x512.png" 
+                    src="/dark-logo.jpeg" 
                     alt="School Logo" 
                     className="w-auto"
                     style={{ maxHeight: '60px' }}
@@ -93,7 +93,7 @@ export function ThermalReceipt({ receiptData }: ReceiptProps) {
             <div className="space-y-2 text-xs">
                 <div>
                     <span className="font-semibold">Student Name:</span>
-                    <div className="ml-2">{receiptData.studentName}</div>
+                    <span className="ml-2">{receiptData.studentName}</span>
                 </div>
 
                 <div className="flex justify-between">
@@ -129,8 +129,9 @@ export function ThermalReceipt({ receiptData }: ReceiptProps) {
             {/* Footer Notes */}
             <div className="text-xs space-y-2">
                 <p className="font-semibold">कृपया समय पर फीस जमा करें</p>
-                <p>कृपया फीस जमा करने के लिए अपना फीस कार्ड अपने साथ लाएं</p>
+                <p>कृपया बच्चे की फीस जमा करते समय डायरी अपने साथ लाये</p>
                 <p>कृपया अपने बच्चे को पढ़ाई में सहयोग करें</p>
+                <p>बच्चे को समय पर स्कूल भेजे</p>
             </div>
 
             {/* Divider */}

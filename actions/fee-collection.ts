@@ -5,6 +5,7 @@ import FeeTransaction from "@/models/FeeTransaction"
 import ClassFee from "@/models/ClassFee"
 import Student from "@/models/Student"
 import Class from "@/models/Class"
+import Counter from "@/models/Counter"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
@@ -38,14 +39,14 @@ export async function getStudentFeeDetails(studentId: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fee = f as any;
     return {
-        type: fee.type,
-        amount: fee.amount,
-        id: fee._id.toString(),
-        // Include title and month for examination fees
-        ...(fee.type === 'examination' ? { 
-            title: fee.title, 
-            month: fee.month 
-        } : {})
+      type: fee.type,
+      amount: fee.amount,
+      id: fee._id.toString(),
+      // Include title and month for examination fees
+      ...(fee.type === 'examination' ? {
+        title: fee.title,
+        month: fee.month
+      } : {})
     };
   });
 
@@ -57,6 +58,55 @@ export async function getStudentFeeDetails(studentId: string) {
   };
 }
 
+// Helper function to generate sequential receipt number
+async function generateReceiptNumber(): Promise<string> {
+  // Ensure counter exists
+  const counter = await Counter.findById('receiptNumber');
+  if (!counter) {
+    try {
+      // Initialize with 1200 so the first increment gives 1201
+      await Counter.create({ _id: 'receiptNumber', seq: 1200 });
+    } catch (error) {
+      console.error("Error initializing receipt number counter:", error);
+      // Ignore duplicate key error in case of race condition
+    }
+  }
+
+  // Increment and get next
+  let updatedCounter = await Counter.findByIdAndUpdate(
+    'receiptNumber',
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+
+  let receiptNo = String(updatedCounter.seq);
+
+  // Collision check: Check if receiptNo exists as exact match or prefix (for monthly fees like 1201-1)
+  let attempts = 0;
+  while (attempts < 5) {
+    const exists = await FeeTransaction.findOne({
+      receiptNumber: { $regex: new RegExp(`^${receiptNo}(-|$)`) }
+    });
+
+    if (!exists) break;
+
+    // Collision found, increment again
+    updatedCounter = await Counter.findByIdAndUpdate(
+      'receiptNumber',
+      { $inc: { seq: 1 } },
+      { new: true }
+    );
+    receiptNo = String(updatedCounter.seq);
+    attempts++;
+  }
+
+  if (attempts >= 5) {
+    throw new Error("Failed to generate unique receipt number after multiple attempts");
+  }
+
+  return receiptNo;
+}
+
 export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId: string) {
   try {
     collectFeeSchema.parse(data);
@@ -64,7 +114,7 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
 
     // Use current session logic if needed, but here we rely on provided year
     const monthsToProcess = data.months ? data.months : []; // Removed +1 because month index from UI is 0-11
-    
+
     // Server-side validation: Ensure total amount equals months * monthly-fee
     if (data.feeType === 'monthly' && monthsToProcess.length > 0) {
       const student = await Student.findById(data.studentId).select('classId');
@@ -79,10 +129,10 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
           const expectedTotal = classFee.amount * monthsToProcess.length;
           // Allow for small floating point differences if any, though likely integers
           if (Math.abs(data.amount - expectedTotal) > 0.1) {
-             return {
-               success: false,
-               error: `Invalid amount. Expected ₹${expectedTotal} for ${monthsToProcess.length} months, but got ₹${data.amount}.`
-             };
+            return {
+              success: false,
+              error: `Invalid amount. Expected ₹${expectedTotal} for ${monthsToProcess.length} months, but got ₹${data.amount}.`
+            };
           }
         }
       }
@@ -126,9 +176,9 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
         return { success: false, error: `Fee for ${data.examType} ${data.year} already paid/pending.` };
       }
     } else if (['admission', 'admissionFees', 'registrationFees'].includes(data.feeType)) {
-        // One-time fees per year or once per admission?
-        // Usually admission is once, registration is annual.
-        // Assuming annual checks for now based on 'year' field.
+      // One-time fees per year or once per admission?
+      // Usually admission is once, registration is annual.
+      // Assuming annual checks for now based on 'year' field.
       const existing = await FeeTransaction.findOne({
         studentId: data.studentId,
         feeType: data.feeType,
@@ -145,10 +195,12 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
       const amountPerMonth = data.amount / monthsToProcess.length;
       const student = await Student.findById(data.studentId).populate('classId', 'name').lean();
 
+      const baseReceiptNumber = await generateReceiptNumber();
+
       // Create a transaction for each month
       for (const m of monthsToProcess) {
         const dbMonth = m + 1;
-        const receiptNumber = `RCP-${Date.now()}-${dbMonth}`;
+        const receiptNumber = `${dbMonth}-${baseReceiptNumber}`;
 
         await FeeTransaction.create({
           receiptNumber,
@@ -165,18 +217,15 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
           // If we set 'pending', it shows in "Pending Fees" not "Collected".
           // Usually "Fee Collection" form implies money received. So it should be 'verified'.
           // Let's change to 'verified' for immediate reflection in revenue.
-          status: 'verified', 
+          status: 'verified',
           transactionDate: new Date(),
         });
-        
-        // Small delay to ensure unique receipt numbers if generated by timestamp
-        await new Promise(resolve => setTimeout(resolve, 10));
       }
-      
+
       revalidatePath("/fees/collect");
       return {
         success: true,
-        receiptNumber: `RCP-${Date.now()}`, // Group receipt number? Or just last one?
+        receiptNumber: baseReceiptNumber, // Group receipt number
         // Returning a generic receipt number for the batch
         receiptData: {
           studentName: student?.name || '',
@@ -194,7 +243,7 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
 
     } else {
       // Single transaction
-      const receiptNumber = `RCP-${Date.now()}`;
+      const receiptNumber = await generateReceiptNumber();
       const student = await Student.findById(data.studentId).populate('classId', 'name').lean();
 
       await FeeTransaction.create({
