@@ -6,7 +6,7 @@ interface ReceiptProps {
         studentName: string
         studentRegNo: string
         className: string
-        feeType: 'monthly' | 'examination' | 'admission' | 'other'
+        feeType: string
         months?: number[]
         year: number
         examType?: string
@@ -29,11 +29,15 @@ export function ThermalReceipt({ receiptData }: ReceiptProps) {
         }
 
         if (feeType === 'examination') {
-            return `Examination Fee - ${examType || 'Annual'} ${year}`
+            return `Examination Fee - ${examType || title || 'Annual'} ${year}`
         }
 
-        if (feeType === 'admission') {
+        if (feeType === 'admission' || feeType === 'admissionFees') {
             return `Admission Fee - ${year}`
+        }
+
+        if (feeType === 'registrationFees') {
+            return `Registration Fee - ${year}`
         }
 
         if (feeType === 'other') {

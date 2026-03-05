@@ -60,7 +60,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
   const [isLoading, setIsLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const [feeDetails, setFeeDetails] = useState<{
-    fees: { type: string; amount: number; id: string }[];
+    fees: { type: string; amount: number; id: string; title?: string; month?: string }[];
     exams: string[];
   } | null>(null)
   const [baseFee, setBaseFee] = useState<number>(0)
@@ -72,7 +72,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
       studentId: "",
       feeType: "monthly",
       amount: "0",
-      months: [new Date().getMonth()],
+      months: [new Date().getMonth()], // Defaults to current month index (0=Jan, 2=March)
       year: new Date().getFullYear().toString(),
       examType: "",
       title: "",
@@ -110,6 +110,24 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
   useEffect(() => {
     if (!feeDetails) return;
 
+    // Special handling for examination fees to select specific exam
+    if (feeType === 'examination') {
+       // Reset or keep default? 
+       // We might want to clear amount until specific exam is selected in UI, 
+       // but for now, let's just handle it via the examType selection if we change that logic.
+       // Or better: In this form, 'feeType' is just 'examination'. 
+       // We need to match the specific exam selected in 'examType' field.
+       const examType = form.getValues("examType");
+       if (examType) {
+          const selectedExamFee = feeDetails.fees.find(f => f.type === 'examination' && f.title === examType);
+          if (selectedExamFee) {
+             setBaseFee(selectedExamFee.amount);
+             form.setValue("amount", selectedExamFee.amount.toString());
+             return;
+          }
+       }
+    }
+
     const selectedFee = feeDetails.fees.find(f => f.type === feeType);
 
     if (selectedFee) {
@@ -117,14 +135,26 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
       if (feeType === 'monthly') {
         const currentMonths = form.getValues("months") || [];
         form.setValue("amount", (selectedFee.amount * currentMonths.length).toString());
-      } else {
+      } else if (feeType !== 'examination') {
         form.setValue("amount", selectedFee.amount.toString());
       }
     } else if (feeType === 'other') {
       setBaseFee(0);
       form.setValue("amount", "0");
     }
-  }, [feeType, feeDetails, form]);
+  }, [feeType, feeDetails, form]); // Added dependency on examType change would be needed if we want real-time update
+
+  // Watch examType to update amount for examination fees
+  const examType = form.watch("examType");
+  useEffect(() => {
+      if (feeType === 'examination' && feeDetails && examType) {
+          const selectedExamFee = feeDetails.fees.find(f => f.type === 'examination' && f.title === examType);
+          if (selectedExamFee) {
+              setBaseFee(selectedExamFee.amount);
+              form.setValue("amount", selectedExamFee.amount.toString());
+          }
+      }
+  }, [examType, feeType, feeDetails, form]);
 
 
   async function onSubmit(values: z.input<typeof formSchema>) {
@@ -196,6 +226,14 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
       form.setValue("amount", newTotal.toString());
     }
   };
+
+  const standardMonthNames = [
+    "January", "February", "March", "April", "May", "June", 
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  // Display order: April (3) to March (2)
+  const displayMonthOrder = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2];
 
   // Helper to format fee type label
   const formatFeeLabel = (type: string) => {
@@ -325,9 +363,9 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {feeDetails?.fees.map((fee) => (
-                              <SelectItem key={fee.id} value={fee.type}>
-                                {formatFeeLabel(fee.type)}
+                            {Array.from(new Set((feeDetails?.fees || []).map(f => f.type))).map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {formatFeeLabel(type)}
                               </SelectItem>
                             ))}
                             <SelectItem value="other">Other</SelectItem>
@@ -357,18 +395,18 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
                   <div className="space-y-3 border p-4 rounded-md">
                     <FormLabel>Select Months</FormLabel>
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {Array.from({ length: 12 }, (_, i) => (
-                        <div key={i} className="flex items-center space-x-2">
+                      {displayMonthOrder.map((monthIndex) => (
+                        <div key={monthIndex} className="flex items-center space-x-2">
                           <Checkbox
-                            id={`month-${i}`}
-                            checked={selectedMonths.includes(i)}
-                            onCheckedChange={() => toggleMonth(i)}
+                            id={`month-${monthIndex}`}
+                            checked={selectedMonths.includes(monthIndex)}
+                            onCheckedChange={() => toggleMonth(monthIndex)}
                           />
                           <label
-                            htmlFor={`month-${i}`}
+                            htmlFor={`month-${monthIndex}`}
                             className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                           >
-                            {new Date(0, i).toLocaleString('default', { month: 'short' })}
+                            {standardMonthNames[monthIndex]}
                           </label>
                         </div>
                       ))}
@@ -391,10 +429,24 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {feeDetails?.exams?.map((exam) => (
-                              <SelectItem key={exam} value={exam}>{exam}</SelectItem>
-                            ))}
-                            {!feeDetails?.exams?.length && <SelectItem value="Annual">Annual (Default)</SelectItem>}
+                            {/* Filter exams from fees instead of class default list if fees exist */}
+                            {(() => {
+                                const examFees = feeDetails?.fees.filter(f => f.type === 'examination');
+                                if (examFees && examFees.length > 0) {
+                                    return examFees.map((fee) => (
+                                        <SelectItem key={fee.id} value={fee.title || "Unknown Exam"}>
+                                            {fee.title} ({fee.month})
+                                        </SelectItem>
+                                    ));
+                                }
+                                // Fallback to class exam list if no fees configured (though amount won't be auto-filled correctly)
+                                if (feeDetails?.exams?.length) {
+                                  return feeDetails.exams.map((exam) => (
+                                    <SelectItem key={exam} value={exam}>{exam}</SelectItem>
+                                  ));
+                                }
+                                return <SelectItem value="Annual">Annual (Default)</SelectItem>;
+                            })()}
                           </SelectContent>
                         </Select>
                         <FormMessage />

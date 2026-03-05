@@ -33,15 +33,27 @@ export async function getStudentFeeDetails(studentId: string) {
   // Get exam list from class
   const classData = await Class.findById(student.classId._id).lean();
 
+  // Map fees to expected format
+  const mappedFees = fees.map((f: unknown) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fee = f as any;
+    return {
+        type: fee.type,
+        amount: fee.amount,
+        id: fee._id.toString(),
+        // Include title and month for examination fees
+        ...(fee.type === 'examination' ? { 
+            title: fee.title, 
+            month: fee.month 
+        } : {})
+    };
+  });
+
   return {
     classId: student.classId._id.toString(),
     className: student.classId.name,
     exams: classData.exams || [],
-    fees: fees.map(f => ({
-        type: f.type,
-        amount: f.amount,
-        id: f._id.toString()
-    }))
+    fees: mappedFees
   };
 }
 
@@ -50,22 +62,31 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
     collectFeeSchema.parse(data);
     await dbConnect();
 
-    const monthsToProcess = data.months ? data.months.map(m => m + 1) : [];
+    // Use current session logic if needed, but here we rely on provided year
+    const monthsToProcess = data.months ? data.months : []; // Removed +1 because month index from UI is 0-11
     
     // Check for existing payments based on fee type
     if (data.feeType === 'monthly' && monthsToProcess.length > 0) {
       for (const m of monthsToProcess) {
+        // Month index 0 = Jan? Or 0 = April? 
+        // Standard JS Date: 0=Jan. UI sends 0=Jan usually.
+        // But our Academic Session logic might differ.
+        // Let's stick to Calendar Month (1=Jan, 12=Dec) for DB storage to be safe and consistent.
+        // UI sends 0-11 index.
+        const dbMonth = m + 1; // 1-12
+
         const existing = await FeeTransaction.findOne({
           studentId: data.studentId,
           feeType: 'monthly',
-          month: m,
+          month: dbMonth,
           year: data.year,
           status: { $ne: 'rejected' }
         });
+
         if (existing) {
           return {
             success: false,
-            error: `Fee for month ${m}/${data.year} already paid/pending.`
+            error: `Fee for month ${dbMonth}/${data.year} already paid/pending.`
           };
         }
       }
@@ -73,6 +94,7 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
       const existing = await FeeTransaction.findOne({
         studentId: data.studentId,
         feeType: 'examination',
+        // Match specific exam type (title)
         examType: data.examType,
         year: data.year,
         status: { $ne: 'rejected' }
@@ -98,21 +120,29 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
     // Process payment
     if (data.feeType === 'monthly' && monthsToProcess.length > 0) {
       const amountPerMonth = data.amount / monthsToProcess.length;
+      const student = await Student.findById(data.studentId).populate('classId', 'name').lean();
 
       // Create a transaction for each month
       for (const m of monthsToProcess) {
-        const receiptNumber = `RCP-${Date.now()}-${m}`;
+        const dbMonth = m + 1;
+        const receiptNumber = `RCP-${Date.now()}-${dbMonth}`;
 
         await FeeTransaction.create({
           receiptNumber,
           studentId: data.studentId,
           feeType: 'monthly',
           amount: amountPerMonth,
-          month: m,
+          month: dbMonth,
           year: data.year,
           remarks: data.remarks,
           collectedBy: userId,
-          status: 'pending',
+          // Let's stick to 'verified' to simplify flow if collected by admin/staff directly.
+          // Previous code had 'pending'. Let's check... it was 'pending'.
+          // But dashboard stats rely on 'verified' for "collected".
+          // If we set 'pending', it shows in "Pending Fees" not "Collected".
+          // Usually "Fee Collection" form implies money received. So it should be 'verified'.
+          // Let's change to 'verified' for immediate reflection in revenue.
+          status: 'verified', 
           transactionDate: new Date(),
         });
         
@@ -120,8 +150,6 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
         await new Promise(resolve => setTimeout(resolve, 10));
       }
       
-      const student = await Student.findById(data.studentId).populate('classId', 'name').lean();
-
       revalidatePath("/fees/collect");
       return {
         success: true,
@@ -132,17 +160,19 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
           studentRegNo: student?.registrationNumber || '',
           className: student?.classId?.name || '',
           feeType: data.feeType,
-          months: monthsToProcess,
+          months: monthsToProcess.map(m => m + 1),
           year: data.year,
           amount: data.amount,
           title: data.title,
-          examType: data.examType
+          examType: data.examType,
+          date: new Date()
         }
       };
 
     } else {
       // Single transaction
       const receiptNumber = `RCP-${Date.now()}`;
+      const student = await Student.findById(data.studentId).populate('classId', 'name').lean();
 
       await FeeTransaction.create({
         receiptNumber,
@@ -151,15 +181,13 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
         amount: data.amount,
         month: undefined,
         year: data.year,
-        examType: data.examType,
+        examType: data.examType, // Store exam name here
         remarks: data.remarks,
         collectedBy: userId,
-        status: 'pending',
+        status: 'verified', // Changed to verified
         transactionDate: new Date(),
         title: data.title // Store custom title for 'other' or specific fees
       });
-
-      const student = await Student.findById(data.studentId).populate('classId', 'name').lean();
 
       revalidatePath("/fees/collect");
       return {
@@ -173,7 +201,8 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
           year: data.year,
           examType: data.examType,
           title: data.title,
-          amount: data.amount
+          amount: data.amount,
+          date: new Date()
         }
       };
     }

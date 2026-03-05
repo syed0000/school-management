@@ -45,22 +45,54 @@ interface DashboardStats {
   netProfit: number
   unpaid: number
   collectable: number
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  recentSales: any[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  overview: any[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  classWise: any[]
+  recentSales: {
+    id: string
+    amount: number
+    studentName: string
+    contactNumber: string
+    studentPhoto?: string
+    status: string
+    type: string
+    month?: number
+    year: number
+    transactionDate: Date
+  }[]
+  overview: {
+    name: string
+    collected: number
+    pending: number
+    unpaid: number
+    expense: number
+    profit: number
+  }[]
+  classWise: {
+    name: string
+    collected: number
+    pending: number
+  }[]
   unpaidStudents: UnpaidStudent[]
   revenueChange: number
   pendingChange: number
   expenseChange: number
 }
 
+interface AttendanceStats {
+  totalStudents: number
+  totalPresent: number
+  totalAbsent: number
+  totalHoliday: number
+  classWise: {
+    name: string
+    present: number
+    absent: number
+    holiday: number
+    total: number
+  }[]
+}
+
 interface DashboardContentProps {
   initialStats: DashboardStats
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  attendanceStats: any
+  attendanceStats: AttendanceStats
   classes: { id: string; name: string }[]
   totalStaff: number
   totalStudents: number
@@ -93,8 +125,7 @@ export function DashboardContent({
     })
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pendingData = stats.overview.map((item: any) => ({
+  const pendingData = stats.overview.map((item) => ({
     name: item.name,
     value: item.unpaid
   }))
@@ -113,7 +144,9 @@ export function DashboardContent({
     { name: 'Unpaid (Deficit)', value: stats.unpaid, color: '#ef4444' }
   ]
 
+  // const revenueChange = stats.revenueChange
   const pendingChange = stats.pendingChange
+  // const expenseChange = stats.expenseChange
 
   const normalizePhoneDigits = (value: string) => value.replace(/[^\d]/g, "")
 

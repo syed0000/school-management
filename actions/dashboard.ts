@@ -33,6 +33,8 @@ interface FeeConfig {
     amount: number;
     effectiveFrom?: Date;
     isActive: boolean;
+    title?: string;
+    month?: string;
 }
 
 interface MonthlyAggResult {
@@ -48,6 +50,7 @@ interface PaidFeeItem {
     type: string;
     m?: number;
     y: number;
+    title?: string;
 }
 
 interface PaidFeeAggResult {
@@ -106,6 +109,13 @@ interface ClassWiseDoc {
     _id: string;
     collected: number;
     pending: number;
+}
+
+interface SaleDocExtended extends SaleDoc {
+    feeType: string;
+    month?: number;
+    year: number;
+    transactionDate: Date;
 }
 
 export async function getDashboardStats(filter: DashboardFilter) {
@@ -237,7 +247,8 @@ export async function getDashboardStats(filter: DashboardFilter) {
                         $push: {
                             type: "$feeType",
                             m: "$month",
-                            y: "$year"
+                            y: "$year",
+                            title: "$examType" // Assuming examType field holds the title for examination fees
                         }
                     }
                 }
@@ -252,6 +263,8 @@ export async function getDashboardStats(filter: DashboardFilter) {
             i.paid.forEach((p) => {
                 if (p.type === 'monthly') {
                     set.add(`${p.type}-${p.m}-${p.y}`);
+                } else if (p.type === 'examination' && p.title) {
+                    set.add(`${p.type}-${p.title}-${p.y}`);
                 } else {
                     set.add(`${p.type}-${p.y}`);
                 }
@@ -264,10 +277,11 @@ export async function getDashboardStats(filter: DashboardFilter) {
         let totalExpected = 0;
 
         // Helper to check payment using the Map (O(1))
-        const hasPaidFeeFast = (studentId: string, type: string, month: number | undefined, year: number) => {
+        const hasPaidFeeFast = (studentId: string, type: string, month: number | undefined, year: number, title?: string) => {
             const paidSet = studentPaidMap.get(studentId);
             if (!paidSet) return false;
             if (type === 'monthly') return paidSet.has(`${type}-${month}-${year}`);
+            if (type === 'examination' && title) return paidSet.has(`${type}-${title}-${year}`);
             return paidSet.has(`${type}-${year}`);
         };
 
@@ -309,30 +323,32 @@ export async function getDashboardStats(filter: DashboardFilter) {
                 }
             }
 
-            const examFeeConfig = studentFees.find(f => f.type === 'examination');
-            if (examFeeConfig && examFeeConfig.effectiveFrom) {
-                const examDate = new Date(examFeeConfig.effectiveFrom);
-                const examMonth = examDate.getMonth() + 1;
-                const examYear = examDate.getFullYear();
+            const examFeesConfig = studentFees.filter(f => f.type === 'examination');
+            for (const examFeeConfig of examFeesConfig) {
+                if (examFeeConfig.effectiveFrom) {
+                    const examDate = new Date(examFeeConfig.effectiveFrom);
+                    const examMonth = examDate.getMonth() + 1;
+                    const examYear = examDate.getFullYear();
 
-                const isDueInPeriod = monthsToCheck.some(d =>
-                    d.getMonth() + 1 === examMonth && d.getFullYear() === examYear
-                );
-                const isStudentEligible = (examYear > admYear) || (examYear === admYear && examMonth >= admMonth);
+                    // Check if this exam falls within the filter period
+                    const isDueInPeriod = monthsToCheck.some(d =>
+                        d.getMonth() + 1 === examMonth && d.getFullYear() === examYear
+                    );
+                    const isStudentEligible = (examYear > admYear) || (examYear === admYear && examMonth >= admMonth);
 
-                if (isDueInPeriod && isStudentEligible) {
-                    totalExpected += examFeeConfig.amount;
+                    if (isDueInPeriod && isStudentEligible) {
+                        totalExpected += examFeeConfig.amount;
 
-                    if (!hasPaidFeeFast(studentId, 'examination', undefined, examYear)) {
-                        studentUnpaidAmount += examFeeConfig.amount;
-                        studentUnpaidDetails.push(`Exam Fee (${format(examDate, 'MMM')})`);
-                        // Note: Exam fees don't easily map to a specific month in "Overview" chart unless we force it.
-                        // Usually Overview is Monthly Fees. Let's ignore Exam Fee in Monthly Overview Unpaid for now to match typical logic,
-                        // or add it to the exam month.
-                        const examMonthKey = `${examMonth}-${examYear}`;
-                        if (monthlyUnpaidMap.has(examMonthKey)) {
-                            const current = monthlyUnpaidMap.get(examMonthKey) || 0;
-                            monthlyUnpaidMap.set(examMonthKey, current + examFeeConfig.amount);
+                        // Check if specific exam (by title and year) is paid
+                        if (!hasPaidFeeFast(studentId, 'examination', undefined, examYear, examFeeConfig.title)) {
+                            studentUnpaidAmount += examFeeConfig.amount;
+                            studentUnpaidDetails.push(`${examFeeConfig.title} (${examYear})`);
+
+                            const examMonthKey = `${examMonth}-${examYear}`;
+                            if (monthlyUnpaidMap.has(examMonthKey)) {
+                                const current = monthlyUnpaidMap.get(examMonthKey) || 0;
+                                monthlyUnpaidMap.set(examMonthKey, current + examFeeConfig.amount);
+                            }
                         }
                     }
                 }
@@ -563,9 +579,7 @@ export async function getDashboardStats(filter: DashboardFilter) {
             unpaid: totalUnpaid,
             collectable: totalExpected,
             recentSales: recentSales.map((sale: unknown) => {
-                const s = sale as SaleDoc;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const sAny = s as any;
+                const s = sale as SaleDocExtended;
                 return {
                     id: s._id.toString(),
                     amount: s.amount,
@@ -573,10 +587,10 @@ export async function getDashboardStats(filter: DashboardFilter) {
                     contactNumber: s.studentId?.contacts?.mobile?.[0] || 'N/A',
                     studentPhoto: s.studentId?.photo,
                     status: s.status,
-                    type: sAny.feeType,
-                    month: sAny.month,
-                    year: sAny.year,
-                    transactionDate: sAny.transactionDate
+                    type: s.feeType,
+                    month: s.month,
+                    year: s.year,
+                    transactionDate: s.transactionDate
                 };
             }),
             overview: processedOverview,
@@ -795,9 +809,7 @@ export async function getStaffDashboardStats(userId: string) {
         myPendingCount,
         studentsAdmittedToday,
         recentTransactions: recentTransactions.map((sale: unknown) => {
-            const s = sale as SaleDoc;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const sAny = s as any;
+            const s = sale as SaleDocExtended;
             return {
                 id: s._id.toString(),
                 amount: s.amount,
@@ -805,10 +817,10 @@ export async function getStaffDashboardStats(userId: string) {
                 contactNumber: s.studentId?.contacts?.mobile?.[0] || 'N/A',
                 studentPhoto: s.studentId?.photo,
                 status: s.status,
-                type: sAny.feeType,
-                month: sAny.month,
-                year: sAny.year,
-                transactionDate: sAny.transactionDate
+                type: s.feeType,
+                month: s.month,
+                year: s.year,
+                transactionDate: s.transactionDate
             };
         }),
         monthlyCollections,

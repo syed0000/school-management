@@ -62,20 +62,27 @@ export function StudentImport() {
   const validateData = (jsonData: Record<string, unknown>[]) => {
     if (jsonData.length === 0) return;
     
+    // Normalize keys to lowercase for checking
     const headers = Object.keys(jsonData[0]);
+    const lowerHeaders = headers.map(h => h.toLowerCase().trim());
     const missing: string[] = [];
 
-    // Check for "Student Name" OR "name"
-    if (!headers.includes("Student Name") && !headers.includes("name")) {
+    // Helper to check for variations
+    const hasField = (variations: string[]) => {
+        return variations.some(v => lowerHeaders.includes(v.toLowerCase()));
+    };
+
+    // Check for "Student Name" variations
+    if (!hasField(["Student Name", "Name", "StudentName"])) {
         missing.push("Student Name");
     }
-    // Check for "Father Name" OR "fatherName"
-    if (!headers.includes("Father Name") && !headers.includes("fatherName")) {
+    // Check for "Father Name" variations
+    if (!hasField(["Father Name", "Father's Name", "FatherName"])) {
         missing.push("Father Name");
     }
-    // Check for "Class Name" OR "className"
-    if (!headers.includes("Class Name") && !headers.includes("className")) {
-        missing.push("Class Name");
+    // Check for "Class Name" variations
+    if (!hasField(["Class Name", "Class", "ClassName"])) {
+        missing.push("Class");
     }
 
     if (missing.length > 0) {

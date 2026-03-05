@@ -4,6 +4,7 @@ import dbConnect from "@/lib/db"
 import Student from "@/models/Student"
 import Class from "@/models/Class"
 import Counter from "@/models/Counter"
+import ClassFee from "@/models/ClassFee"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
@@ -197,10 +198,10 @@ export async function registerStudent(formData: FormData) {
              const counter = await Counter.findById('registrationNumber');
              // If counter doesn't exist or provided number is higher than current sequence
              if (!counter || regNumInt > counter.seq) {
-                 await Counter.findByIdAndUpdate(
-                    'registrationNumber',
+                 await Counter.findOneAndUpdate(
+                    { _id: 'registrationNumber' },
                     { $set: { seq: regNumInt } },
-                    { upsert: true, new: true }
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
                  );
              }
         }
@@ -217,6 +218,7 @@ export async function registerStudent(formData: FormData) {
         }
     };
     
+    // Create student first
     await Student.create({
       registrationNumber,
       name: rawData.name,
@@ -245,6 +247,32 @@ export async function registerStudent(formData: FormData) {
       
       isActive: true,
     });
+
+    // Auto-assign fees for the new student
+    // Fetch class fees
+    const classFees = await ClassFee.find({ 
+        classId: rawData.classId, 
+        isActive: true,
+        type: { $in: ['admission', 'admissionFees', 'registrationFees'] }
+    }).lean();
+
+    if (classFees.length > 0) {
+        // const currentYear = new Date().getFullYear();
+        // Since session starts April, if current month < 3 (April), year is prev year
+        // Actually, for admission, it's usually current academic year.
+        // Let's stick to simple logic: current calendar year or academic year based on session util
+        // For now, let's use the year from dateOfAdmission
+        // const admissionYear = newStudent.dateOfAdmission.getFullYear();
+        // const admissionMonth = newStudent.dateOfAdmission.getMonth();
+        // If admission is Jan-March, it might be end of previous session or start of new session?
+        // Usually new session starts April.
+        // Let's assume academic year is year of admission if month >= 3, else year-1
+        // const academicYear = admissionMonth >= 3 ? admissionYear : admissionYear - 1;
+
+        // We don't automatically create transactions as paid, but we could create "pending" transactions if we had a proper ledger system.
+        // But the current system creates transaction ON PAYMENT.
+        // So we don't need to do anything here. The fees will show up as "due" in the fee collection form because they are defined in ClassFee.
+    }
     
     revalidatePath("/students/list");
     

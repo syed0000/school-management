@@ -55,7 +55,20 @@ const importStudentSchema = z.object({
   tcNumber: z.string().optional(),
   
   dateOfAdmission: z.union([z.string(), z.date()]).optional().transform((val, ctx) => {
-      if (!val) return new Date();
+      // Logic for default admission date based on session
+      if (!val) {
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          const currentMonth = now.getMonth(); // 0-11
+          
+          // Academic session starts April (Month 3)
+          // If we are in Jan(0), Feb(1), Mar(2) of 2025, the session is 2024-25. Start date: April 1, 2024.
+          // If we are in April(3) to Dec(11) of 2025, the session is 2025-26. Start date: April 1, 2025.
+          
+          const sessionStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
+          return new Date(sessionStartYear, 3, 1); // April 1st
+      }
+      
       const date = new Date(val);
        if (isNaN(date.getTime())) {
           if (typeof val === 'string') {
@@ -124,36 +137,54 @@ export async function bulkImportStudents(data: Record<string, unknown>[], confir
         const row = data[i];
         const rowNumber = i + 2; // Assuming header is row 1
         
+        // Helper to get value case-insensitively with variations
+        const getVal = (keys: string[]) => {
+            for (const k of keys) {
+                // Check exact match
+                if (row[k] !== undefined) return row[k];
+                // Check case-insensitive match
+                const lowerK = k.toLowerCase();
+                const foundKey = Object.keys(row).find(rk => rk.toLowerCase() === lowerK);
+                if (foundKey && row[foundKey] !== undefined) return row[foundKey];
+            }
+            return undefined;
+        };
+
+        const studentName = getVal(["Student Name", "Name", "StudentName"]);
+        const fatherName = getVal(["Father Name", "Father's Name", "FatherName"]);
+        const className = getVal(["Class Name", "Class", "ClassName"]);
+        const regNo = getVal(["Registration Number", "Reg No", "RegistrationNumber", "RegNo"]);
+
         // Skip empty rows
-        if (!row['Student Name'] && !row['name'] && !row['Registration Number'] && !row['registrationNumber']) continue;
+        if (!studentName && !regNo) continue;
 
         try {
             const normalizedRow = {
-                name: (row['Student Name'] || row['name']) as string,
-                registrationNumber: row['Registration Number'] ? String(row['Registration Number']) : (row['registrationNumber'] ? String(row['registrationNumber']) : undefined),
+                name: String(studentName || ""),
+                registrationNumber: regNo ? String(regNo) : undefined,
                 
-                fatherName: (row['Father Name'] || row['fatherName']) as string,
-                fatherAadhaar: row['Father Aadhaar'] ? String(row['Father Aadhaar']) : undefined,
+                fatherName: String(fatherName || ""),
+                fatherAadhaar: getVal(["Father Aadhaar", "FatherAadhaar"]) ? String(getVal(["Father Aadhaar", "FatherAadhaar"])) : undefined,
                 
-                motherName: (row['Mother Name'] || row['motherName']) as string,
-                motherAadhaar: row['Mother Aadhaar'] ? String(row['Mother Aadhaar']) : undefined,
+                motherName: String(getVal(["Mother Name", "Mother's Name", "MotherName"]) || ""),
+                motherAadhaar: getVal(["Mother Aadhaar", "MotherAadhaar"]) ? String(getVal(["Mother Aadhaar", "MotherAadhaar"])) : undefined,
                 
-                className: (row['Class Name'] || row['className']) as string,
-                section: (row['Section'] || row['section']) ? String(row['Section'] || row['section']).trim().toUpperCase() || undefined : undefined,
-                rollNumber: row['Roll Number'] ? String(row['Roll Number']) : undefined,
+                className: String(className || ""),
+                section: getVal(["Section"]) ? String(getVal(["Section"])).trim().toUpperCase() || undefined : undefined,
+                rollNumber: getVal(["Roll Number", "Roll No", "RollNumber"]) ? String(getVal(["Roll Number", "Roll No", "RollNumber"])) : undefined,
                 
-                gender: (row['Gender'] || row['gender']) as string,
-                dob: row['Date of Birth'] || row['dob'],
+                gender: getVal(["Gender"]) ? String(getVal(["Gender"])) : undefined,
+                dob: getVal(["Date of Birth", "DOB", "DateOfBirth"]),
                 
-                address: (row['Address'] || row['address']) as string,
-                contactNumber: String(row['Contact Number'] || row['contactNumber'] || ""),
-                email: (row['Email'] || row['email']) as string,
+                address: String(getVal(["Address"]) || ""),
+                contactNumber: String(getVal(["Contact Number", "Contact", "Mobile", "Phone"]) || ""),
+                email: getVal(["Email", "E-mail"]) ? String(getVal(["Email", "E-mail"])) : undefined,
                 
-                pen: row['PEN'] ? String(row['PEN']) : undefined,
-                lastInstitution: (row['Last Institution'] || row['lastInstitution']) as string,
-                tcNumber: row['TC Number'] ? String(row['TC Number']) : undefined,
+                pen: getVal(["PEN"]) ? String(getVal(["PEN"])) : undefined,
+                lastInstitution: getVal(["Last Institution", "Previous School"]) ? String(getVal(["Last Institution", "Previous School"])) : undefined,
+                tcNumber: getVal(["TC Number", "TC No"]) ? String(getVal(["TC Number", "TC No"])) : undefined,
                 
-                dateOfAdmission: row['Admission Date'] || row['admissionDate'] || row['dateOfAdmission']
+                dateOfAdmission: getVal(["Admission Date", "Date of Admission", "AdmissionDate"])
             };
 
             const result = importStudentSchema.safeParse(normalizedRow);

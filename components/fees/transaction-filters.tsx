@@ -67,9 +67,6 @@ export function TransactionFilters({ classes, onFilter, isLoading }: Transaction
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="0">All Months</SelectItem>
-              <SelectItem value="1">January</SelectItem>
-              <SelectItem value="2">February</SelectItem>
-              <SelectItem value="3">March</SelectItem>
               <SelectItem value="4">April</SelectItem>
               <SelectItem value="5">May</SelectItem>
               <SelectItem value="6">June</SelectItem>
@@ -79,6 +76,9 @@ export function TransactionFilters({ classes, onFilter, isLoading }: Transaction
               <SelectItem value="10">October</SelectItem>
               <SelectItem value="11">November</SelectItem>
               <SelectItem value="12">December</SelectItem>
+              <SelectItem value="1">January</SelectItem>
+              <SelectItem value="2">February</SelectItem>
+              <SelectItem value="3">March</SelectItem>
             </SelectContent>
           </Select>
         </div>

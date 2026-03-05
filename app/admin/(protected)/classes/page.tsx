@@ -20,7 +20,7 @@ export default async function ClassesPage() {
             <TableRow>
               <TableHead>Class Name</TableHead>
               <TableHead>Monthly Fee</TableHead>
-              <TableHead>Exam Fee</TableHead>
+              <TableHead>Exam Fees</TableHead>
               <TableHead>Admission Fee</TableHead>
               <TableHead>Registration Fee</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -38,7 +38,19 @@ export default async function ClassesPage() {
                 <TableRow key={cls.id}>
                   <TableCell className="font-medium">{cls.name}</TableCell>
                   <TableCell>₹{cls.monthlyFee.toLocaleString()}</TableCell>
-                  <TableCell>₹{cls.examFee.toLocaleString()}</TableCell>
+                  <TableCell>
+                    {cls.examFees && cls.examFees.length > 0 ? (
+                      <div className="flex flex-col gap-1">
+                        {cls.examFees.map((exam, idx) => (
+                          <div key={idx} className="text-xs">
+                            <span className="font-semibold">{exam.title}</span> ({exam.month}): ₹{exam.amount.toLocaleString()}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">No exams</span>
+                    )}
+                  </TableCell>
                   <TableCell>₹{(cls.admissionFee || 0).toLocaleString()}</TableCell>
                   <TableCell>₹{(cls.registrationFee || 0).toLocaleString()}</TableCell>
                   <TableCell className="text-right">
