@@ -342,13 +342,11 @@ export async function getDashboardStats(filter: DashboardFilter) {
                         // Check if specific exam (by title and year) is paid
                         if (!hasPaidFeeFast(studentId, 'examination', undefined, examYear, examFeeConfig.title)) {
                             studentUnpaidAmount += examFeeConfig.amount;
-                            studentUnpaidDetails.push(`${examFeeConfig.title} (${examYear})`);
+                            studentUnpaidDetails.push(`${examFeeConfig.title || 'Examination Fee'} (${examYear})`);
 
                             const examMonthKey = `${examMonth}-${examYear}`;
-                            if (monthlyUnpaidMap.has(examMonthKey)) {
-                                const current = monthlyUnpaidMap.get(examMonthKey) || 0;
-                                monthlyUnpaidMap.set(examMonthKey, current + examFeeConfig.amount);
-                            }
+                            const current = monthlyUnpaidMap.get(examMonthKey) || 0;
+                            monthlyUnpaidMap.set(examMonthKey, current + examFeeConfig.amount);
                         }
                     }
                 }
@@ -370,10 +368,8 @@ export async function getDashboardStats(filter: DashboardFilter) {
                         studentUnpaidDetails.push(`Admission Fee`);
 
                         const admKey = `${admMonth}-${admYear}`;
-                        if (monthlyUnpaidMap.has(admKey)) {
-                            const current = monthlyUnpaidMap.get(admKey) || 0;
-                            monthlyUnpaidMap.set(admKey, current + admissionFeeConfig.amount);
-                        }
+                        const current = monthlyUnpaidMap.get(admKey) || 0;
+                        monthlyUnpaidMap.set(admKey, current + admissionFeeConfig.amount);
                     }
                 }
             }

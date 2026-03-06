@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Users, FilePlus, UserRoundSearch, ClipboardList, MessageCircle, Phone, CalendarCheck, IndianRupee } from "lucide-react"
+import { Users, FilePlus, UserRoundSearch, ClipboardList, MessageCircle, Phone, CalendarCheck, IndianRupee, Globe } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -24,6 +24,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface UnpaidStudent {
   id: string
@@ -110,6 +117,7 @@ export function DashboardContent({
     to: new Date(),
   })
   const [classId, setClassId] = useState("all")
+  const [language, setLanguage] = useState("en")
 
   const handleFilterChange = (newDate: DateRange | undefined, newClassId: string) => {
     setDate(newDate)
@@ -168,7 +176,16 @@ export function DashboardContent({
 
   const buildWhatsAppMessage = (student: UnpaidStudent) => {
     const monthsText = student.months.length > 0 ? student.months.join(", ") : "the selected period"
-    return `Hello, this is a fee reminder for ${student.name} (Class: ${student.className}). Unpaid: ${monthsText}. Total due: ₹${student.amount.toLocaleString()}. Please submit at the earliest.`
+    
+    switch (language) {
+      case "hi":
+        return `*फीस रिमाइंडर*\n\nनमस्ते,\n\nयह *${student.name}* (कक्षा: ${student.className}) के लिए फीस रिमाइंडर है।\n\n*बकाया विवरण:*\n- महीना: ${monthsText}\n- कुल देय: *₹${student.amount.toLocaleString()}*\n\nकृपया जल्द से जल्द फीस जमा करें।\nधन्यवाद।`
+      case "ur":
+        return `*فیس کی یاد دہانی*\n\nآداب،\n\nیہ *${student.name}* (کلاس: ${student.className}) کے لیے فیس کی یاد دہانی ہے۔\n\n *بقایا تفصیلات:*\n- مہینہ: ${monthsText}\n- کل واجب الادا: *₹${student.amount.toLocaleString()}*\n\nبراہ کرم جلد از جلد فیس جمع کرائیں۔\nشکریہ۔`
+      case "en":
+      default:
+        return `*Fee Reminder*\n\nHello,\n\nThis is a gentle reminder regarding the pending fees for *${student.name}* (Class: ${student.className}).\n\n *Details:*\n- Due for: ${monthsText}\n- Total Amount: *₹${student.amount.toLocaleString()}*\n\nPlease clear the dues at your earliest convenience.\nThank you.`
+    }
   }
 
   return (
@@ -418,8 +435,25 @@ export function DashboardContent({
       {/* Unpaid Students Table */}
       <Card className="col-span-4 shadow-sm mt-4">
         <CardHeader>
-          <CardTitle className="text-base font-bold">Unpaid Students</CardTitle>
-          <CardDescription>Students who haven&apos;t submitted fees in the selected period.</CardDescription>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-base font-bold">Unpaid Students</CardTitle>
+              <CardDescription>Students who haven&apos;t submitted fees in the selected period.</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Globe className="h-4 w-4 text-muted-foreground" />
+              <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger className="w-[100px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="hi">Hindi</SelectItem>
+                  <SelectItem value="ur">Urdu</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="max-h-[460px] overflow-auto">
           <Table>
