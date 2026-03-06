@@ -88,6 +88,9 @@ export async function getFeeTransactions(filter: TransactionFilter, page: number
       name: string
       registrationNumber: string
       photo?: string
+      classId?: {
+        name: string
+      }
     }
     feeType: string
     month?: number
@@ -104,7 +107,14 @@ export async function getFeeTransactions(filter: TransactionFilter, page: number
 
   const [transactions, total] = await Promise.all([
     FeeTransaction.find(query)
-      .populate('studentId', 'name registrationNumber photo')
+      .populate({
+        path: 'studentId',
+        select: 'name registrationNumber photo classId',
+        populate: {
+          path: 'classId',
+          select: 'name'
+        }
+      })
       .populate('collectedBy', 'name')
       .sort({ transactionDate: -1 })
       .skip(skip)
@@ -124,6 +134,7 @@ export async function getFeeTransactions(filter: TransactionFilter, page: number
         studentName: tx.studentId?.name || 'Unknown',
         studentRegNo: tx.studentId?.registrationNumber || 'N/A',
         studentPhoto: tx.studentId?.photo,
+        className: tx.studentId?.classId?.name || 'Unknown',
         feeType: tx.feeType,
         month: tx.month,
         year: tx.year,

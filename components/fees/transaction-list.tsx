@@ -3,6 +3,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ChevronLeft, ChevronRight, FileText, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
@@ -28,6 +29,7 @@ interface Transaction {
   studentName: string
   studentRegNo: string
   studentPhoto?: string
+  className?: string
   feeType: string
   month?: number
   year: number
@@ -50,12 +52,50 @@ interface TransactionListProps {
   }
   onPageChange: (page: number) => void
   isAdmin?: boolean
+  selectedIds: string[]
+  onSelectionChange: (ids: string[]) => void
 }
 
-export function TransactionList({ transactions, pagination, onPageChange, isAdmin }: TransactionListProps) {
+export function TransactionList({ transactions, pagination, onPageChange, isAdmin, selectedIds, onSelectionChange }: TransactionListProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      // Validation: Ensure all visible transactions belong to the same student
+      const uniqueStudents = new Set(transactions.map(t => t.studentRegNo))
+      if (uniqueStudents.size > 1) {
+        toast.error("Cannot select all: The list contains transactions from multiple students. Please filter by a specific student first.")
+        return
+      }
+      
+      const allIds = transactions.map(t => t.id)
+      onSelectionChange(allIds)
+    } else {
+      onSelectionChange([])
+    }
+  }
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) {
+      // Validation: Ensure the new selection belongs to the same student as existing selections
+      if (selectedIds.length > 0) {
+        const firstSelectedId = selectedIds[0]
+        const firstSelectedTransaction = transactions.find(t => t.id === firstSelectedId)
+        const newTransaction = transactions.find(t => t.id === id)
+        
+        if (firstSelectedTransaction && newTransaction && 
+            firstSelectedTransaction.studentRegNo !== newTransaction.studentRegNo) {
+          toast.error("Cannot select transactions from different students. Please clear your selection first.")
+          return
+        }
+      }
+      onSelectionChange([...selectedIds, id])
+    } else {
+      onSelectionChange(selectedIds.filter(sid => sid !== id))
+    }
+  }
 
   const handleDelete = async () => {
     if (!deleteId) return
@@ -120,6 +160,13 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[50px]">
+                <Checkbox 
+                  checked={transactions.length > 0 && selectedIds.length === transactions.length}
+                  onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                  aria-label="Select all"
+                />
+              </TableHead>
               <TableHead>Student</TableHead>
               <TableHead>Receipt No</TableHead>
               <TableHead>Fee Type</TableHead>
@@ -133,6 +180,13 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
           <TableBody>
             {transactions.map((t) => (
               <TableRow key={t.id}>
+                <TableCell>
+                  <Checkbox 
+                    checked={selectedIds.includes(t.id)}
+                    onCheckedChange={(checked) => handleSelectOne(t.id, !!checked)}
+                    aria-label={`Select transaction ${t.receiptNumber}`}
+                  />
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar className="h-8 w-8">
