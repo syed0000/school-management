@@ -13,6 +13,17 @@ interface UnpaidFilter {
     endDate?: Date
 }
 
+export interface UnpaidStudent {
+    id: string;
+    name: string;
+    registrationNumber: string;
+    className: string;
+    amount: number;
+    details: string[];
+    photo?: string;
+    contactNumber: string;
+}
+
 export async function getUnpaidStudents(filter: UnpaidFilter) {
     await dbConnect()
 
@@ -80,17 +91,6 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
         year: { $in: Array.from(yearsToCheck) },
         studentId: { $in: activeStudentIds }
     }).lean()
-
-    interface UnpaidStudent {
-        id: string;
-        name: string;
-        registrationNumber: string;
-        className: string;
-        amount: number;
-        details: string[];
-        photo?: string;
-        contactNumber: string;
-    }
 
     const unpaidList: UnpaidStudent[] = []
 

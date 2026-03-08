@@ -2,11 +2,14 @@
 
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Globe, MessageCircle, Phone } from "lucide-react"
+import { Globe, MessageCircle, Phone, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import { toast } from "sonner"
+import { sendBulkReminders } from "@/actions/whatsapp-reminders"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,8 +45,56 @@ interface UnpaidStudentsTableProps {
 
 export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
   const [language, setLanguage] = useState("en")
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [sending, setSending] = useState(false)
 
   const normalizePhoneDigits = (value: string) => value.replace(/[^\d]/g, "")
+
+  const toggleSelectAll = () => {
+    if (selected.size === students.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(students.map(s => s.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const next = new Set(selected)
+    if (next.has(id)) {
+      next.delete(id)
+    } else {
+      next.add(id)
+    }
+    setSelected(next)
+  }
+
+  const handleSendReminders = async () => {
+    if (selected.size === 0) return
+    setSending(true)
+    try {
+      const lang = language === 'hi' ? 'hindi' : language === 'ur' ? 'urdu' : 'english'
+      
+      const studentsToSend = students.filter(s => selected.has(s.id)).map(s => ({
+        id: s.id,
+        name: s.name,
+        contactNumber: formatForWaMe(s.mobile?.[0] || ''),
+        className: s.className,
+        details: s.months
+      }));
+
+      const result = await sendBulkReminders(studentsToSend, lang)
+      if (result.success) {
+        toast.success(`Sent ${result.summary?.sent} reminders. Failed: ${result.summary?.failed}`)
+        setSelected(new Set())
+      } else {
+        toast.error(`Failed to send reminders: ${result.error}`)
+      }
+    } catch {
+      toast.error("An error occurred")
+    } finally {
+      setSending(false)
+    }
+  }
 
   const formatForWaMe = (value: string) => {
     const digits = normalizePhoneDigits(value)
@@ -84,6 +135,18 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
             <CardDescription>Students who haven&apos;t submitted fees in the selected period.</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            {selected.size > 0 && (
+                <Button 
+                    size="sm" 
+                    variant="default"
+                    onClick={handleSendReminders} 
+                    disabled={sending}
+                    className="h-8 text-xs gap-2"
+                >
+                    <Send className="h-3 w-3" />
+                    {sending ? 'Sending...' : `Send (${selected.size})`}
+                </Button>
+            )}
             <Globe className="h-4 w-4 text-muted-foreground" />
             <Select value={language} onValueChange={setLanguage}>
               <SelectTrigger className="w-[100px] h-8 text-xs">
@@ -102,6 +165,13 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox 
+                    checked={students.length > 0 && selected.size === students.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                />
+              </TableHead>
               <TableHead>Student</TableHead>
               <TableHead>Class</TableHead>
               <TableHead>Contact</TableHead>
@@ -112,7 +182,7 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
           <TableBody>
             {students.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
                   No unpaid students for the selected period.
                 </TableCell>
               </TableRow>
@@ -126,6 +196,13 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
 
                 return (
                   <TableRow key={student.id}>
+                    <TableCell>
+                      <Checkbox 
+                        checked={selected.has(student.id)}
+                        onCheckedChange={() => toggleSelect(student.id)}
+                        aria-label={`Select ${student.name}`}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">

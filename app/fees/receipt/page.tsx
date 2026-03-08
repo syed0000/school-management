@@ -9,20 +9,22 @@ import { Printer, ArrowLeft } from 'lucide-react'
 function ReceiptContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  
+
   const receiptData = {
     receiptNumber: searchParams.get('receiptNumber') || '',
     studentName: searchParams.get('studentName') || '',
     studentRegNo: searchParams.get('studentRegNo') || '',
+    rollNumber: searchParams.get('rollNumber') || '',
     className: searchParams.get('className') || '',
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    feeType: searchParams.get('feeType') as any || 'monthly',
+    section: searchParams.get('section') || '',
+    feeType: searchParams.get('feeType') || 'monthly',
     months: searchParams.get('months')?.split(',').map(Number) || [],
     year: Number(searchParams.get('year')) || new Date().getFullYear(),
     examType: searchParams.get('examType') || '',
     title: searchParams.get('title') || '',
+    remarks: searchParams.get('remarks') || '',
     amount: Number(searchParams.get('amount')) || 0,
-    date: new Date()
+    date: searchParams.get('date') ? new Date(searchParams.get('date')!) : new Date()
   }
 
   const handlePrint = () => {

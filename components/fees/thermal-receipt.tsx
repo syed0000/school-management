@@ -7,12 +7,15 @@ interface ReceiptProps {
         receiptNumber: string
         studentName: string
         studentRegNo: string
+        rollNumber: string
         className: string
+        section: string
         feeType: string
         months?: number[]
         year: number
         examType?: string
         title?: string
+        remarks?: string
         amount: number
         date: Date
     }
@@ -106,8 +109,13 @@ export function ThermalReceipt({ receiptData }: ReceiptProps) {
                 </div>
 
                 <div className="flex justify-between">
-                    <span className="font-semibold">Class:</span>
-                    <span>{receiptData.className}</span>
+                    <span className="font-semibold">Class / Sec:</span>
+                    <span>{receiptData.className} - {receiptData.section}</span>
+                </div>
+
+                <div className="flex justify-between">
+                    <span className="font-semibold">Roll No:</span>
+                    <span>{receiptData.rollNumber}</span>
                 </div>
             </div>
 

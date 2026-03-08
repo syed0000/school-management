@@ -8,6 +8,9 @@ import Class from "@/models/Class"
 import Counter from "@/models/Counter"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+import { sendWhatsAppMessage } from "@/lib/whatsapp"
+import { whatsappConfig } from "@/lib/whatsapp-config"
+import { format } from "date-fns"
 
 const collectFeeSchema = z.object({
   studentId: z.string().min(1, "Student is required"),
@@ -36,8 +39,15 @@ export async function getStudentFeeDetails(studentId: string) {
 
   // Map fees to expected format
   const mappedFees = fees.map((f: unknown) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fee = f as any;
+    // Define an interface for the fee object from database
+    interface DBFee {
+        type: string;
+        amount: number;
+        _id: { toString(): string };
+        title?: string;
+        month?: number;
+    }
+    const fee = f as DBFee;
     return {
       type: fee.type,
       amount: fee.amount,
@@ -223,6 +233,52 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
       }
 
       revalidatePath("/fees/collect");
+
+      // Send WhatsApp Receipt
+      try {
+        if (whatsappConfig.enabled && student?.contacts?.mobile?.[0]) {
+          const mobile = student.contacts.mobile[0];
+          // Construct query params for the receipt image API
+          // Ensuring keys match app/api/receipt/image/route.tsx
+          const queryParams = new URLSearchParams({
+            studentName: student.name,
+            studentRegNo: student.registrationNumber || 'N/A',
+            rollNumber: student.rollNumber || 'N/A',
+            className: student.classId?.name || 'N/A',
+            section: student.section || 'A',
+            amount: data.amount.toString(),
+            date: new Date().toISOString(),
+            feeType: data.feeType,
+            year: data.year.toString(),
+          });
+
+          if (monthsToProcess.length > 0) {
+            // Map 0-11 months to 1-12 for the API
+            queryParams.append('months', monthsToProcess.map(m => m + 1).join(','));
+          }
+          
+          if (data.remarks) queryParams.append('remarks', data.remarks);
+
+          const receiptUrl = `${whatsappConfig.appUrl}/api/receipt/image?receiptNumber=${baseReceiptNumber}&${queryParams.toString()}`;
+          
+          await sendWhatsAppMessage({
+            to: mobile,
+            userName: student.name,
+            campaignName: whatsappConfig.templates.receipt.campaignName,
+            params: [
+              student.name,
+              `₹${data.amount}`,
+              baseReceiptNumber,
+              format(new Date(), 'dd MMM yyyy')
+            ],
+            mediaUrl: receiptUrl,
+            mediaFilename: `Receipt-${baseReceiptNumber}.png`
+          });
+        }
+      } catch (error) {
+        console.error("Failed to send WhatsApp receipt:", error);
+      }
+
       return {
         success: true,
         receiptNumber: baseReceiptNumber, // Group receipt number
@@ -262,6 +318,48 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
       });
 
       revalidatePath("/fees/collect");
+
+      // Send WhatsApp Receipt
+      try {
+        if (whatsappConfig.enabled && student?.contacts?.mobile?.[0]) {
+          const mobile = student.contacts.mobile[0];
+          // Construct query params for the receipt image API
+          const queryParams = new URLSearchParams({
+            studentName: student.name,
+            studentRegNo: student.registrationNumber || 'N/A',
+            rollNumber: student.rollNumber || 'N/A',
+            className: student.classId?.name || 'N/A',
+            section: student.section || 'A',
+            amount: data.amount.toString(),
+            date: new Date().toISOString(),
+            feeType: data.feeType,
+            year: data.year.toString(),
+          });
+
+          if (data.examType) queryParams.append('examType', data.examType);
+          if (data.title) queryParams.append('title', data.title);
+          if (data.remarks) queryParams.append('remarks', data.remarks);
+
+          const receiptUrl = `${whatsappConfig.appUrl}/api/receipt/image?receiptNumber=${receiptNumber}&${queryParams.toString()}`;
+          
+          await sendWhatsAppMessage({
+            to: mobile,
+            userName: student.name,
+            campaignName: whatsappConfig.templates.receipt.campaignName,
+            params: [
+              student.name,
+              `₹${data.amount}`,
+              receiptNumber,
+              format(new Date(), 'dd MMM yyyy')
+            ],
+            mediaUrl: receiptUrl,
+            mediaFilename: `Receipt-${receiptNumber}.png`
+          });
+        }
+      } catch (error) {
+        console.error("Failed to send WhatsApp receipt:", error);
+      }
+
       return {
         success: true,
         receiptNumber,

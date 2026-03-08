@@ -60,7 +60,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
   const [isLoading, setIsLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const [feeDetails, setFeeDetails] = useState<{
-    fees: { type: string; amount: number; id: string; title?: string; month?: string }[];
+    fees: { type: string; amount: number; id: string; title?: string; month?: number }[];
     exams: string[];
   } | null>(null)
   const [baseFee, setBaseFee] = useState<number>(0)

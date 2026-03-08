@@ -1,9 +1,21 @@
 'use client'
 
+import { useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Users } from 'lucide-react'
+import { Users, Send, Globe } from 'lucide-react'
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { toast } from "sonner"
+import { sendBulkReminders } from "@/actions/whatsapp-reminders"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface UnpaidStudent {
   id: string
@@ -21,6 +33,56 @@ interface UnpaidStudentListProps {
 }
 
 export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
+  const [language, setLanguage] = useState("en")
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [sending, setSending] = useState(false)
+
+  const toggleSelectAll = () => {
+    if (selected.size === students.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(students.map(s => s.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const next = new Set(selected)
+    if (next.has(id)) {
+      next.delete(id)
+    } else {
+      next.add(id)
+    }
+    setSelected(next)
+  }
+
+  const handleSendReminders = async () => {
+    if (selected.size === 0) return
+    setSending(true)
+    try {
+      const lang = language === 'hi' ? 'hindi' : language === 'ur' ? 'urdu' : 'english'
+      
+      const studentsToSend = students.filter(s => selected.has(s.id)).map(s => ({
+        id: s.id,
+        name: s.name,
+        contactNumber: s.contactNumber || '',
+        className: s.className,
+        details: s.details
+      }));
+
+      const result = await sendBulkReminders(studentsToSend, lang)
+      if (result.success) {
+        toast.success(`Sent ${result.summary?.sent} reminders. Failed: ${result.summary?.failed}`)
+        setSelected(new Set())
+      } else {
+        toast.error(`Failed to send reminders: ${result.error}`)
+      }
+    } catch {
+      toast.error("An error occurred")
+    } finally {
+      setSending(false)
+    }
+  }
+
   if (students.length === 0) {
     return (
       <div className="text-center py-12">
@@ -32,11 +94,47 @@ export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
   }
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Student</TableHead>
+    <div className="space-y-4">
+      {selected.size > 0 && (
+        <div className="flex items-center justify-between bg-muted/50 p-2 rounded-lg border">
+          <span className="text-sm font-medium px-2">{selected.size} students selected</span>
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-muted-foreground" />
+            <Select value={language} onValueChange={setLanguage}>
+              <SelectTrigger className="w-[120px] h-8 text-xs bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="hi">Hindi</SelectItem>
+                <SelectItem value="ur">Urdu</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button 
+                size="sm" 
+                variant="default"
+                onClick={handleSendReminders} 
+                disabled={sending}
+                className="h-8 text-xs gap-2"
+            >
+                <Send className="h-3 w-3" />
+                {sending ? 'Sending...' : 'Send Reminder'}
+            </Button>
+          </div>
+        </div>
+      )}
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox 
+                    checked={students.length > 0 && selected.size === students.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                />
+              </TableHead>
+              <TableHead>Student</TableHead>
             <TableHead>Class</TableHead>
             <TableHead>Contact</TableHead>
             <TableHead>Unpaid Details</TableHead>
@@ -46,6 +144,13 @@ export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
         <TableBody>
           {students.map((student) => (
             <TableRow key={student.id}>
+              <TableCell>
+                <Checkbox 
+                  checked={selected.has(student.id)}
+                  onCheckedChange={() => toggleSelect(student.id)}
+                  aria-label={`Select ${student.name}`}
+                />
+              </TableCell>
               <TableCell>
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
@@ -82,6 +187,7 @@ export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
           ))}
         </TableBody>
       </Table>
+      </div>
     </div>
   )
 }
