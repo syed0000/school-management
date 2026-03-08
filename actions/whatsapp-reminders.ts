@@ -9,6 +9,7 @@ export interface ReminderStudent {
     contactNumber: string;
     className: string;
     details: string[];
+    amount: number;
 }
 
 interface ReminderResult {
@@ -33,7 +34,8 @@ export async function sendBulkReminders(students: ReminderStudent[], language: '
                 return { id: student.id, name: student.name, status: 'failed', error: 'No contact number' }
             }
 
-            const duesString = student.details.join(', ')
+            const duesList = student.details.join(', ')
+            const totalAmount = `₹${student.amount.toLocaleString()}`
             const template = whatsappConfig.templates.reminders[language]
             
             try {
@@ -44,7 +46,8 @@ export async function sendBulkReminders(students: ReminderStudent[], language: '
                     params: [
                         student.name,
                         student.className,
-                        duesString
+                        duesList,
+                        totalAmount
                     ]
                 })
                 

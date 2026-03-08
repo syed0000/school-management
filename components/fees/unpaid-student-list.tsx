@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+const isWhatsAppEnabled = process.env.NEXT_PUBLIC_ENABLE_WHATSAPP_INTEGRATION === 'true';
+
 interface UnpaidStudent {
   id: string
   name: string
@@ -66,12 +68,27 @@ export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
         name: s.name,
         contactNumber: s.contactNumber || '',
         className: s.className,
-        details: s.details
+        details: s.details,
+        amount: s.amount
       }));
 
       const result = await sendBulkReminders(studentsToSend, lang)
       if (result.success) {
-        toast.success(`Sent ${result.summary?.sent} reminders. Failed: ${result.summary?.failed}`)
+        const successCount = result.summary?.sent || 0
+        const failedCount = result.summary?.failed || 0
+        
+        if (failedCount > 0) {
+            const failures = result.details?.filter(r => r.status === 'failed')
+            const failureMsg = failures?.map(f => `${f.name}: ${f.error}`).join('\n')
+            
+            toast.message(`Sent ${successCount} reminders`, {
+                description: `Failed for ${failedCount}\nstudents:\n${failureMsg}`,
+                duration: 5000,
+            })
+        } else {
+            toast.success(`Successfully sent ${successCount} reminders`)
+        }
+        
         setSelected(new Set())
       } else {
         toast.error(`Failed to send reminders: ${result.error}`)
@@ -95,7 +112,7 @@ export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
 
   return (
     <div className="space-y-4">
-      {selected.size > 0 && (
+      {selected.size > 0 && isWhatsAppEnabled && (
         <div className="flex items-center justify-between bg-muted/50 p-2 rounded-lg border">
           <span className="text-sm font-medium px-2">{selected.size} students selected</span>
           <div className="flex items-center gap-2">
@@ -127,13 +144,15 @@ export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40px]">
-                <Checkbox 
-                    checked={students.length > 0 && selected.size === students.length}
-                    onCheckedChange={toggleSelectAll}
-                    aria-label="Select all"
-                />
-              </TableHead>
+              {isWhatsAppEnabled && (
+                <TableHead className="w-[40px]">
+                    <Checkbox 
+                        checked={students.length > 0 && selected.size === students.length}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
+                    />
+                </TableHead>
+              )}
               <TableHead>Student</TableHead>
             <TableHead>Class</TableHead>
             <TableHead>Contact</TableHead>
@@ -144,13 +163,15 @@ export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
         <TableBody>
           {students.map((student) => (
             <TableRow key={student.id}>
-              <TableCell>
-                <Checkbox 
-                  checked={selected.has(student.id)}
-                  onCheckedChange={() => toggleSelect(student.id)}
-                  aria-label={`Select ${student.name}`}
-                />
-              </TableCell>
+              {isWhatsAppEnabled && (
+                <TableCell>
+                    <Checkbox 
+                    checked={selected.has(student.id)}
+                    onCheckedChange={() => toggleSelect(student.id)}
+                    aria-label={`Select ${student.name}`}
+                    />
+                </TableCell>
+              )}
               <TableCell>
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">

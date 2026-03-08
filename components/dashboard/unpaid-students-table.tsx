@@ -26,6 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+const isWhatsAppEnabled = process.env.NEXT_PUBLIC_ENABLE_WHATSAPP_INTEGRATION === 'true';
+
 export interface UnpaidStudent {
   id: string
   name: string
@@ -79,12 +81,27 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
         name: s.name,
         contactNumber: formatForWaMe(s.mobile?.[0] || ''),
         className: s.className,
-        details: s.months
+        details: s.months,
+        amount: s.amount
       }));
 
       const result = await sendBulkReminders(studentsToSend, lang)
       if (result.success) {
-        toast.success(`Sent ${result.summary?.sent} reminders. Failed: ${result.summary?.failed}`)
+        const successCount = result.summary?.sent || 0
+        const failedCount = result.summary?.failed || 0
+        
+        if (failedCount > 0) {
+            const failures = result.details?.filter(r => r.status === 'failed')
+            const failureMsg = failures?.map(f => `${f.name}: ${f.error}`).join('\n')
+            
+            toast.message(`Sent ${successCount} reminders`, {
+                description: `Failed for ${failedCount} students:\n${failureMsg}`,
+                duration: 5000,
+            })
+        } else {
+            toast.success(`Successfully sent ${successCount} reminders`)
+        }
+
         setSelected(new Set())
       } else {
         toast.error(`Failed to send reminders: ${result.error}`)
@@ -135,7 +152,7 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
             <CardDescription>Students who haven&apos;t submitted fees in the selected period.</CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            {selected.size > 0 && (
+            {selected.size > 0 && isWhatsAppEnabled && (
                 <Button 
                     size="sm" 
                     variant="default"
@@ -148,16 +165,18 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
                 </Button>
             )}
             <Globe className="h-4 w-4 text-muted-foreground" />
-            <Select value={language} onValueChange={setLanguage}>
-              <SelectTrigger className="w-[100px] h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="en">English</SelectItem>
-                <SelectItem value="hi">Hindi</SelectItem>
-                <SelectItem value="ur">Urdu</SelectItem>
-              </SelectContent>
-            </Select>
+            {isWhatsAppEnabled && (
+                <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger className="w-[100px] h-8 text-xs">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="hi">Hindi</SelectItem>
+                    <SelectItem value="ur">Urdu</SelectItem>
+                </SelectContent>
+                </Select>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -165,13 +184,15 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40px]">
-                <Checkbox 
-                    checked={students.length > 0 && selected.size === students.length}
-                    onCheckedChange={toggleSelectAll}
-                    aria-label="Select all"
-                />
-              </TableHead>
+              {isWhatsAppEnabled && (
+                <TableHead className="w-[40px]">
+                    <Checkbox 
+                        checked={students.length > 0 && selected.size === students.length}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
+                    />
+                </TableHead>
+              )}
               <TableHead>Student</TableHead>
               <TableHead>Class</TableHead>
               <TableHead>Contact</TableHead>
@@ -182,7 +203,7 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
           <TableBody>
             {students.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={isWhatsAppEnabled ? 6 : 5} className="text-center text-muted-foreground">
                   No unpaid students for the selected period.
                 </TableCell>
               </TableRow>
@@ -196,13 +217,15 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
 
                 return (
                   <TableRow key={student.id}>
-                    <TableCell>
-                      <Checkbox 
-                        checked={selected.has(student.id)}
-                        onCheckedChange={() => toggleSelect(student.id)}
-                        aria-label={`Select ${student.name}`}
-                      />
-                    </TableCell>
+                    {isWhatsAppEnabled && (
+                        <TableCell>
+                        <Checkbox 
+                            checked={selected.has(student.id)}
+                            onCheckedChange={() => toggleSelect(student.id)}
+                            aria-label={`Select ${student.name}`}
+                        />
+                        </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">
@@ -243,12 +266,14 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
                                 <DropdownMenuContent align="start">
                                   <DropdownMenuLabel>{phone}</DropdownMenuLabel>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem asChild>
-                                    <a href={waUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2">
-                                      <MessageCircle className="size-4" />
-                                      WhatsApp message
-                                    </a>
-                                  </DropdownMenuItem>
+                                  {isWhatsAppEnabled && (
+                                    <DropdownMenuItem asChild>
+                                        <a href={waUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2">
+                                        <MessageCircle className="size-4" />
+                                        WhatsApp message
+                                        </a>
+                                    </DropdownMenuItem>
+                                  )}
                                   <DropdownMenuItem asChild>
                                     <a href={`tel:${telTo}`} className="flex items-center gap-2">
                                       <Phone className="size-4" />
