@@ -45,8 +45,8 @@ export async function saveFile(file: File, folder: string): Promise<string> {
 
   // Fallback to local filesystem (only for dev)
   if (process.env.NODE_ENV === 'production') {
-    logger.warn("Local file upload attempted in production. This will fail on serverless platforms like Vercel. Please configure Cloudinary.");
-    // We can still try, but it will likely fail or be ephemeral
+    logger.error("Local file upload attempted in production. This will fail on serverless platforms like Vercel. Please configure Cloudinary.");
+    throw new Error("File upload failed: Cloudinary not configured in production.");
   }
 
   const fs = await import('node:fs/promises');

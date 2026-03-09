@@ -87,21 +87,7 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
 
       const result = await sendBulkReminders(studentsToSend, lang)
       if (result.success) {
-        const successCount = result.summary?.sent || 0
-        const failedCount = result.summary?.failed || 0
-
-        if (failedCount > 0) {
-          const failures = result.details?.filter(r => r.status === 'failed')
-          const failureMsg = failures?.map(f => `${f.name}: ${f.error}`).join('\n')
-
-          toast.message(`Sent ${successCount} reminders`, {
-            description: `Failed for ${failedCount} students:\n${failureMsg}`,
-            duration: 5000,
-          })
-        } else {
-          toast.success(`Successfully sent ${successCount} reminders`)
-        }
-
+        toast.success(result.message || 'Reminders sheduled to send one by one, you may check the process form you AI Sensy dashbaord')
         setSelected(new Set())
       } else {
         toast.error(`Failed to send reminders: ${result.error}`)

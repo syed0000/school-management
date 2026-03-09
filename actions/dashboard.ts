@@ -11,6 +11,7 @@ import Attendance from "@/models/Attendance"
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, eachMonthOfInterval, format, subMonths, subWeeks, subDays } from "date-fns"
 import { Types } from "mongoose"
 import logger from "@/lib/logger"
+import { unstable_cache } from "next/cache"
 
 interface DashboardFilter {
     startDate?: Date;
@@ -317,7 +318,8 @@ async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: strin
     return { unpaidList, totalUnpaid, totalExpected, monthlyUnpaidMap };
 }
 
-export async function getDashboardStats(filter: DashboardFilter) {
+export const getDashboardStats = unstable_cache(
+    async (filter: DashboardFilter) => {
     try {
         await dbConnect();
 
@@ -626,9 +628,9 @@ export async function getDashboardStats(filter: DashboardFilter) {
             expenseChange: 0
         };
     }
-}
+}, ['dashboard-stats'], { revalidate: 3600, tags: ['dashboard'] })
 
-export async function getAttendanceStats() {
+export const getAttendanceStats = unstable_cache(async () => {
     await dbConnect();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -692,9 +694,9 @@ export async function getAttendanceStats() {
             ...stats
         }))
     };
-}
+}, ['attendance-stats'], { revalidate: 300, tags: ['attendance'] })
 
-export async function getStaffDashboardStats(userId: string) {
+export const getStaffDashboardStats = unstable_cache(async (userId: string) => {
     await dbConnect();
 
     const todayStart = startOfDay(new Date());
@@ -838,4 +840,4 @@ export async function getStaffDashboardStats(userId: string) {
         totalRejected,
         unpaidStudents: unpaidList.sort((a, b) => b.amount - a.amount)
     };
-}
+}, ['staff-dashboard-stats'], { revalidate: 300, tags: ['dashboard'] })

@@ -81,3 +81,16 @@ export async function updateProfile(data: z.infer<typeof updateProfileSchema>) {
     return { success: false, error: message };
   }
 }
+
+export async function getUserProfile(userId: string) {
+  await dbConnect();
+  const user = await User.findById(userId).lean();
+  if (!user) return null;
+  
+  return {
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    id: user._id.toString()
+  };
+}

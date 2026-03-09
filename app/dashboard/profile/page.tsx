@@ -2,8 +2,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { ProfileForm } from "@/components/profile/profile-form"
-import dbConnect from "@/lib/db"
-import User from "@/models/User"
+import { getUserProfile } from "@/actions/profile"
 
 export default async function StaffProfilePage() {
   const session = await getServerSession(authOptions)
@@ -12,8 +11,7 @@ export default async function StaffProfilePage() {
     redirect("/login")
   }
 
-  await dbConnect()
-  const user = await User.findById(session.user.id).lean()
+  const user = await getUserProfile(session.user.id)
 
   if (!user) {
     return <div>User not found</div>

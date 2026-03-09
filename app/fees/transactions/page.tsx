@@ -1,14 +1,18 @@
 import { getFeeTransactions, getTransactionStats } from '@/actions/fee-transactions'
 import { TransactionContent } from '@/components/fees/transaction-content'
-import Class from '@/models/Class'
-import dbConnect from '@/lib/db'
+import { getClasses } from '@/actions/class'
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import dbConnect from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
 export default async function TransactionsPage() {
-  await dbConnect()
+  await dbConnect() // Ideally this should be inside actions, but session might need it? 
+  // Wait, session uses authOptions which uses adapter or manual db call? 
+  // next-auth usually handles its own connection or uses the adapter.
+  // We can remove dbConnect if actions handle their own connection.
+  
   const session = await getServerSession(authOptions)
   const isAdmin = session?.user.role === 'admin'
 
@@ -19,7 +23,7 @@ export default async function TransactionsPage() {
   const [{ transactions, pagination }, stats, classes] = await Promise.all([
     getFeeTransactions(filter, page),
     getTransactionStats(filter),
-    Class.find({}).select('name').lean()
+    getClasses()
   ])
 
   return (
@@ -27,7 +31,7 @@ export default async function TransactionsPage() {
       initialTransactions={transactions}
       initialPagination={pagination}
       initialStats={stats}
-      classes={classes.map(c => ({ id: c._id.toString(), name: c.name }))}
+      classes={classes}
       isAdmin={isAdmin}
     />
   )

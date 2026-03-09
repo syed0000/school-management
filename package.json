@@ -11,6 +11,8 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@next/env": "^16.1.6",
+    "@trigger.dev/react": "4.4.2",
+    "@trigger.dev/sdk": "4.4.2",
     "@types/bcryptjs": "^3.0.0",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",

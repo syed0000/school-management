@@ -1,7 +1,7 @@
 "use server"
 
-import { sendWhatsAppMessage } from "@/lib/whatsapp"
-import { whatsappConfig } from "@/lib/whatsapp-config"
+import { tasks } from "@trigger.dev/sdk/v3";
+import { whatsappConfig } from "@/lib/whatsapp-config";
 
 export interface ReminderStudent {
     id: string;
@@ -10,13 +10,6 @@ export interface ReminderStudent {
     className: string;
     details: string[];
     amount: number;
-}
-
-interface ReminderResult {
-    id: string;
-    name: string;
-    status: 'success' | 'failed';
-    error?: string;
 }
 
 export async function sendBulkReminders(students: ReminderStudent[], language: 'hindi' | 'english' | 'urdu') {
@@ -29,61 +22,33 @@ export async function sendBulkReminders(students: ReminderStudent[], language: '
              return { success: false, error: "No students provided" }
         }
 
-        const results: ReminderResult[] = await Promise.all(students.map(async (student) => {
-            if (!student.contactNumber || student.contactNumber === 'N/A') {
-                return { id: student.id, name: student.name, status: 'failed', error: 'No contact number' }
-            }
+        // Batching strategy: Split students into chunks to avoid timeouts and improve reliability
+        // Chunk size of 50 means 1000 students = 20 runs.
+        // This is safe for the free plan (5000 runs/month) and runs faster in parallel.
+        const BATCH_SIZE = 50;
+        const chunks = [];
+        for (let i = 0; i < students.length; i += BATCH_SIZE) {
+            chunks.push(students.slice(i, i + BATCH_SIZE));
+        }
 
-            const duesList = student.details.join(', ')
-            const totalAmount = `₹${student.amount.toLocaleString()}`
-            const template = whatsappConfig.templates.reminders[language]
-            
-            try {
-                const res = await sendWhatsAppMessage({
-                    to: student.contactNumber,
-                    userName: student.name,
-                    campaignName: template.campaignName,
-                    params: [
-                        student.name,
-                        student.className,
-                        duesList,
-                        totalAmount
-                    ]
-                })
-                
-                return { 
-                    id: student.id, 
-                    name: student.name,
-                    status: res.success ? 'success' : 'failed', 
-                    error: res.error 
-                }
-            } catch (err) {
-                 const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-                 return { 
-                     id: student.id, 
-                     name: student.name,
-                     status: 'failed', 
-                     error: errorMessage
-                 }
-            }
-        }))
-
-        const successCount = results.filter(r => r.status === 'success').length
-        const failureCount = results.filter(r => r.status === 'failed').length
+        // Use Promise.all to trigger jobs in parallel. 
+        // This is equivalent to batching but uses the standard trigger method we know works.
+        const handles = await Promise.all(chunks.map(chunk => 
+            tasks.trigger("send-bulk-whatsapp-reminders", {
+                students: chunk,
+                language
+            })
+        ));
 
         return {
             success: true,
-            summary: {
-                total: students.length,
-                sent: successCount,
-                failed: failureCount
-            },
-            details: results
+            jobId: handles.map(h => h.id).join(', '),
+            message: `Started ${handles.length} background jobs for ${students.length} students`
         }
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error("Bulk reminder error:", error)
+        console.error("Bulk reminder trigger error:", error)
         return { success: false, error: errorMessage }
     }
 }
