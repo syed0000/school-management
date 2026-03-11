@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, FilePlus, UserRoundSearch, ClipboardList, CalendarCheck, IndianRupee } from "lucide-react"
+import { Users, FilePlus, UserRoundSearch, ClipboardList, IndianRupee } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
 import { DashboardFilter } from "@/components/dashboard/dashboard-filter"

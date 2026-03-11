@@ -23,7 +23,7 @@ async function verifySignedCookie(token: string | undefined) {
     try {
         const { payload } = await jwtVerify(token, LICENSE_COOKIE_SECRET);
         return payload as { status: string; expiry: number; verifiedAt: number };
-    } catch (e) {
+    } catch {
         return null; // Invalid signature
     }
 }
