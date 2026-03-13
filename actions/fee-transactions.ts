@@ -117,6 +117,19 @@ export async function getFeeTransactions(filter: TransactionFilter, page: number
       })
       .populate('collectedBy', 'name')
       .sort({ transactionDate: -1 })
+      //.skip(skip) // Skip/Limit on raw documents won't work well with grouping if we want to page by receipts.
+      // But if we return all transactions and group on client, we fetch too much.
+      // If we group here, we need to adjust skip/limit.
+      // For now, let's keep page based on transactions, but user asked about reprinting "multiple transactions receipt".
+      // The current UI allows selecting multiple transactions.
+      // So if the user selects all parts of a split receipt, they can reprint.
+      // But ideally, the list should show one entry per receipt if they were collected together.
+      // However, the request was "allow multiple type of fees collection in single receipt".
+      // And now "will the user be able to re print multiple transacitons receipt".
+      // The current logic in TransactionContent.tsx `handlePrint` handles grouping selected transactions.
+      // So YES, they can reprint if they select the rows.
+      // But finding them might be hard if they are scattered?
+      // No, they are inserted together so they should be adjacent in date sort.
       .skip(skip)
       .limit(limit)
       .lean(),

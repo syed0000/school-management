@@ -11,16 +11,21 @@ import { z } from "zod"
 import { sendWhatsAppMessage } from "@/lib/whatsapp"
 import { whatsappConfig } from "@/lib/whatsapp-config"
 import { format } from "date-fns"
+import { getYearForMonth } from "@/lib/utils"
 
-const collectFeeSchema = z.object({
-  studentId: z.string().min(1, "Student is required"),
-  feeType: z.string().min(1, "Fee type is required"), // Changed from enum to string to support dynamic types
-  amount: z.number().min(1, "Amount must be positive"),
+const feeItemSchema = z.object({
+  feeType: z.string().min(1, "Fee type is required"),
+  amount: z.number().min(0, "Amount must be positive"),
   months: z.array(z.number()).optional(),
   year: z.number().min(2000),
   examType: z.string().optional(),
   title: z.string().optional(),
   remarks: z.string().optional(),
+})
+
+const collectFeesSchema = z.object({
+  studentId: z.string().min(1, "Student is required"),
+  fees: z.array(feeItemSchema).min(1, "At least one fee is required"),
 })
 
 export async function getStudentFeeDetails(studentId: string) {
@@ -117,147 +122,143 @@ async function generateReceiptNumber(): Promise<string> {
   return receiptNo;
 }
 
-export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId: string) {
+interface TransactionDoc {
+    receiptNumber: string;
+    studentId: string;
+    feeType: string;
+    amount: number;
+    month?: number;
+    year: number;
+    remarks?: string;
+    collectedBy: string;
+    status: string;
+    transactionDate: Date;
+    examType?: string;
+    title?: string;
+}
+
+export async function collectFees(data: z.infer<typeof collectFeesSchema>, userId: string) {
   try {
-    collectFeeSchema.parse(data);
+    collectFeesSchema.parse(data);
     await dbConnect();
 
-    // Use current session logic if needed, but here we rely on provided year
-    const monthsToProcess = data.months ? data.months : []; // Removed +1 because month index from UI is 0-11
+    const student = await Student.findById(data.studentId).populate('classId', 'name').lean();
+    if (!student) throw new Error("Student not found");
 
-    // Server-side validation: Ensure total amount equals months * monthly-fee
-    if (data.feeType === 'monthly' && monthsToProcess.length > 0) {
-      const student = await Student.findById(data.studentId).select('classId');
-      if (student) {
-        const classFee = await ClassFee.findOne({
-          classId: student.classId,
-          type: 'monthly',
-          isActive: true
-        });
+    const baseReceiptNumber = await generateReceiptNumber();
+    let totalAmount = 0;
+    const transactionDocs: TransactionDoc[] = [];
 
-        if (classFee) {
-          const expectedTotal = classFee.amount * monthsToProcess.length;
-          // Allow for small floating point differences if any, though likely integers
-          if (Math.abs(data.amount - expectedTotal) > 0.1) {
-            return {
-              success: false,
-              error: `Invalid amount. Expected ₹${expectedTotal} for ${monthsToProcess.length} months, but got ₹${data.amount}.`
-            };
+    // Process each fee item
+    for (let i = 0; i < data.fees.length; i++) {
+      const feeItem = data.fees[i];
+      totalAmount += feeItem.amount;
+
+      // Validation logic for monthly fees
+      const monthsToProcess = feeItem.months ? feeItem.months : [];
+      if (feeItem.feeType === 'monthly' && monthsToProcess.length > 0) {
+        // Validate duplicates
+        for (const m of monthsToProcess) {
+          const dbMonth = m + 1;
+          const actualYear = getYearForMonth(m, feeItem.year);
+          const existing = await FeeTransaction.findOne({
+            studentId: data.studentId,
+            feeType: 'monthly',
+            month: dbMonth,
+            year: actualYear,
+            status: { $ne: 'rejected' }
+          });
+          if (existing) {
+             return { success: false, error: `Fee for month ${dbMonth}/${actualYear} already paid/pending.` };
           }
         }
-      }
-    }
-
-    // Check for existing payments based on fee type
-    if (data.feeType === 'monthly' && monthsToProcess.length > 0) {
-      for (const m of monthsToProcess) {
-        // Month index 0 = Jan? Or 0 = April? 
-        // Standard JS Date: 0=Jan. UI sends 0=Jan usually.
-        // But our Academic Session logic might differ.
-        // Let's stick to Calendar Month (1=Jan, 12=Dec) for DB storage to be safe and consistent.
-        // UI sends 0-11 index.
-        const dbMonth = m + 1; // 1-12
-
-        const existing = await FeeTransaction.findOne({
-          studentId: data.studentId,
-          feeType: 'monthly',
-          month: dbMonth,
-          year: data.year,
-          status: { $ne: 'rejected' }
-        });
-
-        if (existing) {
-          return {
-            success: false,
-            error: `Fee for month ${dbMonth}/${data.year} already paid/pending.`
-          };
+        
+        // Create transactions per month
+        const amountPerMonth = feeItem.amount / monthsToProcess.length;
+        for (const m of monthsToProcess) {
+            const dbMonth = m + 1;
+            const actualYear = getYearForMonth(m, feeItem.year);
+            // Use unique suffix for each transaction part of this receipt
+            const uniqueSuffix = transactionDocs.length + 1;
+            const receiptNumber = `${baseReceiptNumber}-${uniqueSuffix}`;
+            
+            transactionDocs.push({
+                receiptNumber,
+                studentId: data.studentId,
+                feeType: 'monthly',
+                amount: amountPerMonth,
+                month: dbMonth,
+                year: actualYear,
+                remarks: feeItem.remarks,
+                collectedBy: userId,
+                status: 'verified',
+                transactionDate: new Date(),
+            });
         }
-      }
-    } else if (data.feeType === 'examination') {
-      const existing = await FeeTransaction.findOne({
-        studentId: data.studentId,
-        feeType: 'examination',
-        // Match specific exam type (title)
-        examType: data.examType,
-        year: data.year,
-        status: { $ne: 'rejected' }
-      });
-      if (existing) {
-        return { success: false, error: `Fee for ${data.examType} ${data.year} already paid/pending.` };
-      }
-    } else if (['admission', 'admissionFees', 'registrationFees'].includes(data.feeType)) {
-      // One-time fees per year or once per admission?
-      // Usually admission is once, registration is annual.
-      // Assuming annual checks for now based on 'year' field.
-      const existing = await FeeTransaction.findOne({
-        studentId: data.studentId,
-        feeType: data.feeType,
-        year: data.year,
-        status: { $ne: 'rejected' }
-      });
-      if (existing) {
-        return { success: false, error: `${data.feeType} for ${data.year} already paid/pending.` };
+      } else {
+        // Other fees
+        // Check duplicates
+        if (feeItem.feeType === 'examination') {
+             const existing = await FeeTransaction.findOne({
+                studentId: data.studentId,
+                feeType: 'examination',
+                examType: feeItem.examType,
+                year: feeItem.year,
+                status: { $ne: 'rejected' }
+              });
+              if (existing) return { success: false, error: `Fee for ${feeItem.examType} ${feeItem.year} already paid/pending.` };
+        } else if (['admission', 'admissionFees', 'registrationFees'].includes(feeItem.feeType)) {
+             const existing = await FeeTransaction.findOne({
+                studentId: data.studentId,
+                feeType: feeItem.feeType,
+                year: feeItem.year,
+                status: { $ne: 'rejected' }
+              });
+              if (existing) return { success: false, error: `${feeItem.feeType} for ${feeItem.year} already paid/pending.` };
+        }
+
+        const uniqueSuffix = transactionDocs.length + 1;
+        const receiptNumber = `${baseReceiptNumber}-${uniqueSuffix}`;
+
+        transactionDocs.push({
+            receiptNumber,
+            studentId: data.studentId,
+            feeType: feeItem.feeType,
+            amount: feeItem.amount,
+            year: feeItem.year,
+            examType: feeItem.examType,
+            title: feeItem.title,
+            remarks: feeItem.remarks,
+            collectedBy: userId,
+            status: 'verified',
+            transactionDate: new Date(),
+        });
       }
     }
 
-    // Process payment
-    if (data.feeType === 'monthly' && monthsToProcess.length > 0) {
-      const amountPerMonth = data.amount / monthsToProcess.length;
-      const student = await Student.findById(data.studentId).populate('classId', 'name').lean();
+    // Save all transactions
+    await FeeTransaction.insertMany(transactionDocs);
 
-      const baseReceiptNumber = await generateReceiptNumber();
+    revalidatePath("/fees/collect");
 
-      // Create a transaction for each month
-      for (const m of monthsToProcess) {
-        const dbMonth = m + 1;
-        const receiptNumber = `${dbMonth}-${baseReceiptNumber}`;
-
-        await FeeTransaction.create({
-          receiptNumber,
-          studentId: data.studentId,
-          feeType: 'monthly',
-          amount: amountPerMonth,
-          month: dbMonth,
-          year: data.year,
-          remarks: data.remarks,
-          collectedBy: userId,
-          // Let's stick to 'verified' to simplify flow if collected by admin/staff directly.
-          // Previous code had 'pending'. Let's check... it was 'pending'.
-          // But dashboard stats rely on 'verified' for "collected".
-          // If we set 'pending', it shows in "Pending Fees" not "Collected".
-          // Usually "Fee Collection" form implies money received. So it should be 'verified'.
-          // Let's change to 'verified' for immediate reflection in revenue.
-          status: 'verified',
-          transactionDate: new Date(),
-        });
-      }
-
-      revalidatePath("/fees/collect");
-
-      // Send WhatsApp Receipt
-      try {
+    // Send WhatsApp Receipt (Consolidated)
+    try {
         if (whatsappConfig.enabled && student?.contacts?.mobile?.[0]) {
           const mobile = student.contacts.mobile[0];
-          // Construct query params for the receipt image API
-          // Ensuring keys match app/api/receipt/image/route.tsx
+          // We can't put all details in URL params efficiently.
+          // Just put basic info and total amount.
           const queryParams = new URLSearchParams({
             studentName: student.name,
             studentRegNo: student.registrationNumber || 'N/A',
             rollNumber: student.rollNumber || 'N/A',
             className: student.classId?.name || 'N/A',
             section: student.section || 'A',
-            amount: data.amount.toString(),
+            amount: totalAmount.toString(),
             date: new Date().toISOString(),
-            feeType: data.feeType,
-            year: data.year.toString(),
+            // Just indicate multiple
+            feeType: 'Multiple Fees',
+            year: new Date().getFullYear().toString(),
           });
-
-          if (monthsToProcess.length > 0) {
-            // Map 0-11 months to 1-12 for the API
-            queryParams.append('months', monthsToProcess.map(m => m + 1).join(','));
-          }
-          
-          if (data.remarks) queryParams.append('remarks', data.remarks);
 
           const receiptUrl = `${whatsappConfig.appUrl}/api/receipt/image?receiptNumber=${baseReceiptNumber}&${queryParams.toString()}`;
           
@@ -267,7 +268,7 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
             campaignName: whatsappConfig.templates.receipt.campaignName,
             params: [
               student.name,
-              `₹${data.amount}`,
+              `₹${totalAmount}`,
               baseReceiptNumber,
               format(new Date(), 'dd MMM yyyy')
             ],
@@ -275,109 +276,105 @@ export async function collectFee(data: z.infer<typeof collectFeeSchema>, userId:
             mediaFilename: `Receipt-${baseReceiptNumber}.png`
           });
         }
-      } catch (error) {
+    } catch (error) {
         console.error("Failed to send WhatsApp receipt:", error);
-      }
-
-      return {
-        success: true,
-        receiptNumber: baseReceiptNumber, // Group receipt number
-        // Returning a generic receipt number for the batch
-        receiptData: {
-          studentName: student?.name || '',
-          studentRegNo: student?.registrationNumber || '',
-          className: student?.classId?.name || '',
-          feeType: data.feeType,
-          months: monthsToProcess.map(m => m + 1),
-          year: data.year,
-          amount: data.amount,
-          title: data.title,
-          examType: data.examType,
-          date: new Date()
-        }
-      };
-
-    } else {
-      // Single transaction
-      const receiptNumber = await generateReceiptNumber();
-      const student = await Student.findById(data.studentId).populate('classId', 'name').lean();
-
-      await FeeTransaction.create({
-        receiptNumber,
-        studentId: data.studentId,
-        feeType: data.feeType,
-        amount: data.amount,
-        month: undefined,
-        year: data.year,
-        examType: data.examType, // Store exam name here
-        remarks: data.remarks,
-        collectedBy: userId,
-        status: 'verified', // Changed to verified
-        transactionDate: new Date(),
-        title: data.title // Store custom title for 'other' or specific fees
-      });
-
-      revalidatePath("/fees/collect");
-
-      // Send WhatsApp Receipt
-      try {
-        if (whatsappConfig.enabled && student?.contacts?.mobile?.[0]) {
-          const mobile = student.contacts.mobile[0];
-          // Construct query params for the receipt image API
-          const queryParams = new URLSearchParams({
-            studentName: student.name,
-            studentRegNo: student.registrationNumber || 'N/A',
-            rollNumber: student.rollNumber || 'N/A',
-            className: student.classId?.name || 'N/A',
-            section: student.section || 'A',
-            amount: data.amount.toString(),
-            date: new Date().toISOString(),
-            feeType: data.feeType,
-            year: data.year.toString(),
-          });
-
-          if (data.examType) queryParams.append('examType', data.examType);
-          if (data.title) queryParams.append('title', data.title);
-          if (data.remarks) queryParams.append('remarks', data.remarks);
-
-          const receiptUrl = `${whatsappConfig.appUrl}/api/receipt/image?receiptNumber=${receiptNumber}&${queryParams.toString()}`;
-          
-          await sendWhatsAppMessage({
-            to: mobile,
-            userName: student.name,
-            campaignName: whatsappConfig.templates.receipt.campaignName,
-            params: [
-              student.name,
-              `₹${data.amount}`,
-              receiptNumber,
-              format(new Date(), 'dd MMM yyyy')
-            ],
-            mediaUrl: receiptUrl,
-            mediaFilename: `Receipt-${receiptNumber}.png`
-          });
-        }
-      } catch (error) {
-        console.error("Failed to send WhatsApp receipt:", error);
-      }
-
-      return {
-        success: true,
-        receiptNumber,
-        receiptData: {
-          studentName: student?.name || '',
-          studentRegNo: student?.registrationNumber || '',
-          className: student?.classId?.name || '',
-          feeType: data.feeType,
-          year: data.year,
-          examType: data.examType,
-          title: data.title,
-          amount: data.amount,
-          date: new Date()
-        }
-      };
     }
+
+    return {
+        success: true,
+        receiptNumber: baseReceiptNumber,
+    };
+
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "An unknown error occurred";
     return { success: false, error: message };
   }
+}
+
+export async function getReceiptDetails(receiptNumber: string) {
+    await dbConnect();
+
+    // Extract base receipt number if it contains a suffix (e.g., 1201-1 -> 1201)
+    // Assuming base receipt number is numeric (from counter)
+    const baseReceiptNumber = receiptNumber.split('-')[0];
+
+    // Regex to match baseReceiptNumber (exact) or baseReceiptNumber-suffix
+    const regex = new RegExp(`^${baseReceiptNumber}(-[0-9]+)?$`);
+    
+    const transactions = await FeeTransaction.find({ receiptNumber: { $regex: regex } })
+        .populate({
+            path: 'studentId',
+            select: 'name registrationNumber rollNumber classId section',
+            populate: { path: 'classId', select: 'name' }
+        })
+        .lean();
+
+    if (!transactions || transactions.length === 0) {
+        return null;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const firstTx = transactions[0] as any;
+    const student = firstTx.studentId;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const items = transactions.map((t: any) => ({
+        feeType: t.feeType,
+        amount: t.amount,
+        months: t.month ? [t.month] : [],
+        year: t.year,
+        examType: t.examType,
+        title: t.title,
+        remarks: t.remarks
+    }));
+
+    // Consolidate monthly fees into one item if needed, or keep separate
+    // For receipt display, maybe grouping monthly fees by year makes sense?
+    // Let's do a simple grouping
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const consolidatedItems: any[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const monthlyGroups: Record<string, any> = {};
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items.forEach((item: any) => {
+        if (item.feeType === 'monthly') {
+            const key = `${item.year}`;
+            if (!monthlyGroups[key]) {
+                monthlyGroups[key] = {
+                    feeType: 'monthly',
+                    amount: 0,
+                    months: [],
+                    year: item.year,
+                    remarks: item.remarks // Take first remark?
+                };
+                consolidatedItems.push(monthlyGroups[key]);
+            }
+            monthlyGroups[key].amount += item.amount;
+            monthlyGroups[key].months.push(...item.months);
+        } else {
+            consolidatedItems.push(item);
+        }
+    });
+
+    // Sort months
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Object.values(monthlyGroups).forEach((group: any) => {
+        group.months.sort((a: number, b: number) => a - b);
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const totalAmount = transactions.reduce((sum: number, t: any) => sum + t.amount, 0);
+
+    return {
+        receiptNumber: baseReceiptNumber,
+        studentName: student?.name || 'Unknown',
+        studentRegNo: student?.registrationNumber || 'N/A',
+        rollNumber: student?.rollNumber || 'N/A',
+        className: student?.classId?.name || 'N/A',
+        section: student?.section || 'A',
+        date: firstTx.transactionDate,
+        items: consolidatedItems,
+        totalAmount
+    };
 }

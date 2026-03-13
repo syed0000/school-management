@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/card';
 import { Search, FileSpreadsheet, FileText } from 'lucide-react';
 import { getFeeReport } from '@/actions/reports';
+import { formatNumber } from '@/lib/utils';
 import {
   BarChart,
   Bar,
@@ -87,7 +88,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
   const [classId, setClassId] = useState('all');
   const [section, setSection] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   const [reportData, setReportData] = useState<FeeReportData | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -120,26 +121,26 @@ export default function FeeReport({ classes }: FeeReportProps) {
     fetchData();
   };
 
-  const filteredStudents = reportData?.studentReport?.filter((student) => 
+  const filteredStudents = reportData?.studentReport?.filter((student) =>
     student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (student.rollNumber && student.rollNumber.toLowerCase().includes(searchQuery.toLowerCase()))
   ) || [];
 
   const handleExportExcel = () => {
     if (!reportData) return;
-    
+
     const ws = XLSX.utils.json_to_sheet(filteredStudents.map((s) => ({
       'Name': s.name,
       'Roll No': s.rollNumber,
       'Class': s.className,
       'Section': s.section,
-      'Collected (Period)': s.collectedPeriod,
-      'Expected (Period)': s.expectedPeriod,
-      'Due Amount (Period)': s.dueAmount,
       'Due Period': s.period,
+      'Expected': s.expectedPeriod,
+      'Paid': s.collectedPeriod,
+      'Pending': s.dueAmount,
       'Status': s.status,
     })));
-    
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Fee Report");
     XLSX.writeFile(wb, `fee_report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
@@ -164,7 +165,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
           <label className="text-sm font-medium mb-1 block">Period</label>
           <CalendarDateRangePicker date={date} setDate={setDate} className="w-full" />
         </div>
-        
+
         <div className="w-full md:w-[180px]">
           <label className="text-sm font-medium mb-1 block">Class</label>
           <Select value={classId} onValueChange={setClassId}>
@@ -223,7 +224,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
               <CardTitle className="text-sm font-medium">Collected (Period)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">₹{(reportData.summary?.totalCollected || 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold">₹{formatNumber(reportData.summary?.totalCollected || 0)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -231,7 +232,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
               <CardTitle className="text-sm font-medium">Expected (Period)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">₹{(reportData.summary?.totalExpected || 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold text-blue-600">₹{formatNumber(reportData.summary?.totalExpected || 0)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -239,7 +240,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
               <CardTitle className="text-sm font-medium">Pending Dues (Period)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">₹{(reportData.summary?.totalPending || 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold text-red-600">₹{formatNumber(reportData.summary?.totalPending || 0)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -272,7 +273,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>Payment Status Distribution</CardTitle>
@@ -327,10 +328,10 @@ export default function FeeReport({ classes }: FeeReportProps) {
                 <TableHead>Roll No</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Class</TableHead>
-                <TableHead className="text-right">Collected (Period)</TableHead>
-                <TableHead className="text-right">Expected (Period)</TableHead>
-                <TableHead className="text-right">Due Amount</TableHead>
-                <TableHead className="text-right">Due Period</TableHead>
+                <TableHead className="text-left">Due Period</TableHead>
+                <TableHead className="text-right">Expected</TableHead>
+                <TableHead className="text-right">Paid</TableHead>
+                <TableHead className="text-right">Pending</TableHead>
                 <TableHead className="text-right">Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -347,12 +348,12 @@ export default function FeeReport({ classes }: FeeReportProps) {
                     <TableCell>{student.rollNumber || '-'}</TableCell>
                     <TableCell className="font-medium">{student.name}</TableCell>
                     <TableCell>{student.className}</TableCell>
-                    <TableCell className="text-right">₹{(student.collectedPeriod || 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">₹{(student.expectedPeriod || 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right text-red-600">₹{(student.dueAmount || 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right text-sm max-w-[200px] truncate" title={student.period}>
+                    <TableCell className="text-left text-sm max-w-[80px] truncate" title={student.period}>
                       {student.period}
                     </TableCell>
+                    <TableCell className="text-right">₹{formatNumber(student.expectedPeriod || 0)}</TableCell>
+                    <TableCell className="text-right">₹{formatNumber(student.collectedPeriod || 0)}</TableCell>
+                    <TableCell className={`text-right ${student.dueAmount ? 'text-red-600' : ''}`}>₹{formatNumber(student.dueAmount || 0)}</TableCell>
                     <TableCell className="text-right font-bold">
                       <span className={
                         student.status === 'Due' ? 'text-red-500 bg-red-50 px-2 py-1 rounded' : 'text-green-600 bg-green-50 px-2 py-1 rounded'

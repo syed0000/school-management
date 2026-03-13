@@ -53,6 +53,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
   const searchParams = useSearchParams()
   
   const isAdmin = session?.user?.role === 'admin'
+  const isAttendanceStaff = session?.user?.role === 'attendance_staff'
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -80,6 +81,9 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
   const selectedClass = watch("classId")
   const selectedSection = watch("section")
   const selectedDate = watch("date")
+
+  const isToday = selectedDate && selectedDate.toDateString() === today.toDateString()
+  const canEdit = isAdmin || (isAttendanceStaff && isToday)
 
   const fetchStudents = useCallback(async () => {
     // If not all fields are selected, do not fetch
@@ -350,7 +354,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
                     "flex items-center p-3 rounded-lg border shadow-sm",
                     attendanceState[student.id] === "Present" ? "bg-green-50 border-green-200" : "bg-white"
                   )}
-                  onClick={() => !isHoliday && toggleStatus(student.id)}
+                  onClick={() => !isHoliday && canEdit && toggleStatus(student.id)}
                 >
                   <Avatar className="h-10 w-10 mr-3 border">
                     <AvatarImage src={student.photo} />
@@ -366,10 +370,12 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
                      ) : (
                        <Button 
                           size="sm" 
+                          disabled={!canEdit}
                           variant={attendanceState[student.id] === "Present" ? "default" : "outline"}
                           className={cn(
                             "h-8 w-16 transition-colors",
-                            attendanceState[student.id] === "Present" ? "bg-green-600 hover:bg-green-700" : "text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                            attendanceState[student.id] === "Present" ? "bg-green-600 hover:bg-green-700" : "text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700",
+                            !canEdit && "opacity-100 cursor-not-allowed"
                           )}
                        >
                           {attendanceState[student.id] === "Present" ? "P" : "A"}
@@ -415,8 +421,10 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
                           type="button"
                           variant={attendanceState[student.id] === "Present" ? "default" : "outline"}
                           size="sm"
+                          disabled={!canEdit}
                           className={cn(
-                            attendanceState[student.id] === "Present" && "bg-green-600 hover:bg-green-700"
+                            attendanceState[student.id] === "Present" && "bg-green-600 hover:bg-green-700",
+                            !canEdit && "opacity-100 cursor-not-allowed"
                           )}
                           onClick={() => handleStatusChange(student.id, "Present")}
                         >
@@ -426,6 +434,10 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
                           type="button"
                           variant={attendanceState[student.id] === "Absent" ? "destructive" : "outline"}
                           size="sm"
+                          disabled={!canEdit}
+                          className={cn(
+                            !canEdit && "opacity-100 cursor-not-allowed"
+                          )}
                           onClick={() => handleStatusChange(student.id, "Absent")}
                         >
                           Absent
@@ -438,12 +450,14 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
             </div>
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t md:relative md:bg-transparent md:border-0 md:p-0 z-10">
-            <Button size="lg" onClick={form.handleSubmit(onSubmit)} disabled={saving} className="w-full md:w-auto">
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Submit Attendance ({presentCount} Present)
-            </Button>
-          </div>
+          {canEdit ? (
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t md:relative md:bg-transparent md:border-0 md:p-0 z-10">
+              <Button size="lg" onClick={form.handleSubmit(onSubmit)} disabled={saving} className="w-full md:w-auto">
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Submit Attendance ({presentCount} Present)
+              </Button>
+            </div>
+          ) : null}
           {/* Spacer for fixed bottom button on mobile */}
           <div className="h-20 md:hidden"></div>
         </div>

@@ -15,7 +15,7 @@ interface OverviewProps {
 
 export function Overview({ data }: OverviewProps) {
   return (
-    <ResponsiveContainer width="100%" height={150}>
+    <ResponsiveContainer width="100%" height={300}>
       <LineChart data={data}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
         <XAxis
@@ -44,7 +44,7 @@ export function Overview({ data }: OverviewProps) {
           dataKey="collected"
           name="Income"
           stroke="#16a34a" 
-          strokeWidth={3}
+          strokeWidth={2}
           dot={{ r: 4, fill: "#16a34a", strokeWidth: 2 }}
           activeDot={{ r: 6 }}
         />
@@ -55,7 +55,7 @@ export function Overview({ data }: OverviewProps) {
           dataKey="expense"
           name="Expense"
           stroke="#ef4444"
-          strokeWidth={3}
+          strokeWidth={2}
           dot={{ r: 4, fill: "#ef4444", strokeWidth: 2 }}
           activeDot={{ r: 6 }}
         />
@@ -66,7 +66,7 @@ export function Overview({ data }: OverviewProps) {
           dataKey="profit"
           name="Profit/Loss"
           stroke="#eab308"
-          strokeWidth={3}
+          strokeWidth={2}
           dot={{ r: 4, fill: "#eab308", strokeWidth: 2 }}
           activeDot={{ r: 6 }}
         />

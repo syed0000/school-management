@@ -26,10 +26,15 @@ export default async function StaffLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b">
-        <div className="flex h-16 items-center px-4">
-          <div className="flex items-center gap-3 mr-4">
-             <div className="relative h-10 w-32 flex items-center justify-center rounded-md overflow-hidden">
+      <header className="sticky top-0 z-20 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+        <div className="flex h-16 items-center px-4 justify-between">
+          <div className="flex items-center gap-3">
+             {/* Mobile Menu Trigger inside Header */}
+             <div className="lg:hidden">
+               <MainNav role="staff" mobileOnly />
+             </div>
+
+             <div className="relative h-8 w-24 md:h-10 md:w-32 flex items-center justify-center rounded-md overflow-hidden">
                 <Image 
                   src="/feeEasyLogo.png" 
                   alt="feeEase" 
@@ -38,17 +43,22 @@ export default async function StaffLayout({
                   priority
                 />
              </div>
-             <X className="h-5 w-5 text-purple-600 font-bold stroke-3" />
-             <div className="font-bold text-lg tracking-tight hidden md:block">
+             <X className="h-4 w-4 md:h-5 md:w-5 text-purple-600 font-bold stroke-3 hidden sm:block" />
+             <div className="font-bold text-lg md:text-xl tracking-tight hidden sm:block">
                 {schoolConfig.name}
              </div>
           </div>
-          <MainNav className="mx-6" role="staff" />
-          <div className="ml-auto flex items-center space-x-4">
+          <div className="flex items-center space-x-4">
             <UserNav user={session.user} />
           </div>
         </div>
       </header>
+
+      {/* Secondary Nav Bar for Desktop */}
+      <div className="hidden lg:block border-y px-4 py-2 overflow-x-auto bg-muted sticky top-16 z-10">
+        <MainNav role="staff" desktopOnly />
+      </div>
+
       <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">
         {children}
       </main>

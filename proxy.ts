@@ -10,6 +10,14 @@ const PUBLIC_PATHS = [
   "/api/auth", // Allow auth API calls
   "/_next",
   "/favicon.ico",
+  "/manifest.webmanifest",
+  "/site.webmanifest",
+  "/apple-touch-icon.png",
+  "/android-chrome-192x192.png",
+  "/android-chrome-512x512.png",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/feeEasyLogo.png",
   "/static",
   "/images",
   "/public"
@@ -72,7 +80,7 @@ export async function proxy(req: NextRequest) {
   if (licenseCheck.needsValidation) {
     // Redirect to validation endpoint
     const url = new URL("/api/license/validate", req.url);
-    url.searchParams.set("next", pathname);
+    url.searchParams.set("next", `${pathname}${req.nextUrl.search}`);
     return NextResponse.redirect(url);
   }
 

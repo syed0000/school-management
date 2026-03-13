@@ -21,6 +21,20 @@ export function getCurrentSession(): string {
     }
 }
 
+export function getCurrentSessionStartYear(): number {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    return currentMonth < 3 ? currentYear - 1 : currentYear;
+}
+
+export function getYearForMonth(monthIndex: number, sessionStartYear: number): number {
+    // Academic year: April (3) to March (2)
+    // months 3-11 are in sessionStartYear
+    // months 0-2 are in sessionStartYear + 1
+    return monthIndex >= 3 ? sessionStartYear : sessionStartYear + 1;
+}
+
 export function getAcademicYearStart(year: number): Date {
     // Academic year starts on April 1st of the given year
     return new Date(year, 3, 1);
@@ -29,4 +43,17 @@ export function getAcademicYearStart(year: number): Date {
 export function getAcademicYearEnd(year: number): Date {
     // Academic year ends on March 31st of the next year
     return new Date(year + 1, 2, 31);
+}
+
+export function formatNumber(amount: number): string {
+  return new Intl.NumberFormat('en-IN').format(amount);
+}
+
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
 }

@@ -20,6 +20,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, Eye, EyeOff } from "lucide-react"
 
+import Link from "next/link"
+
 const adminSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
@@ -151,6 +153,17 @@ export function LoginForm({ type }: LoginFormProps) {
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sign In
             </Button>
+            <div className="text-center text-sm">
+              {type === "admin" ? (
+                <Link href="/login" className="underline underline-offset-4 hover:text-primary">
+                  Staff Login
+                </Link>
+              ) : (
+                <Link href="/admin/login" className="underline underline-offset-4 hover:text-primary">
+                  Admin Login
+                </Link>
+              )}
+            </div>
           </form>
         </Form>
       </CardContent>

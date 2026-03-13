@@ -4,20 +4,19 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { schoolConfig } from "@/lib/config";
-import { headers } from "next/headers";
+import dbConnect from "@/lib/db";
+import License from "@/models/License";
+import User from "@/models/User";
 
 export const dynamic = 'force-dynamic';
 
 async function checkInitialization() {
     try {
-        const headersList = await headers();
-        const host = headersList.get("host") || "localhost:3000";
-        const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
+        await dbConnect();
+        const license = await License.findOne({});
+        const admin = await User.findOne({ role: 'admin' });
         
-        const res = await fetch(`${protocol}://${host}/api/init/check`, { cache: "no-store" });
-        if (!res.ok) return false;
-        const data = await res.json();
-        return data.initialized;
+        return !!(license && admin);
     } catch (e) {
         console.error("Failed to check initialization:", e);
         return false;
@@ -36,6 +35,8 @@ export default async function Home() {
   if (session) {
     if (session.user.role === "admin") {
       redirect("/admin/dashboard");
+    } else if (session.user.role === "attendance_staff") {
+      redirect("/attendance/dashboard");
     } else {
       redirect("/dashboard");
     }

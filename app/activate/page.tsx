@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,24 @@ export default function ActivatePage() {
   const [licenseKey, setLicenseKey] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  // Check if already activated
+  useEffect(() => {
+    async function checkStatus() {
+      try {
+        const { checkActivationStatus } = await import("@/actions/license");
+        const status = await checkActivationStatus();
+        if (status.isActivated || status.hasLicense) {
+            // If license exists, redirect to validation to set cookie
+            // Using window.location to ensure full reload if needed
+            window.location.href = "/api/license/validate?next=/dashboard";
+        }
+      } catch (e) {
+        console.error("Failed to check status", e);
+      }
+    }
+    checkStatus();
+  }, []);
 
   async function handleActivate(e: React.FormEvent) {
     e.preventDefault();

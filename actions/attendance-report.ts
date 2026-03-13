@@ -2,8 +2,6 @@
 
 import dbConnect from "@/lib/db"
 import Attendance from "@/models/Attendance"
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import Student from "@/models/Student"
 import { startOfDay, endOfDay } from "date-fns"
 import logger from "@/lib/logger"
 
@@ -14,13 +12,49 @@ interface AttendanceReportFilter {
   studentId?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getAttendanceReport(filter: AttendanceReportFilter): Promise<any[]> {
+interface AttendanceHistoryItem {
+  id: string
+  date: string
+  className: string
+  classId: string
+  section: string
+  totalStudents: number
+  presentCount: number
+  absentCount: number
+  holidayCount: number
+  markedBy: string
+  updatedAt: string
+}
+
+interface AttendanceRecordLean {
+  status?: string
+}
+
+interface AttendanceClassLean {
+  _id?: { toString(): string } | string
+  name?: string
+}
+
+interface AttendanceUserLean {
+  name?: string
+}
+
+interface AttendanceDocLean {
+  _id: { toString(): string }
+  date: Date
+  classId?: AttendanceClassLean | { toString(): string } | string
+  section?: string
+  records?: AttendanceRecordLean[]
+  markedBy?: AttendanceUserLean | { toString(): string } | string
+  isHoliday?: boolean
+  updatedAt: Date
+}
+
+export async function getAttendanceReport(filter: AttendanceReportFilter): Promise<AttendanceHistoryItem[]> {
   try {
     await dbConnect();
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const query: any = {};
+    const query: Record<string, unknown> = {};
     
     if (filter.startDate && filter.endDate) {
       query.date = {
@@ -38,45 +72,45 @@ export async function getAttendanceReport(filter: AttendanceReportFilter): Promi
       query.classId = filter.classId;
     }
 
-    const attendanceRecords = await Attendance.find(query)
+    const attendanceRecords = (await Attendance.find(query)
       .populate('classId', 'name')
-      .populate('records.studentId', 'name registrationNumber')
+      .populate('markedBy', 'name')
       .sort({ date: -1 })
-      .lean();
+      .lean()) as unknown as AttendanceDocLean[];
       
-    // Filter by studentId if provided (Client side filtering as records are embedded)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let result = attendanceRecords.flatMap((record: any) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return record.records.map((r: any) => ({
-            _id: record._id,
-            date: record.date,
-            className: record.classId?.name || 'Unknown',
-            studentName: r.studentId?.name || 'Unknown',
-            studentId: r.studentId?._id?.toString() || r.studentId, // Handle populated vs unpopulated
-            registrationNumber: r.studentId?.registrationNumber || '',
-            status: r.status,
-            remarks: r.remarks,
-            updatedAt: record.updatedAt
-        }));
-    });
+    return attendanceRecords.map((record) => {
+      const records = record.records ?? []
+      const presentCount = records.filter((r) => r.status === "Present").length
+      const absentCount = records.filter((r) => r.status === "Absent").length
+      const holidayCount = records.filter((r) => r.status === "Holiday").length
 
-    if (filter.studentId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        result = result.filter((r: any) => r.studentId === filter.studentId);
-    }
-    
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return result.map((r: any) => ({
-      id: r._id.toString(),
-      date: r.date.toISOString(),
-      className: r.className,
-      studentName: r.studentName,
-      registrationNumber: r.registrationNumber,
-      status: r.status,
-      remarks: r.remarks,
-      updatedAt: r.updatedAt.toISOString()
-    }));
+      const effectiveHolidayCount = record.isHoliday ? records.length : holidayCount
+      const effectivePresentCount = record.isHoliday ? 0 : presentCount
+      const effectiveAbsentCount = record.isHoliday ? 0 : absentCount
+
+      const classDoc =
+        record.classId && typeof record.classId === "object" ? (record.classId as AttendanceClassLean) : null
+
+      return {
+        id: record._id.toString(),
+        date: record.date.toISOString(),
+        className: classDoc?.name || "Unknown",
+        classId:
+          classDoc?._id && typeof classDoc._id === "object"
+            ? classDoc._id.toString()
+            : classDoc?._id?.toString?.() || String(record.classId || ""),
+        section: record.section || "",
+        totalStudents: records.length,
+        presentCount: effectivePresentCount,
+        absentCount: effectiveAbsentCount,
+        holidayCount: effectiveHolidayCount,
+        markedBy:
+          record.markedBy && typeof record.markedBy === "object"
+            ? (record.markedBy as AttendanceUserLean).name || "Unknown"
+            : "Unknown",
+        updatedAt: record.updatedAt.toISOString(),
+      }
+    });
   } catch (error: unknown) {
     logger.error(error, "Error fetching attendance report");
     return [];

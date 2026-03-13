@@ -5,7 +5,7 @@ import User from "@/models/User";
 import bcrypt from "bcryptjs";
 import { verifyLicense } from "@/lib/license";
 
-const FEEEASE_URL = process.env.FEEEASE_URL || "http://localhost:3001";
+const FEEEASE_URL = process.env.NEXT_PUBLIC_FEEEASE_URL;
 
 export async function POST(req: NextRequest) {
   try {

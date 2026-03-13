@@ -4,7 +4,7 @@ import License from "@/models/License";
 import { verifyLicense } from "@/lib/license";
 import { SignJWT } from "jose";
 
-const FEEEASE_URL = process.env.FEEEASE_URL || "http://localhost:3001";
+const FEEEASE_URL = process.env.NEXT_PUBLIC_FEEEASE_URL;
 
 export async function GET(req: NextRequest) {
   try {

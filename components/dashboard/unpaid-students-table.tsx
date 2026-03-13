@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { sendBulkReminders } from "@/actions/whatsapp-reminders"
+import { formatNumber } from "@/lib/utils"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -120,12 +121,12 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
 
     switch (language) {
       case "hi":
-        return `*फीस रिमाइंडर*\n\nयह *${student.name}* (कक्षा: ${student.className}) के लिए फीस रिमाइंडर है।\n\n*बकाया विवरण:*\n- महीना: ${monthsText}\n- कुल देय: *₹${student.amount.toLocaleString()}*\n\nकृपया जल्द से जल्द फीस जमा करें।\nधन्यवाद।`
+        return `*फीस रिमाइंडर*\n\nयह *${student.name}* (कक्षा: ${student.className}) के लिए फीस रिमाइंडर है।\n\n*बकाया विवरण:*\n- महीना: ${monthsText}\n- कुल देय: *₹${formatNumber(student.amount)}*\n\nकृपया जल्द से जल्द फीस जमा करें।\nधन्यवाद।`
       case "ur":
-        return `*فیس کی یاد دہانی*\n\nآداب،\n\nیہ *${student.name}* (کلاس: ${student.className}) کے لیے فیس کی یاد دہانی ہے۔\n\n *بقایا تفصیلات:*\n- مہینہ: ${monthsText}\n- کل واجب الادا: *₹${student.amount.toLocaleString()}*\n\nبراہ کرم جلد از جلد فیس جمع کرائیں۔\nشکریہ۔`
+        return `*فیس کی یاد دہانی*\n\nآداب،\n\nیہ *${student.name}* (کلاس: ${student.className}) کے لیے فیس کی یاد دہانی ہے۔\n\n *بقایا تفصیلات:*\n- مہینہ: ${monthsText}\n- کل واجب الادا: *₹${formatNumber(student.amount)}*\n\nبراہ کرم جلد از جلد فیس جمع کرائیں۔\nشکریہ۔`
       case "en":
       default:
-        return `*Fee Reminder*\n\nHello,\n\nThis is a gentle reminder regarding the pending fees for *${student.name}* (Class: ${student.className}).\n\n *Details:*\n- Due for: ${monthsText}\n- Total Amount: *₹${student.amount.toLocaleString()}*\n\nPlease clear the dues at your earliest convenience.\nThank you.`
+        return `*Fee Reminder*\n\nHello,\n\nThis is a gentle reminder regarding the pending fees for *${student.name}* (Class: ${student.className}).\n\n *Details:*\n- Due for: ${monthsText}\n- Total Amount: *₹${formatNumber(student.amount)}*\n\nPlease clear the dues at your earliest convenience.\nThank you.`
     }
   }
 
@@ -286,8 +287,8 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {student.months.slice(0, 4).map((m) => (
-                          <Badge key={m} variant="secondary" className="text-xs">
+                        {student.months.slice(0, 4).map((m, i) => (
+                          <Badge key={`${m}-${i}`} variant="secondary" className="text-xs">
                             {m}
                           </Badge>
                         ))}
@@ -297,7 +298,7 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className="font-semibold text-red-600">₹{student.amount.toLocaleString()}</span>
+                      <span className="font-semibold text-red-600">₹{formatNumber(student.amount)}</span>
                     </TableCell>
                   </TableRow>
                 )
@@ -309,7 +310,7 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
                   Total
                 </TableCell>
                 <TableCell className="text-right font-bold">
-                  ₹{students.reduce((total, student) => total + student.amount, 0).toLocaleString()}
+                  ₹{formatNumber(students.reduce((total, student) => total + student.amount, 0))}
                 </TableCell>
               </TableRow>
             )}

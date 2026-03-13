@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, FilePlus, UserRoundSearch, ClipboardList, IndianRupee } from "lucide-react"
+import { Users, FilePlus, ClipboardList, IndianRupee, PlusCircle } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
 import { DashboardFilter } from "@/components/dashboard/dashboard-filter"
@@ -13,6 +13,7 @@ import { getDashboardStats } from "@/actions/dashboard"
 import { UnpaidStudentsTable, UnpaidStudent } from "@/components/dashboard/unpaid-students-table"
 import { DateRange } from "react-day-picker"
 import { subDays } from "date-fns"
+import { formatNumber } from "@/lib/utils"
 interface DashboardStats {
   collected: number
   pending: number
@@ -145,7 +146,7 @@ export function DashboardContent({
 
         {/* Row 1 */}
         {/* Total Amount Collected Chart - Large Card - Full width on mobile */}
-        <Card className="col-span-1 md:col-span-2 row-span-1 shadow-sm">
+        <Card className="col-span-1 md:col-span-2 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-base font-bold">Financial Overview</CardTitle>
           </CardHeader>
@@ -163,7 +164,7 @@ export function DashboardContent({
               <IndianRupee className="h-3 w-3 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              <div className="text-lg md:text-2xl font-bold">₹{stats.collected.toLocaleString()}</div>
+              <div className="text-lg md:text-2xl font-bold">₹{formatNumber(stats.collected)}</div>
             </CardContent>
           </Card>
 
@@ -174,7 +175,7 @@ export function DashboardContent({
               <IndianRupee className="h-3 w-3 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              <div className="text-lg md:text-2xl font-bold">₹{stats.totalExpenses.toLocaleString()}</div>
+              <div className="text-lg md:text-2xl font-bold">₹{formatNumber(stats.totalExpenses)}</div>
             </CardContent>
           </Card>
 
@@ -184,7 +185,7 @@ export function DashboardContent({
               <CardTitle className="text-xs font-bold">Net Profit</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              <div className="text-xl md:text-3xl font-bold">₹{stats.netProfit.toLocaleString()}</div>
+              <div className="text-xl md:text-3xl font-bold">₹{formatNumber(stats.netProfit)}</div>
               <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
                 Income - Expense
               </p>
@@ -197,7 +198,7 @@ export function DashboardContent({
               <CardTitle className="text-xs font-bold">Reminders</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              <div className="text-xl md:text-3xl font-bold">₹{stats.unpaid.toLocaleString()}</div>
+              <div className="text-xl md:text-3xl font-bold">₹{formatNumber(stats.unpaid)}</div>
               <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
                 Total Unpaid / Deficit
               </p>
@@ -207,10 +208,10 @@ export function DashboardContent({
         </div>
 
         {/* Row 2 */}
-        {/* Pending Fees Breakdown Chart - Large Card */}
+        {/* Pending Fees Chart - Large Card */}
         <Card className="col-span-1 md:col-span-2 lg:col-span-3 row-span-1 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-bold">Pending Fees Breakdown</CardTitle>
+            <CardTitle className="text-base font-bold">Pending Fees</CardTitle>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
               Unpaid Fees (Deficit)
@@ -228,7 +229,7 @@ export function DashboardContent({
             <IndianRupee className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{stats.pending.toLocaleString()}</div>
+            <div className="text-2xl font-bold">₹{formatNumber(stats.pending)}</div>
             <p className={`text-xs ${pendingChange <= 0 ? "text-green-600" : "text-red-600"}`}>
               {pendingChange > 0 ? "+" : ""}{pendingChange}% from last month
             </p>
@@ -263,7 +264,7 @@ export function DashboardContent({
 
         {/* Quick Actions Row - Horizontal Scroll on Mobile */}
         <div className="col-span-1 md:col-span-2 lg:col-span-4 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0">
-          <div className="flex gap-4 md:grid md:grid-cols-4 min-w-[600px] md:min-w-0">
+          <div className="flex gap-4 md:grid md:grid-cols-4 min-w-[900px] md:min-w-0">
             {/* New Student */}
             <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer flex-1">
               <Link href="/students/admit" className="block h-full">
@@ -290,19 +291,6 @@ export function DashboardContent({
               </Link>
             </Card>
 
-            {/* Find */}
-            <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer flex-1">
-              <Link href="/students/list" className="block h-full">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-bold">Find</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col items-center justify-center py-6">
-                  <UserRoundSearch className="h-10 w-10 mb-2" strokeWidth={1.5} />
-                  <span className="text-sm font-medium">Find Student</span>
-                </CardContent>
-              </Link>
-            </Card>
-
             {/* Report */}
             <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer flex-1">
               <Link href="/admin/reports" className="block h-full">
@@ -312,6 +300,17 @@ export function DashboardContent({
                 <CardContent className="flex flex-col items-center justify-center py-6">
                   <ClipboardList className="h-10 w-10 mb-2" strokeWidth={1.5} />
                   <span className="text-sm font-medium text-center">Generate and Print Report</span>
+                </CardContent>
+              </Link>
+            </Card>
+            <Card className="shadow-sm hover:shadow-md transition-shadow cursor-pointer flex-1 w-full">
+              <Link href={`${process.env.NEXT_PUBLIC_FEEEASE_URL}/contactus/school`} className="block h-full">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-bold">Request Add-ons</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center justify-center py-6">
+                  <PlusCircle className="h-10 w-10 mb-2" strokeWidth={1.5} />
+                  <span className="text-sm font-medium text-center">Ask for new features</span>
                 </CardContent>
               </Link>
             </Card>

@@ -190,10 +190,10 @@ export function DashboardLayoutNew({ stats }: DashboardLayoutNewProps) {
             </Link>
         </Card>
 
-        {/* Pending Fees Breakdown Chart - Large Card */}
+        {/* Pending Fees Chart - Large Card */}
         <Card className="col-span-3 row-span-1 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-bold">Pending Fees Breakdown</CardTitle>
+            <CardTitle className="text-base font-bold">Pending Fees</CardTitle>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
                 Total Collection Recorded

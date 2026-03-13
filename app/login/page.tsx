@@ -12,6 +12,8 @@ export default async function StaffLoginPage() {
   if (session) {
     if (session.user.role === "admin") {
       redirect("/admin/dashboard")
+    } else if (session.user.role === "attendance_staff") {
+      redirect("/attendance/dashboard")
     } else {
       redirect("/dashboard")
     }

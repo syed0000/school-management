@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { format } from "date-fns"
+import { formatNumber } from "@/lib/utils"
 
 interface Payment {
   id: string
@@ -71,7 +72,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
                 {payment.transactionDate ? format(new Date(payment.transactionDate), 'dd-MM-yyyy') : 'N/A'}
               </TableCell>
               <TableCell className="text-right font-medium">
-                ₹{payment.amount.toLocaleString()}
+                ₹{formatNumber(payment.amount)}
               </TableCell>
             </TableRow>
           )

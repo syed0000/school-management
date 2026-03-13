@@ -25,8 +25,6 @@ export function MainNav({
   const [open, setOpen] = useState(false)
 
   const adminRoutes = [
-    // ... existing routes
-
     {
       href: "/admin/dashboard",
       label: "Overview",

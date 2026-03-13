@@ -48,7 +48,9 @@ export async function GET(request: NextRequest) {
         let feeDescription = 'Fee Payment';
         const year = yearStr ? parseInt(yearStr) : date.getFullYear();
 
-        if (feeType === 'monthly') {
+        if (feeType === 'Multiple Fees') {
+             feeDescription = 'Multiple Fee Items (See Detail in App)';
+        } else if (feeType === 'monthly') {
             let months: number[] = [];
             if (monthsStr) {
                 months = monthsStr.split(',').map(m => parseInt(m));
@@ -158,7 +160,7 @@ export async function GET(request: NextRequest) {
 
                     {/* Total */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '24px', fontWeight: 'bold', marginTop: '20px', borderTop: '2px solid black', paddingTop: '10px' }}>
-                        <span>Total Paid:</span>
+                        <span>GRAND TOTAL:</span>
                         <span>₹{amount.toLocaleString()}</span>
                     </div>
 

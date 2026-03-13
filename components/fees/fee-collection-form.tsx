@@ -13,13 +13,14 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Loader2, Check, ChevronsUpDown } from "lucide-react"
-import { collectFee, getStudentFeeDetails } from "@/actions/fee-collection"
+import { Loader2, Check, ChevronsUpDown, Plus, Trash2 } from "lucide-react"
+import { collectFees, getStudentFeeDetails } from "@/actions/fee-collection"
 import { useRouter } from "next/navigation"
 import {
   Command,
@@ -34,14 +35,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
+import { cn, getCurrentSessionStartYear } from "@/lib/utils"
 import { BackButton } from "../ui/back-button"
 
-const formSchema = z.object({
-  classId: z.string().optional(),
-  studentId: z.string().min(1, "Student is required"),
+// Schema for a single fee item input
+const feeItemInputSchema = z.object({
   feeType: z.string().min(1, "Fee type is required"),
-  amount: z.string(),
+  amount: z.string(), // Input as string for easier handling
   months: z.array(z.number()).optional(),
   year: z.string(),
   examType: z.string().optional(),
@@ -49,10 +49,29 @@ const formSchema = z.object({
   remarks: z.string().optional(),
 })
 
+// Schema for the overall form (mainly for student selection)
+const formSchema = z.object({
+  classId: z.string().optional(),
+  studentId: z.string().min(1, "Student is required"),
+  // Current fee item fields
+  ...feeItemInputSchema.shape,
+})
+
 interface FeeCollectionFormProps {
   students: { id: string; name: string; registrationNumber: string; className: string }[]
   classes: { id: string; name: string; exams: string[] }[]
   userId: string
+}
+
+interface FeeItem {
+  id: string; // Temp ID for list management
+  feeType: string;
+  amount: number;
+  months?: number[];
+  year: number;
+  examType?: string;
+  title?: string;
+  remarks?: string;
 }
 
 export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFormProps) {
@@ -64,6 +83,9 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
     exams: string[];
   } | null>(null)
   const [baseFee, setBaseFee] = useState<number>(0)
+  
+  // List of added fees
+  const [feeItems, setFeeItems] = useState<FeeItem[]>([])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -72,8 +94,8 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
       studentId: "",
       feeType: "monthly",
       amount: "0",
-      months: [new Date().getMonth()], // Defaults to current month index (0=Jan, 2=March)
-      year: new Date().getFullYear().toString(),
+      months: [new Date().getMonth()],
+      year: getCurrentSessionStartYear().toString(),
       examType: "",
       title: "",
       remarks: "",
@@ -89,12 +111,13 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
     ? students.filter(s => s.className === classes.find(c => c.id === selectedClassId)?.name)
     : students;
 
+  // Fetch fee details when student changes
   useEffect(() => {
     if (selectedStudentId) {
+      setFeeItems([]); // Clear added fees when student changes
       getStudentFeeDetails(selectedStudentId).then((details) => {
         if (details) {
           setFeeDetails(details);
-          // Default to monthly if available, else first type
           const hasMonthly = details.fees.some(f => f.type === 'monthly');
           if (hasMonthly) {
             form.setValue("feeType", "monthly");
@@ -110,13 +133,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
   useEffect(() => {
     if (!feeDetails) return;
 
-    // Special handling for examination fees to select specific exam
     if (feeType === 'examination') {
-       // Reset or keep default? 
-       // We might want to clear amount until specific exam is selected in UI, 
-       // but for now, let's just handle it via the examType selection if we change that logic.
-       // Or better: In this form, 'feeType' is just 'examination'. 
-       // We need to match the specific exam selected in 'examType' field.
        const examType = form.getValues("examType");
        if (examType) {
           const selectedExamFee = feeDetails.fees.find(f => f.type === 'examination' && f.title === examType);
@@ -142,9 +159,9 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
       setBaseFee(0);
       form.setValue("amount", "0");
     }
-  }, [feeType, feeDetails, form]); // Added dependency on examType change would be needed if we want real-time update
+  }, [feeType, feeDetails, form]);
 
-  // Watch examType to update amount for examination fees
+  // Watch examType
   const examType = form.watch("examType");
   useEffect(() => {
       if (feeType === 'examination' && feeDetails && examType) {
@@ -155,57 +172,6 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
           }
       }
   }, [examType, feeType, feeDetails, form]);
-
-
-  async function onSubmit(values: z.input<typeof formSchema>) {
-    setIsLoading(true)
-    try {
-      // Send the total amount directly to the server
-      const payload = {
-        studentId: values.studentId,
-        feeType: values.feeType,
-        amount: Number(values.amount),
-        months: values.feeType === 'monthly' ? values.months : undefined,
-        year: parseInt(values.year),
-        examType: values.feeType === 'examination' ? values.examType : undefined,
-        title: values.title,
-        remarks: values.remarks,
-      }
-
-      const result = await collectFee(payload, userId)
-      if (result.success && result.receiptData) {
-        toast.success(`Fee collected successfully!`)
-
-        const params = new URLSearchParams({
-          receiptNumber: result.receiptNumber,
-          studentName: result.receiptData.studentName,
-          studentRegNo: result.receiptData.studentRegNo,
-          className: result.receiptData.className,
-          feeType: result.receiptData.feeType,
-          year: result.receiptData.year.toString(),
-          amount: result.receiptData.amount.toString(),
-        })
-
-        if (result.receiptData.months) {
-          params.append('months', result.receiptData.months.join(','))
-        }
-        if (result.receiptData.examType) {
-          params.append('examType', result.receiptData.examType)
-        }
-        if (result.receiptData.title) {
-          params.append('title', result.receiptData.title)
-        }
-
-        router.push(`/fees/receipt?${params.toString()}`)
-      } else {
-        toast.error(`Failed: ${result.error}`)
-      }
-    } catch {
-      toast.error("Something went wrong")
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const toggleMonth = (monthIndex: number) => {
     const current = form.getValues("months") || [];
@@ -223,15 +189,132 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
     }
   };
 
+  const handleAddFee = async () => {
+    // Validate fields relevant to adding a fee
+    const isValid = await form.trigger(["feeType", "amount", "year", "months", "examType", "title"]);
+    if (!isValid) return;
+
+    const values = form.getValues();
+    const amount = Number(values.amount);
+
+    if (amount <= 0) {
+        form.setError("amount", { message: "Amount must be positive" });
+        return;
+    }
+
+    if (values.feeType === 'monthly' && (!values.months || values.months.length === 0)) {
+        form.setError("months", { message: "Select at least one month" });
+        return;
+    }
+
+    if (values.feeType === 'other' && !values.title) {
+        form.setError("title", { message: "Title is required for Other fee" });
+        return;
+    }
+
+    const newItem: FeeItem = {
+        id: Math.random().toString(36).substr(2, 9),
+        feeType: values.feeType,
+        amount: amount,
+        months: values.feeType === 'monthly' ? values.months : undefined,
+        year: parseInt(values.year),
+        examType: values.feeType === 'examination' ? values.examType : undefined,
+        title: values.title,
+        remarks: values.remarks,
+    };
+
+    setFeeItems([...feeItems, newItem]);
+    
+    // Reset fields to allow adding more
+    // Keep year and student, maybe reset type to default?
+    form.setValue("remarks", "");
+    form.setValue("amount", "0");
+    form.setValue("months", []);
+    form.setValue("title", "");
+    form.setValue("examType", "");
+    
+    // Reset amount logic triggers automatically via useEffect on feeType change if we change type
+    // If we keep type, we might want to reset selection.
+    if (values.feeType === 'monthly') {
+        form.setValue("months", []);
+        form.setValue("amount", "0");
+    }
+    
+    toast.success("Fee item added");
+  };
+
+  const handleRemoveFee = (id: string) => {
+    setFeeItems(feeItems.filter(item => item.id !== id));
+  };
+
+  const calculateTotal = () => {
+    return feeItems.reduce((sum, item) => sum + item.amount, 0);
+  };
+
+  async function onSubmit() {
+    // If there are no items in list, try to add the current form content first?
+    // Or just require items in the list.
+    // UX decision: If list is empty, treat current form as the item.
+    // If list has items, ignore current form unless user clicks "Add".
+    
+    const itemsToSubmit = [...feeItems];
+    
+    if (itemsToSubmit.length === 0) {
+        // Try to add current form
+        const isValid = await form.trigger(["studentId", "feeType", "amount", "year", "months", "examType", "title"]);
+        if (!isValid) return;
+        
+        const values = form.getValues();
+        if (Number(values.amount) > 0) {
+             itemsToSubmit.push({
+                id: "single",
+                feeType: values.feeType,
+                amount: Number(values.amount),
+                months: values.feeType === 'monthly' ? values.months : undefined,
+                year: parseInt(values.year),
+                examType: values.feeType === 'examination' ? values.examType : undefined,
+                title: values.title,
+                remarks: values.remarks,
+             });
+        } else {
+            toast.error("Please add at least one fee item with valid amount");
+            return;
+        }
+    }
+
+    if (!selectedStudentId) {
+        form.setError("studentId", { message: "Student is required" });
+        return;
+    }
+
+    setIsLoading(true)
+    try {
+      const payload = {
+        studentId: selectedStudentId,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        fees: itemsToSubmit.map(({ id, ...rest }) => rest)
+      }
+
+      const result = await collectFees(payload, userId)
+      if (result.success && result.receiptNumber) {
+        toast.success(`Fee collected successfully!`)
+        router.push(`/fees/receipt?receiptNumber=${result.receiptNumber}`)
+      } else {
+        toast.error(`Failed: ${result.error}`)
+      }
+    } catch {
+      toast.error("Something went wrong")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const standardMonthNames = [
     "January", "February", "March", "April", "May", "June", 
     "July", "August", "September", "October", "November", "December"
   ];
-
-  // Display order: April (3) to March (2)
   const displayMonthOrder = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2];
 
-  // Helper to format fee type label
   const formatFeeLabel = (type: string) => {
     switch (type) {
       case 'monthly': return 'Monthly Fee';
@@ -244,273 +327,332 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
   }
 
   return (
-    <>
-      <div className="max-w-3xl mx-auto p-4">
-        <BackButton />
-        <Card>
-          <CardHeader>
-            <CardTitle>Collect Fee</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="classId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Filter by Class</FormLabel>
-                        <Select onValueChange={(val) => {
-                          field.onChange(val);
-                          form.setValue("studentId", "");
-                        }} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="All Classes" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="all">All Classes</SelectItem>
-                            {classes.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="studentId"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col mt-2">
-                        <FormLabel>Student</FormLabel>
-                        <Popover open={open} onOpenChange={setOpen}>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                aria-expanded={open}
-                                className={cn(
-                                  "w-full justify-between",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value
-                                  ? students.find((s) => s.id === field.value)?.name + ` (${students.find((s) => s.id === field.value)?.registrationNumber})`
-                                  : "Select Student"}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[300px] p-0">
-                            <Command>
-                              <CommandInput placeholder="Search student..." />
-                              <CommandList>
-                                <CommandEmpty>No student found.</CommandEmpty>
-                                <CommandGroup>
-                                  {filteredStudents.map((student) => (
-                                    <CommandItem
-                                      key={student.id}
-                                      value={student.name + " " + student.registrationNumber}
-                                      onSelect={() => {
-                                        form.setValue("studentId", student.id)
-                                        setOpen(false)
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          student.id === field.value
-                                            ? "opacity-100"
-                                            : "opacity-0"
-                                        )}
-                                      />
-                                      {student.name} ({student.registrationNumber})
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="feeType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Fee Type</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select Type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {Array.from(new Set((feeDetails?.fees || []).map(f => f.type))).map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {formatFeeLabel(type)}
-                              </SelectItem>
-                            ))}
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="year"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Year</FormLabel>
+    <div className="max-w-3xl mx-auto p-4 space-y-6">
+      <BackButton />
+      <Card>
+        <CardHeader>
+          <CardTitle>Collect Fee</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <div className="space-y-6">
+              
+              {/* Student Selection */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="classId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Filter by Class</FormLabel>
+                      <Select onValueChange={(val) => {
+                        field.onChange(val);
+                        form.setValue("studentId", "");
+                      }} defaultValue={field.value}>
                         <FormControl>
-                          <Input type="number" {...field} />
+                          <SelectTrigger>
+                            <SelectValue placeholder="All Classes" />
+                          </SelectTrigger>
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                        <SelectContent>
+                          <SelectItem value="all">All Classes</SelectItem>
+                          {classes.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                {feeType === 'monthly' && (
-                  <div className="space-y-3 border p-4 rounded-md">
-                    <FormLabel>Select Months</FormLabel>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {displayMonthOrder.map((monthIndex) => (
-                        <div key={monthIndex} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`month-${monthIndex}`}
-                            checked={selectedMonths.includes(monthIndex)}
-                            onCheckedChange={() => toggleMonth(monthIndex)}
-                          />
-                          <label
-                            htmlFor={`month-${monthIndex}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {standardMonthNames[monthIndex]}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                    {selectedMonths.length === 0 && <p className="text-xs text-destructive">Select at least one month</p>}
+                <FormField
+                  control={form.control}
+                  name="studentId"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col mt-2">
+                      <FormLabel>Student</FormLabel>
+                      <Popover open={open} onOpenChange={setOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={open}
+                              className={cn(
+                                "w-full justify-between",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value
+                                ? students.find((s) => s.id === field.value)?.name + ` (${students.find((s) => s.id === field.value)?.registrationNumber})`
+                                : "Select Student"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search student..." />
+                            <CommandList>
+                              <CommandEmpty>No student found.</CommandEmpty>
+                              <CommandGroup>
+                                {filteredStudents.map((student) => (
+                                  <CommandItem
+                                    key={student.id}
+                                    value={student.name + " " + student.registrationNumber}
+                                    onSelect={() => {
+                                      form.setValue("studentId", student.id)
+                                      setOpen(false)
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        student.id === field.value
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      )}
+                                    />
+                                    {student.name} ({student.registrationNumber})
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Add Fee Section */}
+              <div className="border rounded-md p-4 bg-muted/30 space-y-4">
+                  <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium">Add Fee Item</h3>
                   </div>
-                )}
-
-                {feeType === 'examination' && (
-                  <FormField
-                    control={form.control}
-                    name="examType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Exam Name</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select Exam" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {/* Filter exams from fees instead of class default list if fees exist */}
-                            {(() => {
-                                const examFees = feeDetails?.fees.filter(f => f.type === 'examination');
-                                if (examFees && examFees.length > 0) {
-                                    return examFees.map((fee) => (
-                                        <SelectItem key={fee.id} value={fee.title || "Unknown Exam"}>
-                                            {fee.title} ({fee.month})
-                                        </SelectItem>
-                                    ));
-                                }
-                                // Fallback to class exam list if no fees configured (though amount won't be auto-filled correctly)
-                                if (feeDetails?.exams?.length) {
-                                  return feeDetails.exams.map((exam) => (
-                                    <SelectItem key={exam} value={exam}>{exam}</SelectItem>
-                                  ));
-                                }
-                                return <SelectItem value="Annual">Annual (Default)</SelectItem>;
-                            })()}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                {feeType === 'other' && (
-                  <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Title (Required for Other)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., Sports Fee, Library Fee" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                <FormField
-                  control={form.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Total Amount
-                        {feeType === 'monthly' && selectedMonths.length > 0 && baseFee > 0 && (
-                          <span className="ml-2 text-muted-foreground font-normal">
-                            (Unit: {baseFee.toLocaleString()} x {selectedMonths.length})
-                          </span>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="feeType"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Fee Type</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                            <FormControl>
+                                <SelectTrigger>
+                                <SelectValue placeholder="Select Type" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {Array.from(new Set((feeDetails?.fees || []).map(f => f.type))).map((type) => (
+                                <SelectItem key={type} value={type}>
+                                    {formatFeeLabel(type)}
+                                </SelectItem>
+                                ))}
+                                <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
                         )}
-                      </FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0.00" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    />
 
-                <FormField
-                  control={form.control}
-                  name="remarks"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Remarks (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Any notes..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormField
+                            control={form.control}
+                            name="year"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Session Start Year</FormLabel>
+                                <FormControl>
+                                <Input type="number" {...field} />
+                                </FormControl>
+                                <FormDescription className="text-[10px]">
+                                  Academic session starts in April of this year.
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                  </div>
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Collect Payment
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-      </div>
-    </>
+                  {feeType === 'monthly' && (
+                    <div className="space-y-3 border p-4 rounded-md bg-background">
+                        <FormLabel>Select Months</FormLabel>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {displayMonthOrder.map((monthIndex) => (
+                            <div key={monthIndex} className="flex items-center space-x-2">
+                            <Checkbox
+                                id={`month-${monthIndex}`}
+                                checked={selectedMonths.includes(monthIndex)}
+                                onCheckedChange={() => toggleMonth(monthIndex)}
+                            />
+                            <label
+                                htmlFor={`month-${monthIndex}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                            >
+                                {standardMonthNames[monthIndex]}
+                            </label>
+                            </div>
+                        ))}
+                        </div>
+                        {selectedMonths.length === 0 && <p className="text-xs text-destructive">Select at least one month</p>}
+                    </div>
+                  )}
+
+                  {feeType === 'examination' && (
+                    <FormField
+                        control={form.control}
+                        name="examType"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Exam Name</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                            <FormControl>
+                                <SelectTrigger>
+                                <SelectValue placeholder="Select Exam" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {(() => {
+                                    const examFees = feeDetails?.fees.filter(f => f.type === 'examination');
+                                    if (examFees && examFees.length > 0) {
+                                        return examFees.map((fee) => (
+                                            <SelectItem key={fee.id} value={fee.title || "Unknown Exam"}>
+                                                {fee.title} ({fee.month})
+                                            </SelectItem>
+                                        ));
+                                    }
+                                    if (feeDetails?.exams?.length) {
+                                    return feeDetails.exams.map((exam) => (
+                                        <SelectItem key={exam} value={exam}>{exam}</SelectItem>
+                                    ));
+                                    }
+                                    return <SelectItem value="Annual">Annual (Default)</SelectItem>;
+                                })()}
+                            </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                  )}
+
+                  {feeType === 'other' && (
+                    <FormField
+                        control={form.control}
+                        name="title"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Title (Required for Other)</FormLabel>
+                            <FormControl>
+                            <Input placeholder="e.g., Sports Fee, Library Fee" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="amount"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>
+                            Amount
+                            {feeType === 'monthly' && selectedMonths.length > 0 && baseFee > 0 && (
+                                <span className="ml-2 text-muted-foreground font-normal">
+                                (Unit: {baseFee.toLocaleString()} x {selectedMonths.length})
+                                </span>
+                            )}
+                            </FormLabel>
+                            <FormControl>
+                            <Input type="number" placeholder="0.00" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="remarks"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Remarks (Optional)</FormLabel>
+                            <FormControl>
+                            <Input placeholder="Any notes..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                  </div>
+
+                  <Button type="button" variant="secondary" onClick={handleAddFee} className="w-full">
+                    <Plus className="mr-2 h-4 w-4" /> Add Fee Type
+                  </Button>
+              </div>
+
+              {/* Added Fees List */}
+              {feeItems.length > 0 && (
+                  <div className="space-y-2">
+                      <h3 className="text-sm font-medium">Items to Collect</h3>
+                      <div className="border rounded-md divide-y">
+                          {feeItems.map((item) => (
+                              <div key={item.id} className="p-3 flex justify-between items-center bg-card">
+                                  <div className="text-sm">
+                                      <div className="font-medium">
+                                          {formatFeeLabel(item.feeType)}
+                                          {item.feeType === 'monthly' && item.months && (
+                                              <span className="text-muted-foreground ml-1">
+                                                  ({item.months.length} months)
+                                              </span>
+                                          )}
+                                          {item.feeType === 'examination' && (
+                                              <span className="text-muted-foreground ml-1">
+                                                  - {item.examType}
+                                              </span>
+                                          )}
+                                          {item.title && (
+                                              <span className="text-muted-foreground ml-1">
+                                                  - {item.title}
+                                              </span>
+                                          )}
+                                      </div>
+                                      <div className="text-muted-foreground text-xs">
+                                          Year: {item.year}
+                                      </div>
+                                  </div>
+                                  <div className="flex items-center gap-4">
+                                      <span className="font-semibold">₹{item.amount.toLocaleString()}</span>
+                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleRemoveFee(item.id)}>
+                                          <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                  </div>
+                              </div>
+                          ))}
+                          <div className="p-3 bg-muted/50 flex justify-between items-center font-bold">
+                              <span>Total</span>
+                              <span>₹{calculateTotal().toLocaleString()}</span>
+                          </div>
+                      </div>
+                  </div>
+              )}
+
+              <Button type="button" onClick={onSubmit} className="w-full" size="lg" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Collect Payment {feeItems.length > 0 && `(₹${calculateTotal().toLocaleString()})`}
+              </Button>
+            </div>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

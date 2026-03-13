@@ -755,7 +755,7 @@ export const getStaffDashboardStats = unstable_cache(async (userId: string) => {
     }));
 
     // 7. Global Pending Trend (Last 12 Months) for Line Chart
-    // NOTE: This is GLOBAL pending, not just for this user, as requested layout shows "Global Pending Fees Breakdown"
+    // NOTE: This is GLOBAL pending, not just for this user, as requested layout shows "Global Pending Fees"
     const globalPendingTrend = await Promise.all(monthsToCheck.map(async (date) => {
         const s = startOfMonth(date);
         const e = endOfMonth(date);

@@ -1,6 +1,17 @@
-import Image from 'next/image'
+/* eslint-disable @next/next/no-img-element */
 import { format } from 'date-fns'
 import { schoolConfig } from '@/lib/config'
+import { formatNumber } from "@/lib/utils"
+
+interface ReceiptItem {
+    feeType: string
+    amount: number
+    months: number[]
+    year: number
+    examType?: string
+    title?: string
+    remarks?: string
+}
 
 interface ReceiptProps {
     receiptData: {
@@ -10,31 +21,42 @@ interface ReceiptProps {
         rollNumber: string
         className: string
         section: string
-        feeType: string
-        months?: number[]
-        year: number
-        examType?: string
-        title?: string
-        remarks?: string
-        amount: number
         date: Date
+        totalAmount: number
+        items: ReceiptItem[]
     }
 }
 
 export function ThermalReceipt({ receiptData }: ReceiptProps) {
-    const getFeeDescription = () => {
-        const { feeType, months, year, examType, title } = receiptData
+    const getFeeDescription = (item: ReceiptItem) => {
+        const { feeType, months, year, examType, title } = item
 
         if (feeType === 'monthly' && months && months.length > 0) {
-            const monthNames = months.map(m => format(new Date(year, m - 1), 'MMM')).join(', ')
-            if (months.length === 1) {
-                return `Monthly Fee - ${monthNames} ${year}`
+            // Sort months to be safe
+            const sortedMonths = [...months].sort((a, b) => a - b);
+
+            // Check if sequential
+            let isSequential = true;
+            for (let i = 0; i < sortedMonths.length - 1; i++) {
+                if (sortedMonths[i + 1] !== sortedMonths[i] + 1) {
+                    isSequential = false;
+                    break;
+                }
             }
-            return `Monthly Fee - ${monthNames} ${year}`
+
+            const monthNames = sortedMonths.map(m => format(new Date(year, m - 1), 'MMM')).join(', ')
+
+            if (isSequential && sortedMonths.length > 2) {
+                const first = format(new Date(year, sortedMonths[0] - 1), 'MMM');
+                const last = format(new Date(year, sortedMonths[sortedMonths.length - 1] - 1), 'MMM');
+                return `Monthly Fee (${first}-${last} ${year})`
+            }
+
+            return `Monthly Fee (${monthNames} ${year})`
         }
 
         if (feeType === 'examination') {
-            return `Examination Fee - ${examType || title || 'Annual'} ${year}`
+            return `Exam Fee - ${examType || title || 'Annual'} ${year}`
         }
 
         if (feeType === 'admission' || feeType === 'admissionFees') {
@@ -49,34 +71,36 @@ export function ThermalReceipt({ receiptData }: ReceiptProps) {
             return title || 'Other Fee'
         }
 
-        return 'Fee Payment'
+        return formatFeeLabel(feeType)
+    }
+
+    const formatFeeLabel = (type: string) => {
+        return type.charAt(0).toUpperCase() + type.slice(1).replace(/([A-Z])/g, ' $1').trim();
     }
 
     return (
         <div className="thermal-receipt bg-white text-black p-6 max-w-[80mm] mx-auto font-mono text-sm">
             {/* School Logo/Emblem */}
             <div className="flex justify-center mb-4 relative h-[120px]">
-                <Image 
-                    src="/dark-logo.jpeg" 
-                    alt="School Logo" 
+                {/* // eslint-disable-next-line @next/next/no-img-element, @next/next/no-img-element */}
+                <img
+                    src="/dark-logo.jpeg"
+                    alt="School Logo"
                     className="object-contain"
-                    fill
-                    sizes="120px"
-                    priority
                 />
             </div>
 
             {/* School Name */}
-            <div className="text-center mb-6">
-                <h1 className="text-xl font-bold">{schoolConfig.name}</h1>
-                <p className="text-xs mt-1">Fee Receipt</p>
+            <div className="text-center mb-4">
+                <h1 className="text-lg font-bold leading-tight">{schoolConfig.name}</h1>
+                <p className="text-[10px] mt-1">Fee Receipt</p>
             </div>
 
             {/* Divider */}
-            <div className="border-t-2 border-dashed border-black my-4"></div>
+            <div className="border-t border-dashed border-black my-2"></div>
 
             {/* Receipt Details */}
-            <div className="space-y-2 text-xs">
+            <div className="space-y-1 text-[11px]">
                 <div className="flex justify-between">
                     <span className="font-semibold">Receipt No:</span>
                     <span>{receiptData.receiptNumber}</span>
@@ -84,60 +108,67 @@ export function ThermalReceipt({ receiptData }: ReceiptProps) {
 
                 <div className="flex justify-between">
                     <span className="font-semibold">Date:</span>
-                    <span>{format(receiptData.date, 'dd MMM yyyy')}</span>
-                </div>
-
-                <div className="flex justify-between">
-                    <span className="font-semibold">Time:</span>
-                    <span>{format(receiptData.date, 'hh:mm a')}</span>
+                    <span>{format(receiptData.date, 'dd MMM yyyy, hh:mm a')}</span>
                 </div>
             </div>
 
             {/* Divider */}
-            <div className="border-t-2 border-dashed border-black my-4"></div>
+            <div className="border-t border-dashed border-black my-2"></div>
 
             {/* Student Details */}
-            <div className="space-y-2 text-xs">
-                <div>
-                    <span className="font-semibold">Student Name:</span>
-                    <span className="ml-2">{receiptData.studentName}</span>
+            <div className="space-y-1 text-[11px]">
+                <div className="flex">
+                    <span className="font-semibold w-20 shrink-0">Name:</span>
+                    <span>{receiptData.studentName}</span>
                 </div>
 
-                <div className="flex justify-between">
-                    <span className="font-semibold">Reg. No:</span>
+                <div className="flex">
+                    <span className="font-semibold w-20 shrink-0">Reg. No:</span>
                     <span>{receiptData.studentRegNo}</span>
                 </div>
 
-                <div className="flex justify-between">
-                    <span className="font-semibold">Class / Sec:</span>
+                <div className="flex">
+                    <span className="font-semibold w-20 shrink-0">Class/Sec:</span>
                     <span>{receiptData.className} - {receiptData.section}</span>
                 </div>
 
-                <div className="flex justify-between">
-                    <span className="font-semibold">Roll No:</span>
-                    <span>{receiptData.rollNumber}</span>
-                </div>
+                {receiptData.rollNumber && (
+                    <div className="flex">
+                        <span className="font-semibold w-20 shrink-0">Roll No:</span>
+                        <span>{receiptData.rollNumber}</span>
+                    </div>
+                )}
             </div>
 
             {/* Divider */}
-            <div className="border-t-2 border-dashed border-black my-4"></div>
+            <div className="border-t border-dashed border-black my-2"></div>
 
-            {/* Fee Details */}
-            <div className="space-y-2 text-xs">
-                <div>
-                    <span className="font-semibold">Fee Type:</span>
-                    <div className="ml-2 mt-1">{getFeeDescription()}</div>
-                </div>
+            {/* Fee Items Header */}
+            <div className="flex justify-between text-[11px] font-bold border-b border-black pb-1 mb-1">
+                <span>Description</span>
+                <span>Amount</span>
+            </div>
 
-                <div className="flex justify-between items-center mt-4 text-base font-bold">
-                    <span>Amount Paid:</span>
-                    <span>₹{receiptData.amount.toLocaleString()}</span>
-                </div>
+            {/* Fee Items */}
+            <div className="space-y-1 text-[11px] min-h-[40px]">
+                {receiptData.items.map((item, index) => (
+                    <div key={index} className="flex justify-between items-start">
+                        <span className="pr-2">{getFeeDescription(item)}</span>
+                        <span className="whitespace-nowrap">₹{formatNumber(item.amount)}</span>
+                    </div>
+                ))}
             </div>
 
             {/* Divider */}
-            <div className="border-t-2 border-dashed border-black my-4"></div>
+            <div className="border-t border-dashed border-black my-2"></div>
 
+            {/* Total */}
+            <div className="flex justify-between items-center text-sm font-bold">
+                <span>GRAND TOTAL:</span>
+                <span>₹{formatNumber(receiptData.totalAmount)}</span>
+            </div>
+
+            <div className="border-t border-dashed border-black my-4"></div>
             {/* Footer Notes */}
             <div className="text-xs space-y-2">
                 <p className="font-semibold">कृपया समय पर फीस जमा करें</p>

@@ -72,12 +72,15 @@ interface FeeTransactionDoc {
   month?: number;
   year?: number;
   transactionDate: Date;
+  examType?: string;
 }
 
 interface ClassFeeDoc {
-    classId: Types.ObjectId;
-    type: string;
-    amount: number;
+  classId: Types.ObjectId;
+  type: string;
+  amount: number;
+  title?: string;
+  month?: string;
 }
 
 // --- Attendance Reporting ---
@@ -112,7 +115,7 @@ export async function getAttendanceReport({
     let totalDays = 0;
     let totalPresent = 0;
     let totalAbsent = 0;
-    
+
     const studentStats: Record<string, StudentStat> = {};
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -151,12 +154,12 @@ export async function getAttendanceReport({
       record.records.forEach((studentRec) => {
         if (!studentRec.studentId) return;
         const sId = studentRec.studentId._id.toString();
-        
+
         if (studentId && sId !== studentId) return;
 
         if (studentStats[sId]) {
           const status = studentRec.status;
-          
+
           if (status !== 'Holiday') {
             isWorkingDay = true;
             studentStats[sId].total += 1;
@@ -167,7 +170,7 @@ export async function getAttendanceReport({
               studentStats[sId].absent += 1;
               totalAbsent += 1;
             }
-            
+
             studentStats[sId].history.push({
               date: dateStr,
               status: status,
@@ -175,7 +178,7 @@ export async function getAttendanceReport({
           }
         }
       });
-      
+
       if (isWorkingDay) {
         workingDays.add(dateStr);
       }
@@ -201,18 +204,18 @@ export async function getAttendanceReport({
     daysInterval.forEach((day) => {
       const dateStr = format(day, 'yyyy-MM-dd');
       const recordsForDay = attendanceByDate[dateStr];
-      
+
       if (recordsForDay) {
         let dayPresent = 0;
         let dayTotal = 0;
 
         recordsForDay.forEach((record) => {
           record.records.forEach((s) => {
-             if (studentId && s.studentId?._id.toString() !== studentId) return;
-             if (s.studentId && studentStats[s.studentId._id.toString()]) {
-                if (s.status === 'Present') dayPresent++;
-                if (s.status !== 'Holiday') dayTotal++;
-             }
+            if (studentId && s.studentId?._id.toString() !== studentId) return;
+            if (s.studentId && studentStats[s.studentId._id.toString()]) {
+              if (s.status === 'Present') dayPresent++;
+              if (s.status !== 'Holiday') dayTotal++;
+            }
           });
         });
 
@@ -295,6 +298,17 @@ export async function getFeeReport({
       return fee ? fee.amount : 0;
     };
 
+    const getExamsForClass = (cId: string | undefined) => {
+      if (!cId) return [];
+      return classFees.filter((f) => f.classId.toString() === cId.toString() && f.type === 'examination');
+    };
+
+    const monthNameToNumber = (monthName: string | undefined) => {
+      if (!monthName) return -1;
+      const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+      return months.indexOf(monthName.toLowerCase());
+    };
+
     let totalCollectedPeriod = 0;
     let totalExpectedPeriod = 0;
     let totalDuePeriod = 0;
@@ -304,93 +318,115 @@ export async function getFeeReport({
       const sId = student._id.toString();
       const cId = student.classId?._id.toString();
 
-      const periodTxns = transactions.filter((t) => t.studentId.toString() === sId);
-      const collectedPeriod = periodTxns.reduce((sum, t) => sum + t.amount, 0);
-
       const studentAllTxns = allTransactions.filter((t) => t.studentId.toString() === sId);
 
-      let expectedPeriod = 0;
+      let expectedAmount = 0;
+      let paidAmount = 0;
       const monthlyFee = getFeeForClass(cId, 'monthly');
       const admissionFee = getFeeForClass(cId, 'admissionFees');
+      const registrationFee = getFeeForClass(cId, 'registrationFees');
+      const exams = getExamsForClass(cId);
+
+      const dueMonthsList: string[] = [];
 
       // 1. Monthly Fees in Period
-      let currentIterDate = startOfMonth(startDate);
+      const currentIterDate = startOfMonth(startDate);
       const endIterDate = endOfMonth(endDate);
-      
-      const dueMonthsList: string[] = [];
-      const paidMonthsSet = new Set<string>();
-      
-      studentAllTxns.forEach((txn) => {
-        if (txn.feeType === 'monthly' && txn.month && txn.year) {
-          paidMonthsSet.add(`${txn.year}-${txn.month}`);
-        }
-      });
 
-      let admissionDate = new Date();
-      if (student.dateOfAdmission) {
-        const d = new Date(student.dateOfAdmission);
-        if (!isNaN(d.getTime())) {
-            admissionDate = d;
-        }
-      }
-      
+      const admissionDate = student.dateOfAdmission ? new Date(student.dateOfAdmission) : new Date();
       const effectiveStart = isAfter(admissionDate, currentIterDate) ? startOfMonth(admissionDate) : currentIterDate;
 
-      if (isAfter(effectiveStart, currentIterDate)) {
-        currentIterDate = effectiveStart;
-      }
+      const tempIterDate = new Date(effectiveStart);
+      while (tempIterDate <= endIterDate) {
+        const y = tempIterDate.getFullYear();
+        const m = tempIterDate.getMonth() + 1; // 1-12
 
-      while (currentIterDate <= endIterDate) {
-        const y = currentIterDate.getFullYear();
-        const m = currentIterDate.getMonth() + 1;
-        const key = `${y}-${m}`;
-        
-        expectedPeriod += monthlyFee;
-        
-        if (!paidMonthsSet.has(key)) {
-            const monthName = currentIterDate.toLocaleString('default', { month: 'short' });
-            dueMonthsList.push(`${monthName} ${y}`);
+        expectedAmount += monthlyFee;
+
+        const paidTxn = studentAllTxns.find(t => t.feeType === 'monthly' && t.month === m && t.year === y);
+        if (paidTxn) {
+          paidAmount += paidTxn.amount;
+        } else {
+          const monthName = tempIterDate.toLocaleString('default', { month: 'short' });
+          dueMonthsList.push(`${monthName} ${y}`);
         }
-        
-        currentIterDate.setMonth(currentIterDate.getMonth() + 1);
+
+        tempIterDate.setMonth(tempIterDate.getMonth() + 1);
       }
 
-      // 2. Admission Fee in Period
+      // 2. Admission / Registration Fee in Period
       if (isAfter(admissionDate, startOfDay(startDate)) && isBefore(admissionDate, endOfDay(endDate))) {
-         expectedPeriod += admissionFee;
-         const paidAdmission = studentAllTxns.some((txn) => {
-             return txn.feeType === 'admission' || txn.feeType === 'admissionFees';
-         });
-         if (!paidAdmission) {
-             dueMonthsList.push("Admission Fee");
-         }
+        // Check if they paid EITHER admission OR registration (anywhere in studentAllTxns)
+        const admissionTxn = studentAllTxns.find(t =>
+          t.feeType === 'admission' ||
+          t.feeType === 'admissionFees' ||
+          t.feeType === 'registrationFees'
+        );
+
+        if (admissionTxn) {
+          // If they paid either, then it's expected and paid.
+          expectedAmount += admissionTxn.amount;
+          paidAmount += admissionTxn.amount;
+        } else {
+          // If not paid, expect either the admission fee or the registration fee.
+          const entryFeeAmount = admissionFee || registrationFee;
+          expectedAmount += entryFeeAmount;
+          if (entryFeeAmount > 0) {
+            dueMonthsList.push(admissionFee ? "Admission Fee" : "Registration Fee");
+          }
+        }
       }
 
-      let dueAmount = 0;
-      dueMonthsList.forEach(item => {
-          if (item === "Admission Fee") {
-              dueAmount += admissionFee;
-          } else {
-              dueAmount += monthlyFee;
+      // 3. Examination Fees in Period
+      exams.forEach((exam) => {
+        const examMonthNum = monthNameToNumber(exam.month);
+        if (examMonthNum !== -1) {
+          // Check if this exam falls in any year of the selected period
+          const examIterDate = startOfMonth(startDate);
+          while (examIterDate <= endIterDate) {
+            if (examIterDate.getMonth() === examMonthNum) {
+              const y = examIterDate.getFullYear();
+              expectedAmount += exam.amount;
+
+              const paidExamTxn = studentAllTxns.find(t =>
+                t.feeType === 'examination' &&
+                t.year === y &&
+                (t.examType === exam.title || t.feeType === 'examination') // Fallback check
+              );
+
+              if (paidExamTxn) {
+                paidAmount += paidExamTxn.amount;
+              } else {
+                dueMonthsList.push(exam.title || "Examination Fee");
+              }
+            }
+            examIterDate.setMonth(examIterDate.getMonth() + 1);
           }
+        }
       });
 
-      totalCollectedPeriod += collectedPeriod;
-      totalExpectedPeriod += expectedPeriod;
+      const dueAmount = expectedAmount - paidAmount > 0 ? expectedAmount - paidAmount : 0;
+
+      totalCollectedPeriod += paidAmount;
+      totalExpectedPeriod += expectedAmount;
       totalDuePeriod += dueAmount;
 
       let periodStr = "-";
       if (dueMonthsList.length > 0) {
         if (dueMonthsList.length <= 3) {
-            periodStr = dueMonthsList.join(", ");
+          periodStr = dueMonthsList.join(", ");
         } else {
-            const monthsOnly = dueMonthsList.filter(m => m !== "Admission Fee");
-            if (monthsOnly.length > 0) {
-                 periodStr = `${monthsOnly[0]} - ${monthsOnly[monthsOnly.length - 1]} (${monthsOnly.length} Months)`;
-            }
-            if (dueMonthsList.includes("Admission Fee")) {
-                periodStr += " + Adm. Fee";
-            }
+          const monthsOnly = dueMonthsList.filter(m => !m.includes("Fee") && !m.includes("Exam"));
+          if (monthsOnly.length > 0) {
+            periodStr = `${monthsOnly[0]} - ${monthsOnly[monthsOnly.length - 1]} (${monthsOnly.length} Others)`;
+          }
+          if (dueMonthsList.includes("Admission Fee")) {
+            periodStr += " + Adm. Fee";
+          }
+          const examDues = dueMonthsList.filter(m => m.includes("Exam"));
+          if (examDues.length > 0) {
+            periodStr += ` + ${examDues.length} Exam(s)`;
+          }
         }
       }
 
@@ -400,8 +436,8 @@ export async function getFeeReport({
         rollNumber: student.rollNumber,
         className: student.classId?.name || 'N/A',
         section: student.section,
-        collectedPeriod,
-        expectedPeriod,
+        collectedPeriod: paidAmount,
+        expectedPeriod: expectedAmount,
         dueAmount,
         status: dueAmount <= 0 ? 'Paid' : 'Due',
         period: periodStr,

@@ -118,13 +118,11 @@ export function AttendanceContent({
                       <TableCell className="text-blue-600 font-medium">{record.holidayCount}</TableCell>
                       <TableCell className="whitespace-nowrap">{record.markedBy}</TableCell>
                       <TableCell className="text-right">
-                        {canEdit && (
-                          <Link href={`/attendance/take?classId=${record.classId}&section=${record.section}&date=${format(recordDate, "yyyy-MM-dd")}`}>
+                        <Link href={`/attendance/take?classId=${record.classId}&section=${record.section}&date=${format(recordDate, "yyyy-MM-dd")}`}>
                             <Button variant="outline" size="sm">
-                              Edit
+                              {canEdit ? "Edit" : "View"}
                             </Button>
-                          </Link>
-                        )}
+                        </Link>
                       </TableCell>
                     </TableRow>
                   );

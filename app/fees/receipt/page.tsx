@@ -1,31 +1,70 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Suspense } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { ThermalReceipt } from '@/components/fees/thermal-receipt'
 import { Button } from '@/components/ui/button'
-import { Printer, ArrowLeft } from 'lucide-react'
+import { Printer, ArrowLeft, Loader2 } from 'lucide-react'
+import { getReceiptDetails } from '@/actions/fee-collection'
+import { toast } from 'sonner'
+
+interface ReceiptData {
+    receiptNumber: string
+    studentName: string
+    studentRegNo: string
+    rollNumber: string
+    className: string
+    section: string
+    date: Date
+    totalAmount: number
+    items: {
+        feeType: string
+        amount: number
+        months: number[]
+        year: number
+        examType?: string
+        title?: string
+        remarks?: string
+    }[]
+}
 
 function ReceiptContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const receiptData = {
-    receiptNumber: searchParams.get('receiptNumber') || '',
-    studentName: searchParams.get('studentName') || '',
-    studentRegNo: searchParams.get('studentRegNo') || '',
-    rollNumber: searchParams.get('rollNumber') || '',
-    className: searchParams.get('className') || '',
-    section: searchParams.get('section') || '',
-    feeType: searchParams.get('feeType') || 'monthly',
-    months: searchParams.get('months')?.split(',').map(Number) || [],
-    year: Number(searchParams.get('year')) || new Date().getFullYear(),
-    examType: searchParams.get('examType') || '',
-    title: searchParams.get('title') || '',
-    remarks: searchParams.get('remarks') || '',
-    amount: Number(searchParams.get('amount')) || 0,
-    date: searchParams.get('date') ? new Date(searchParams.get('date')!) : new Date()
-  }
+  useEffect(() => {
+    const fetchReceipt = async () => {
+        const receiptNumber = searchParams.get('receiptNumber')
+        if (!receiptNumber) {
+            setLoading(false)
+            return
+        }
+
+        try {
+            const data = await getReceiptDetails(receiptNumber)
+            if (data) {
+                // Convert date string/object to Date object
+                setReceiptData({
+                    ...data,
+                    date: new Date(data.date),
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    items: data.items as any
+                })
+            } else {
+                toast.error("Receipt not found")
+            }
+        } catch (error) {
+            console.error(error)
+            toast.error("Failed to load receipt")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    fetchReceipt()
+  }, [searchParams])
 
   const handlePrint = () => {
     window.print()
@@ -35,8 +74,15 @@ function ReceiptContent() {
     router.back()
   }
 
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>
+  }
+
   if (!receiptData) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+    return <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <p className="text-muted-foreground">Receipt not found or invalid receipt number.</p>
+        <Button onClick={handleBack}>Go Back</Button>
+    </div>
   }
 
   return (
