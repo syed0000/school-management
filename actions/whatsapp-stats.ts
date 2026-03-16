@@ -15,6 +15,7 @@ export async function getWhatsAppSummary() {
   await dbConnect();
 
   const totalCostResult = await WhatsAppStat.aggregate([
+    { $match: { status: { $in: ['success', 'partial'] } } },
     { $group: { _id: null, totalCost: { $sum: "$cost" } } },
   ]);
 

@@ -37,6 +37,7 @@ interface ProfileFormProps {
   user: {
     name: string
     email: string
+    role?: string
   }
 }
 
@@ -158,8 +159,9 @@ export function ProfileForm({ user }: ProfileFormProps) {
           </Form>
         </CardContent>
       </Card>
-
-      <Card>
+      
+      {!['teacher', 'parent'].includes(user.role || '') && (
+        <Card>
         <CardHeader>
           <CardTitle>Change Password</CardTitle>
           <CardDescription>Update your password to keep your account secure.</CardDescription>
@@ -247,6 +249,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
           </Form>
         </CardContent>
       </Card>
+      )}
     </div>
   )
 }

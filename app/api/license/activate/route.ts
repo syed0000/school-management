@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     // 3. Seed initial WhatsApp pricing
     await WhatsAppPricing.deleteMany({});
     await WhatsAppPricing.create({
-      pricePerRequest: 0.50, // Seed 0.50 according to widespread usage in codebase
+      pricePerRequest: 0.18, // Seed 0.18 according to widespread usage in codebase
       effectiveFrom: new Date('2025-04-01'), // Matching model's default
     });
 

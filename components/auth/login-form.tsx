@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, Eye, EyeOff } from "lucide-react"
 
 import Link from "next/link"
+import { whatsappConfig } from "@/lib/whatsapp-config"
 
 const adminSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -183,6 +184,35 @@ export function LoginForm({ type }: LoginFormProps) {
             </div>
           </form>
         </Form>
+        {(() => {
+          const isEnabled = whatsappConfig.enableParentLogin || 
+                            whatsappConfig.enableTeacherLogin || 
+                            process.env.NEXT_PUBLIC_ENABLE_PARENT_LOGIN === 'true' ||
+                            process.env.NEXT_PUBLIC_ENABLE_TEACHER_LOGIN === 'true';
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('WhatsApp Button Check:', { 
+              configParent: whatsappConfig.enableParentLogin,
+              configTeacher: whatsappConfig.enableTeacherLogin,
+              envParent: process.env.NEXT_PUBLIC_ENABLE_PARENT_LOGIN,
+              envTeacher: process.env.NEXT_PUBLIC_ENABLE_TEACHER_LOGIN,
+              finalResult: isEnabled
+            });
+          }
+
+          if (!isEnabled) return null;
+
+          return (
+            <div className="mt-4 pt-4 border-t border-border flex flex-col items-center gap-2">
+              <p className="text-xs text-muted-foreground text-center">
+                Parent or Teacher?
+              </p>
+              <Button variant="outline" className="w-full" asChild>
+                <Link href="/login/otp">Login with WhatsApp OTP</Link>
+              </Button>
+            </div>
+          );
+        })()}
       </CardContent>
     </Card>
   )

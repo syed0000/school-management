@@ -24,6 +24,12 @@ export default async function StaffLayout({
     redirect("/attendance/dashboard");
   }
 
+  if (session.user.role !== 'staff' && session.user.role !== 'admin') {
+    if (session.user.role === 'parent') redirect("/parent/dashboard");
+    if (session.user.role === 'teacher') redirect("/teacher/dashboard");
+    redirect("/login");
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">

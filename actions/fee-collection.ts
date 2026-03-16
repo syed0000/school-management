@@ -282,12 +282,11 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
              return;
           }
 
-          const workerUrl = process.env.FEEEASE_WORKER_URL || 'http://localhost:4000';
           const payload = {
             schoolId: license.schoolId,
             licenseKey: license.key,
             mode: 'single',
-            campaignName: process.env.WHATSAPP_TEMPLATE_RECEIPT || 'fee_receipt_v1',
+            campaignName: whatsappConfig.templates.receipt,
             phone: mobile,
             parentName: student.name, // using student as parent fallback
             studentName: student.name,
@@ -297,7 +296,7 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
             media: { url: receiptUrl, filename: `Receipt-${baseReceiptNumber}.png` }
           };
 
-          const workerRes = await fetch(`${workerUrl}/api/v1/whatsapp/receipt`, {
+          const workerRes = await fetch(`${whatsappConfig.worker.url}/api/v1/whatsapp/receipt`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)

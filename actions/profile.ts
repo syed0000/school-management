@@ -2,6 +2,8 @@
 
 import dbConnect from "@/lib/db"
 import User from "@/models/User"
+import Teacher from "@/models/Teacher"
+import Student from "@/models/Student"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
@@ -83,14 +85,50 @@ export async function updateProfile(data: z.infer<typeof updateProfileSchema>) {
 }
 
 export async function getUserProfile(userId: string) {
-  await dbConnect();
-  const user = await User.findById(userId).lean();
-  if (!user) return null;
-  
-  return {
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    id: user._id.toString()
-  };
+  try {
+    await dbConnect();
+    const session = await getServerSession(authOptions);
+    if (!session) return null;
+
+    const role = session.user.role;
+
+    if (role === 'teacher') {
+        const teacher = await Teacher.findById(userId).lean();
+        if (!teacher) return null;
+        return {
+            name: (teacher as any).name,
+            email: (teacher as any).email || "",
+            role: 'teacher',
+            id: (teacher as any)._id.toString(),
+            phone: (teacher as any).phone
+        };
+    }
+
+    if (role === 'parent') {
+        const student = await Student.findById(userId).lean();
+        if (!student) return null;
+        const parentName = (student as any).parents?.father?.name || (student as any).parents?.mother?.name || (student as any).name;
+        return {
+            name: parentName,
+            email: (student as any).contacts?.email?.[0] || "",
+            role: 'parent',
+            id: (student as any)._id.toString(),
+            phone: (student as any).contacts?.mobile?.[0]
+        };
+    }
+
+    // Default: Administrative User
+    const user = await User.findById(userId).lean();
+    if (!user) return null;
+    
+    return {
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        id: user._id.toString()
+    };
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    return null;
+  }
 }

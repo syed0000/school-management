@@ -2,6 +2,9 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import dbConnect from "@/lib/db";
 import User from "@/models/User";
+import Teacher from "@/models/Teacher";
+import Student from "@/models/Student";
+import Otp from "@/models/Otp";
 import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
@@ -12,21 +15,60 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         username: { label: "Username", type: "text" },
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
+        phone: { label: "Phone", type: "text" },
+        otp: { label: "OTP", type: "text" },
+        role: { label: "Role", type: "text" }
       },
       async authorize(credentials) {
+        await dbConnect();
+        
+        // Handle OTP-based login (Teacher/Parent)
+        if (credentials.phone && credentials.otp && credentials.role) {
+            const role = credentials.role as 'teacher' | 'parent';
+            
+            const otpDoc = await Otp.findOne({
+                phone: credentials.phone,
+                otp: credentials.otp,
+                role: role,
+                isUsed: false,
+                expiresAt: { $gt: new Date() }
+            });
+
+            if (!otpDoc) {
+                throw new Error("Invalid or expired OTP");
+            }
+
+            // Mark OTP as used
+            otpDoc.isUsed = true;
+            await otpDoc.save();
+
+            let entity;
+            if (role === 'teacher') {
+                entity = await Teacher.findById(otpDoc.refId);
+            } else {
+                entity = await Student.findById(otpDoc.refId).populate('parents.father parents.mother');
+            }
+
+            if (!entity) {
+                throw new Error("User record not found");
+            }
+
+            return {
+                id: entity._id.toString(),
+                name: entity.name,
+                email: (entity as any).email || (entity as any).contacts?.email?.[0] || "",
+                role: role,
+                requiresPasswordChange: false
+            };
+        }
+
+        // Handle Password-based login (Admin/Staff)
         if (!credentials?.password) {
           throw new Error("Password is required");
         }
-        
-        // Connect to DB
-        await dbConnect();
-        
+
         let user;
-        
-        // Handle empty DB / First launch (Optional: allow default admin if no users exist?)
-        // Actually, seeding should happen via activation.
-        // If DB is empty or no users, this will fail as expected.
         
         console.log("Authorize attempt for:", credentials.username || credentials.email);
         
@@ -79,8 +121,8 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
       }
       
-      // On subsequent calls, check if user is still active
-      if (token.id) {
+      // On subsequent calls, check if user is still active for non-OTP roles
+      if (token.id && !['teacher', 'parent'].includes(token.role as string)) {
         try {
           await dbConnect();
           const dbUser = await User.findById(token.id);

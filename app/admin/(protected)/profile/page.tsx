@@ -25,7 +25,7 @@ export default async function AdminProfilePage() {
         <h2 className="text-3xl font-bold tracking-tight">Profile Settings</h2>
       </div>
       <div className="max-w-2xl">
-        <ProfileForm user={{ name: user.name, email: user.email }} />
+        <ProfileForm user={{ name: user.name, email: user.email, role: user.role }} />
       </div>
     </div>
   )

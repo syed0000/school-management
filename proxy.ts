@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { jwtVerify } from "jose"; // We'll use this for signed cookies
+import { jwtVerify } from "jose";
+import { getToken } from "next-auth/jwt";
 
 // Define public paths that don't require license check
 const PUBLIC_PATHS = [
@@ -75,6 +76,79 @@ export async function proxy(req: NextRequest) {
   const licenseCheck = await checkLicense(req);
 
   if (licenseCheck.valid) {
+    // RBAC Check (After License Check)
+    let token = null;
+    try {
+      token = await getToken({ 
+        req: req as any, 
+        secret: process.env.NEXTAUTH_SECRET 
+      });
+    } catch (e) {
+      // If decryption fails (e.g. secret changed), treat as no token
+      token = null;
+    }
+
+    // Handle root path and login pages redirect
+    if (pathname === "/" || pathname === "/login" || pathname === "/admin/login" || pathname === "/login/otp") {
+      if (!token) {
+        if (pathname === "/") {
+          return NextResponse.redirect(new URL("/login", req.url));
+        }
+        return NextResponse.next();
+      }
+      
+      const role = token.role;
+      if (role === "admin") return NextResponse.redirect(new URL("/admin/dashboard", req.url));
+      if (role === "attendance_staff") return NextResponse.redirect(new URL("/attendance/dashboard", req.url));
+      if (role === "teacher") return NextResponse.redirect(new URL("/teacher/dashboard", req.url));
+      if (role === "parent") return NextResponse.redirect(new URL("/parent/dashboard", req.url));
+      
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+
+    // 1. Admin & Staff Routes
+    if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
+      if (!token || (token.role !== "admin" && token.role !== "staff")) {
+        return NextResponse.redirect(new URL("/admin/login", req.url));
+      }
+    }
+
+    // 2. Attendance Staff Routes
+    if (pathname.startsWith("/attendance")) {
+      if (!token || (token.role !== "attendance_staff" && token.role !== "admin")) {
+        return NextResponse.redirect(new URL("/dashboard", req.url));
+      }
+    }
+
+    // 3. General Staff/Admin Dashboard & Management
+    if (pathname.startsWith("/dashboard") || 
+        pathname.startsWith("/students") || 
+        pathname.startsWith("/teachers") || 
+        pathname.startsWith("/fees") || 
+        pathname.startsWith("/whatsapp") || 
+        pathname.startsWith("/id-cards")
+    ) {
+      if (!token || (token.role !== "staff" && token.role !== "admin")) {
+         if (token?.role === 'parent') return NextResponse.redirect(new URL("/parent/dashboard", req.url));
+         if (token?.role === 'teacher') return NextResponse.redirect(new URL("/teacher/dashboard", req.url));
+         return NextResponse.redirect(new URL("/login", req.url));
+      }
+    }
+
+    // 4. Parent Portal Routes
+    if (pathname.startsWith("/parent")) {
+      if (!token || (token.role !== "parent" && token.role !== "admin")) {
+        return NextResponse.redirect(new URL("/login/otp", req.url));
+      }
+    }
+
+    // 5. Teacher Portal Routes
+    if (pathname.startsWith("/teacher") && !pathname.startsWith("/teachers")) {
+      if (!token || (token.role !== "teacher" && token.role !== "admin")) {
+        return NextResponse.redirect(new URL("/login/otp", req.url));
+      }
+    }
+
     return NextResponse.next();
   }
 
@@ -94,12 +168,11 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes) -> We handle specific API routes in PUBLIC_PATHS, others should be protected?
-     *   Actually, let's protect everything and allowlist specific APIs.
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - public (public folder)
      */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico|public).*)",
   ],
 };

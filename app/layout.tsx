@@ -17,12 +17,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Modern Nursery Management",
+  title: "School Management",
   description: "Efficient nursery school management system",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Modern Nursery Management",
+    title: "School Management",
   },
   icons: {
     icon: "/favicon.ico",

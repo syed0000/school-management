@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const WhatsAppPricingSchema = new mongoose.Schema({
-  pricePerRequest: { type: Number, required: true, default: 0.5 },
+  pricePerRequest: { type: Number, required: true, default: 0.18 },
   effectiveFrom: { type: Date, required: true, default: new Date("2025-04-01") },
   createdAt: { type: Date, default: new Date("2025-04-01") },
 });
@@ -9,7 +9,7 @@ const WhatsAppPricingSchema = new mongoose.Schema({
 WhatsAppPricingSchema.statics.getCurrentPrice = async function() {
   const pricing = await this.findOne({ effectiveFrom: { $lte: new Date() } })
     .sort({ effectiveFrom: -1 });
-  return pricing ? pricing.pricePerRequest : 0.5; // Default to 0.5 as used across the codebase
+  return pricing ? pricing.pricePerRequest : 0.18; // Default to 0.18 as used across the codebase
 };
 
 export interface IWhatsAppPricing extends mongoose.Document {
@@ -31,7 +31,7 @@ if (WhatsAppPricing && !WhatsAppPricing.getCurrentPrice) {
   WhatsAppPricing.getCurrentPrice = async function() {
     const pricing = await this.findOne({ effectiveFrom: { $lte: new Date() } })
       .sort({ effectiveFrom: -1 });
-    return pricing ? pricing.pricePerRequest : 0.5;
+    return pricing ? pricing.pricePerRequest : 0.18;
   };
 }
 

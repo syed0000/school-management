@@ -17,7 +17,7 @@ export async function GET() {
         if (!pricing) {
             console.log("No WhatsApp pricing found, seeding initial pricing...");
             await WhatsAppPricing.create({
-                pricePerRequest: 0.50,
+                pricePerRequest: 0.18,
                 effectiveFrom: new Date('2025-04-01'),
             });
         }
