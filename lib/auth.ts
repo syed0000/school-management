@@ -21,6 +21,7 @@ export const authOptions: NextAuthOptions = {
         role: { label: "Role", type: "text" }
       },
       async authorize(credentials) {
+        if (!credentials) return null;
         await dbConnect();
         
         // Handle OTP-based login (Teacher/Parent)

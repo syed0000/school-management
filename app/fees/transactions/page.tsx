@@ -23,7 +23,7 @@ export default async function TransactionsPage() {
   const filter = { startDate, endDate }
 
   const [{ transactions, pagination }, stats, classes] = await Promise.all([
-    getFeeTransactions(filter, page),
+    getFeeTransactions(filter),
     getTransactionStats(filter),
     getClasses()
   ])

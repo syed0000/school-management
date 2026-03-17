@@ -1,31 +1,11 @@
 import { whatsappConfig as whatsappConfigSchema } from './whatsapp-config';
+import License from "@/models/License";
+import dbConnect from "@/lib/db";
 
 interface WhatsAppMessageResult {
   success: boolean;
   messageId?: string;
   error?: string;
-}
-
-interface WhatsAppPayload {
-  apiKey: string;
-  campaignName: string;
-  destination: string;
-  userName: string;
-  source?: string;
-  media?: {
-    url: string;
-    filename: string;
-  };
-  templateParams?: string[];
-  tags?: string[];
-  attributes?: Record<string, string>;
-}
-
-interface AiSensyResponse {
-    success: boolean;
-    message?: string;
-    messageId?: string;
-    // Add other properties as needed based on actual API response
 }
 
 interface UniversalMessageParams {
@@ -56,43 +36,42 @@ export async function sendWhatsAppMessage({
   }
 
   try {
+    await dbConnect();
+    const license = await License.findOne().sort({ createdAt: -1 }).lean();
+    if (!license || !license.schoolId || !license.key) {
+      throw new Error("Worker configuration missing (Could not find License in DB)");
+    }
+
     const validatedPhone = validatePhoneNumber(to);
     if (!validatedPhone) {
       throw new Error(`Invalid phone number: ${to}`);
     }
 
-    const template = messageType === 'image' 
+    const endpointPath = messageType === 'image' ? 'broadcast/image' : 'broadcast/text';
+    const campaignName = messageType === 'image' 
       ? config.templates.universal_image 
       : config.templates.universal_text;
 
-    const templateParams = [
-      params.parent_name,
-      params.notification_type,
-      config.schoolName,
-      params.student_name,
-      params.main_message
-    ];
-
-    const payload: WhatsAppPayload = {
-      apiKey: config.apiKey,
-      campaignName: template.campaignName,
-      destination: validatedPhone,
-      userName: params.parent_name, // Use parent's name for userName
+    // The worker's broadcast endpoint expects a list of recipients
+    const payload = {
+      schoolId: license.schoolId,
+      licenseKey: license.key,
+      mode: 'single', // We are sending one message, but using broadcast endpoint structure
+      campaignName: campaignName,
+      media: mediaUrl && mediaFilename ? { url: mediaUrl, filename: mediaFilename } : undefined,
+      notificationType: params.notification_type,
+      mainMessage: params.main_message,
+      recipients: [{
+        phone: validatedPhone,
+        studentName: params.student_name,
+        parentName: params.parent_name,
+      }],
       source: 'Fee Ease School Management System',
-      templateParams: templateParams,
+      // Webhook is optional for single messages usually, but we can provide appUrl if needed
+      webhookUrl: `${config.appUrl}/api/whatsapp/webhook`,
     };
 
-    if (mediaUrl && mediaFilename) {
-      payload.media = {
-        url: mediaUrl,
-        filename: mediaFilename
-      };
-    }
-
-    // This console log is helpful for debugging on the server.
-    // console.log(`Sending WhatsApp message to ${validatedPhone} with campaign ${campaignName}`);
-
-    const response = await fetch(config.baseUrl, {
+    const response = await fetch(`${config.worker.url}/api/v1/whatsapp/${endpointPath}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -100,13 +79,13 @@ export async function sendWhatsAppMessage({
       body: JSON.stringify(payload),
     });
 
-    const data = await response.json() as AiSensyResponse;
+    const data = await response.json();
 
     if (!response.ok || data.success === false) {
-      throw new Error(data.message || `API Error: ${response.statusText}`);
+      throw new Error(data.detail || data.message || `Worker Error: ${response.statusText}`);
     }
 
-    return { success: true, messageId: data.messageId || 'sent' };
+    return { success: true, messageId: data.jobId || data.messageId || 'sent' };
 
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -120,20 +99,20 @@ export function validatePhoneNumber(phone: string): string | null {
   const cleaned = phone.replace(/\D/g, '');
 
   // Check if it's a valid length (e.g., 10 digits for India)
-  // If 10 digits, add +91 (default country code for India if applicable, context implies India based on currency symbol ₹)
   if (cleaned.length === 10) {
     return `+91${cleaned}`;
   }
 
-  // If 12 digits and starts with 91, add +
+  // If 12 digits and starts with 91 or 0, handle it
   if (cleaned.length === 12 && cleaned.startsWith('91')) {
     return `+${cleaned}`;
   }
 
-  // If it already has country code (e.g., > 10 digits), assume it's correct but needs +
-  if (cleaned.length > 10 && cleaned.length < 13) {
+  // Basic length check for international
+  if (cleaned.length >= 10 && cleaned.length <= 15) {
      return `+${cleaned}`;
   }
 
   return null;
 }
+
