@@ -48,16 +48,11 @@ export async function sendWhatsAppMessage({
     }
 
     const endpointPath = messageType === 'image' ? 'broadcast/image' : 'broadcast/text';
-    const campaignName = messageType === 'image' 
-      ? config.templates.universal_image 
-      : config.templates.universal_text;
-
     // The worker's broadcast endpoint expects a list of recipients
     const payload = {
       schoolId: license.schoolId,
       licenseKey: license.key,
       mode: 'single', // We are sending one message, but using broadcast endpoint structure
-      campaignName: campaignName,
       media: mediaUrl && mediaFilename ? { url: mediaUrl, filename: mediaFilename } : undefined,
       notificationType: params.notification_type,
       mainMessage: params.main_message,

@@ -119,7 +119,6 @@ export async function sendBulkNotification(formData: FormData) {
         schoolId: license.schoolId,
         licenseKey: license.key,
         mode: 'bulk',
-        campaignName: messageType === 'image' ? whatsappConfig.templates.universal_image : whatsappConfig.templates.universal_text,
         media: mediaUrl && mediaFilename ? { url: mediaUrl, filename: mediaFilename } : undefined,
         notificationType: notificationType,
         mainMessage: mainMessage,

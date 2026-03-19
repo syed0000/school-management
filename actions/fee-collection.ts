@@ -286,7 +286,6 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
             schoolId: license.schoolId,
             licenseKey: license.key,
             mode: 'single',
-            campaignName: whatsappConfig.templates.receipt,
             phone: mobile,
             parentName: student.name, // using student as parent fallback
             studentName: student.name,

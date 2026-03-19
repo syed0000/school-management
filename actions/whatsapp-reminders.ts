@@ -83,7 +83,7 @@ export async function sendBulkReminders(
         schoolId: license.schoolId,
         licenseKey: license.key,
         mode: 'bulk',
-        campaignName: whatsappConfig.templates[`reminder_${language}`] || whatsappConfig.templates.reminder_english,
+        language,
         recipients,
         webhookUrl,
         jobId: batchId,

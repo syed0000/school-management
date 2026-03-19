@@ -76,7 +76,6 @@ export async function requestOtp(phone: string, role: 'teacher' | 'parent') {
             body: JSON.stringify({
                 schoolId: license.schoolId,
                 licenseKey: license.key,
-                campaignName: whatsappConfig.templates.otp,
                 phone: phone,
                 userName: userName,
                 otp: otpCode,
