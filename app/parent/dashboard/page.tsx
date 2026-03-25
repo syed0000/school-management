@@ -1,10 +1,144 @@
-import { UnderDevelopment } from "@/components/ui/under-development";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getStudentProfileForParent, getParentStudents } from "@/actions/parent";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { CalendarDays, CreditCard, BookOpen, User2 } from "lucide-react";
+import Link from "next/link";
+import dbConnect from "@/lib/db";
+import Student from "@/models/Student";
 
-export default async function ParentDashboardPage() {
+type SearchParams = Promise<{ studentId?: string }>;
+
+export default async function ParentDashboardPage({ searchParams }: { searchParams: SearchParams }) {
+  const session = await getServerSession(authOptions);
+  if (!session) redirect("/login/otp");
+  if (session.user.role !== 'parent' && session.user.role !== 'admin') redirect("/dashboard");
+
+  const { studentId: queryStudentId } = await searchParams;
+  const sessionStudentId = session.user.id;
+
+  // Resolve which student to show
+  let targetStudentId = queryStudentId || sessionStudentId;
+  let phone = "";
+
+  if (session.user.role === 'parent') {
+    await dbConnect();
+    const student = await Student.findById(sessionStudentId).select('contacts').lean() as { contacts?: { mobile?: string[] } } | null;
+    phone = student?.contacts?.mobile?.[0] ?? "";
+  }
+
+  // Validate access if switching student
+  if (queryStudentId && queryStudentId !== sessionStudentId && phone) {
+    const students = await getParentStudents(phone);
+    const hasAccess = students.some((s) => s._id === queryStudentId);
+    if (!hasAccess) targetStudentId = sessionStudentId;
+  }
+
+  const profile = await getStudentProfileForParent(targetStudentId, phone);
+
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold">Profile not found</h2>
+          <p className="text-muted-foreground mt-2">We could not load the student profile.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const quickLinks = [
+    {
+      label: "View Profile",
+      description: "Personal details & photo",
+      href: `/parent/profile?studentId=${targetStudentId}`,
+      icon: User2,
+      color: "bg-purple-50 text-purple-700 border-purple-200",
+    },
+    {
+      label: "Attendance",
+      description: "Monthly attendance calendar",
+      href: `/parent/attendance?studentId=${targetStudentId}`,
+      icon: CalendarDays,
+      color: "bg-blue-50 text-blue-700 border-blue-200",
+    },
+    {
+      label: "Fee Status",
+      description: "Paid & pending dues",
+      href: `/parent/fees?studentId=${targetStudentId}`,
+      icon: CreditCard,
+      color: "bg-green-50 text-green-700 border-green-200",
+    },
+    {
+      label: "Academics",
+      description: "Class & section info",
+      href: `/parent/profile?studentId=${targetStudentId}`,
+      icon: BookOpen,
+      color: "bg-orange-50 text-orange-700 border-orange-200",
+    },
+  ];
+
   return (
-    <UnderDevelopment 
-      title="Parent Portal Coming Soon" 
-      description="We are currently building a powerful dashboard for you to track your child's progress, fees, and more. Stay tuned!"
-    />
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+
+      {/* Student profile card */}
+      <Card className="overflow-hidden">
+        <div className="h-20 bg-gradient-to-r from-primary/20 to-primary/5" />
+        <CardContent className="pt-0 relative">
+          <div className="flex items-end gap-4 -mt-10 mb-4">
+            <Avatar className="h-20 w-20 border-4 border-background shadow-md ring-2 ring-primary/20">
+              <AvatarImage src={profile.photo} className="object-cover" />
+              <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
+                {profile.name[0]}
+              </AvatarFallback>
+            </Avatar>
+            <div className="pb-1">
+              <h2 className="text-xl font-bold">{profile.name}</h2>
+              <p className="text-muted-foreground text-sm">
+                {profile.className} – Section {profile.section}
+                {profile.rollNumber ? ` · Roll ${profile.rollNumber}` : ""}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {profile.registrationNumber && (
+              <Badge variant="outline" className="text-xs">
+                Reg: {profile.registrationNumber}
+              </Badge>
+            )}
+            {profile.dateOfAdmission && (
+              <Badge variant="outline" className="text-xs">
+                Admitted: {profile.dateOfAdmission}
+              </Badge>
+            )}
+            <Badge variant={profile.isActive ? "default" : "destructive"} className="text-xs">
+              {profile.isActive ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick links */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {quickLinks.map((link) => (
+          <Link key={link.label} href={link.href}>
+            <Card className={`border cursor-pointer hover:shadow-md transition-shadow h-full ${link.color}`}>
+              <CardContent className="p-4 flex flex-col gap-2">
+                <link.icon className="h-6 w-6" />
+                <div>
+                  <div className="font-semibold text-sm">{link.label}</div>
+                  <div className="text-xs opacity-75">{link.description}</div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }

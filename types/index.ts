@@ -27,8 +27,10 @@ export interface Student {
   gender?: "Male" | "Female" | "Other";
   parents: Parents;
   address: string;
-  mobile: string[];
-  email: string[];
+  contacts: {
+    mobile: string[];
+    email: string[];
+  };
   photo?: string;
   documents: Document[];
   pen?: string;
@@ -51,6 +53,13 @@ export interface Salary {
   effectiveDate: string | Date;
 }
 
+export interface AssignedClass {
+  classId: string;
+  section: string;
+  attendanceAccess: boolean; // per-class attendance marking permission
+  className?: string; // populated
+}
+
 export interface Teacher {
   _id: string;
   id: string;
@@ -58,14 +67,12 @@ export interface Teacher {
   email: string;
   phone: string;
   joiningDate: string | Date;
-  // documentNumber: string; // Removed in favor of documents array
-  // photo: string; // Kept as separate field for profile photo, but could be in documents
   photo?: string;
   pastExperience?: {
     totalExperience: number;
     experienceLetter?: string;
   };
-  experienceCertificate?: string; // Could be moved to documents array
+  experienceCertificate?: string;
   aadhaar: string;
   parents?: {
     fatherName?: string;
@@ -75,6 +82,63 @@ export interface Teacher {
   teacherId: string;
   salary: Salary;
   documents: Document[];
+  assignedClasses: AssignedClass[];
   createdAt: string | Date;
   updatedAt: string | Date;
 }
+
+// --- Parent Portal Types ---
+
+export interface ParentStudentProfile {
+  _id: string;
+  name: string;
+  registrationNumber: string;
+  className: string;
+  classId: string;
+  section: string;
+  rollNumber?: string;
+  dateOfBirth: string;
+  gender?: string;
+  photo?: string;
+  address: string;
+  contacts: { mobile: string[]; email: string[] };
+  parents: Parents;
+  dateOfAdmission?: string;
+  isActive: boolean;
+}
+
+export type AttendanceStatus = 'Present' | 'Absent' | 'Holiday' | null;
+
+export interface AttendanceCalendarEntry {
+  date: string; // "yyyy-MM-dd"
+  status: AttendanceStatus;
+  remarks?: string;
+}
+
+export interface MonthlyFeeStatus {
+  month: number; // 1-12
+  year: number;
+  monthName: string;
+  expected: number;
+  paid: number;
+  due: number;
+  status: 'Paid' | 'Due' | 'Partial';
+}
+
+export interface StudentFeeOverview {
+  totalExpected: number;
+  totalPaid: number;
+  totalDue: number;
+  monthlyBreakdown: MonthlyFeeStatus[];
+  otherFees: { label: string; expected: number; paid: number; due: number }[];
+}
+
+// --- Teacher Portal Types ---
+
+export interface TeacherClassAccess {
+  classId: string;
+  className: string;
+  section: string;
+  attendanceAccess: boolean; // per-class: can this teacher mark/edit attendance here?
+}
+

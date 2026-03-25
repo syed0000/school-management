@@ -89,6 +89,11 @@ export async function createTeacher(formData: FormData) {
     if (existingTeacher) {
       return { success: false, error: "Teacher with these details likely already exists." }
     }
+
+    // Parse assignedClasses from JSON string
+    const assignedClassesStr = formData.get('assignedClasses') as string;
+    const assignedClasses: { classId: string; section: string; attendanceAccess: boolean }[] =
+      assignedClassesStr ? JSON.parse(assignedClassesStr) : [];
     
     const newTeacher = await Teacher.create({
       name,
@@ -111,7 +116,8 @@ export async function createTeacher(formData: FormData) {
       pastExperience: {
           totalExperience: parseFloat(totalExperience) || 0,
           experienceLetter: expLetterUrl
-      }
+      },
+      assignedClasses,
     })
 
     revalidatePath("/admin/teachers")
@@ -270,6 +276,12 @@ export async function updateTeacher(id: string, formData: FormData) {
                  updateData.documents = [...(existing.documents || []), ...newDocs];
              }
          }
+    }
+
+    // Parse assignedClasses if provided
+    const assignedClassesStr = formData.get('assignedClasses') as string | null;
+    if (assignedClassesStr) {
+      updateData.assignedClasses = JSON.parse(assignedClassesStr) as { classId: string; section: string; attendanceAccess: boolean }[];
     }
 
     const teacher = await Teacher.findByIdAndUpdate(id, updateData, { new: true })

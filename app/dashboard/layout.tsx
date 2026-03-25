@@ -3,9 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { UserNav } from "@/components/dashboard/user-nav";
 import { MainNav } from "@/components/dashboard/main-nav";
-import Image from "next/image";
-import { X } from "lucide-react";
-import { schoolConfig } from "@/lib/config";
+import { AppLogo } from "@/components/ui/app-logo";
 
 export const dynamic = 'force-dynamic'
 
@@ -40,19 +38,7 @@ export default async function StaffLayout({
                <MainNav role="staff" mobileOnly />
              </div>
 
-             <div className="relative h-8 w-24 md:h-10 md:w-32 flex items-center justify-center rounded-md overflow-hidden">
-                <Image 
-                  src="/feeEasyLogo.png" 
-                  alt="feeEase" 
-                  fill
-                  className="object-contain p-1"
-                  priority
-                />
-             </div>
-             <X className="h-4 w-4 md:h-5 md:w-5 text-purple-600 font-bold stroke-3 hidden sm:block" />
-             <div className="font-bold text-lg md:text-xl tracking-tight hidden sm:block">
-                {schoolConfig.name}
-             </div>
+             <AppLogo href="/dashboard" />
           </div>
           <div className="flex items-center space-x-4">
             <UserNav user={session.user} />

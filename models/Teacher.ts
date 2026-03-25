@@ -18,7 +18,6 @@ const TeacherSchema = new mongoose.Schema({
     totalExperience: { type: Number },
     experienceLetter: { type: String }, // Path to local file or URL
   },
-  // experienceCertificate: { type: String }, // Moved to documents array
 
   aadhaar: { type: String, required: true },
   parents: {
@@ -31,6 +30,15 @@ const TeacherSchema = new mongoose.Schema({
     amount: { type: Number, required: true },
     effectiveDate: { type: Date, default: Date.now },
   },
+
+  // Portal access: which classes/sections this teacher can view
+  // attendanceAccess per entry controls whether the teacher can mark/edit attendance for that class
+  assignedClasses: [{
+    classId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true },
+    section: { type: String, enum: ['A', 'B', 'C', 'D'], required: true },
+    attendanceAccess: { type: Boolean, default: false },
+  }],
+
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
