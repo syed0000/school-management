@@ -83,7 +83,7 @@ export function StudentProfileCard({ profile }: StudentProfileCardProps) {
                   />
                 ) : (
                   <Avatar className="w-full h-full rounded-none">
-                    <AvatarFallback className="rounded-none text-2xl">
+                    <AvatarFallback className="rounded-none text-2xl bg-primary/10 text-primary">
                       {profile.name[0]}
                     </AvatarFallback>
                   </Avatar>
@@ -105,6 +105,18 @@ export function StudentProfileCard({ profile }: StudentProfileCardProps) {
                   )}
                 </button>
               </div>
+
+              {/* Floating edit button for mobile/better visibility */}
+              <Button
+                variant="secondary"
+                size="icon"
+                className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full border shadow-sm flex items-center justify-center bg-background p-1"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isPending}
+              >
+                {isPending ? <Loader2 className="h-3 w-3 animate-spin"/> : <Camera className="h-3 w-3" />}
+              </Button>
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -114,7 +126,7 @@ export function StudentProfileCard({ profile }: StudentProfileCardProps) {
               />
             </div>
 
-            <div className="pt-10 flex-1">
+            <div className="pt-2 sm:pt-4 flex-1">
               <h2 className="text-xl font-bold">{profile.name}</h2>
               <p className="text-sm text-muted-foreground">
                 {profile.className} · Section {profile.section}
@@ -127,16 +139,6 @@ export function StudentProfileCard({ profile }: StudentProfileCardProps) {
                   {profile.isActive ? "Active" : "Inactive"}
                 </Badge>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mt-2 h-7 text-xs text-muted-foreground"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isPending}
-              >
-                <Camera className="mr-1 h-3 w-3" />
-                Change Photo
-              </Button>
             </div>
           </div>
         </CardContent>

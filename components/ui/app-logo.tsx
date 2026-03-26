@@ -12,14 +12,14 @@ export function AppLogo({ href }: AppLogoProps) {
     <div className="flex items-center gap-2 sm:gap-3 transition-opacity hover:opacity-90">
       <div className="relative h-8 w-24 md:h-10 md:w-32 flex items-center justify-center rounded-md overflow-hidden bg-background">
         <Image 
-          src="/feeEasyLogo.png" 
-          alt="feeEase" 
+          src="/images/assets/logo-horizontal.png"
+          alt="FeeEase" 
           fill
-          className="object-contain p-1 dark:brightness-200 dark:grayscale"
+          className="object-contain p-1"
           priority
         />
       </div>
-      <X className="h-4 w-4 md:h-5 md:w-5 text-foreground" strokeWidth={3} />
+      <X className="h-4 w-4 md:h-5 md:w-5 text-foreground hidden sm:block" strokeWidth={3} />
       <div className="font-bold text-base md:text-lg tracking-tight hidden sm:block text-foreground truncate max-w-[150px] md:max-w-xs">
         {schoolConfig.name || "School Name"}
       </div>

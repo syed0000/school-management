@@ -10,6 +10,8 @@ import Link from "next/link";
 import dbConnect from "@/lib/db";
 import Student from "@/models/Student";
 
+import { DashboardPhotoUpload } from "@/components/parent/dashboard-photo-upload";
+
 type SearchParams = Promise<{ studentId?: string }>;
 
 export default async function ParentDashboardPage({ searchParams }: { searchParams: SearchParams }) {
@@ -83,19 +85,16 @@ export default async function ParentDashboardPage({ searchParams }: { searchPara
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
-
       {/* Student profile card */}
       <Card className="overflow-hidden">
         <div className="h-20 bg-gradient-to-r from-primary/20 to-primary/5" />
         <CardContent className="pt-0 relative">
           <div className="flex items-end gap-4 -mt-10 mb-4">
-            <Avatar className="h-20 w-20 border-4 border-background shadow-md ring-2 ring-primary/20">
-              <AvatarImage src={profile.photo} className="object-cover" />
-              <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
-                {profile.name[0]}
-              </AvatarFallback>
-            </Avatar>
+            <DashboardPhotoUpload
+              profileId={profile._id}
+              name={profile.name}
+              photo={profile.photo || undefined}
+            />
             <div className="pb-1">
               <h2 className="text-xl font-bold">{profile.name}</h2>
               <p className="text-muted-foreground text-sm">
