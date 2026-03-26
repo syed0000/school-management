@@ -68,6 +68,7 @@ interface StudentFeeReport {
   dueAmount: number;
   period: string;
   status: string;
+  feeStatuses: Record<string, string>;
 }
 
 interface FeeReportData {
@@ -100,7 +101,6 @@ export default function FeeReport({ classes }: FeeReportProps) {
           classId: classId === 'all' ? undefined : classId,
           section: section === 'all' ? undefined : section,
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setReportData(data as any);
       } catch (error) {
         console.error('Failed to fetch fee report:', error);
@@ -126,17 +126,25 @@ export default function FeeReport({ classes }: FeeReportProps) {
   const handleExportExcel = () => {
     if (!reportData) return;
 
-    const ws = XLSX.utils.json_to_sheet(filteredStudents.map((s) => ({
-      'Name': s.name,
-      'Roll No': s.rollNumber,
-      'Class': s.className,
-      'Section': s.section,
-      'Due Period': s.period,
-      'Expected': s.expectedPeriod,
-      'Paid': s.collectedPeriod,
-      'Pending': s.dueAmount,
-      'Status': s.status,
-    })));
+    // Get all unique monthly/fee headers
+    const allHeaders = Array.from(new Set(filteredStudents.flatMap(s => Object.keys(s.feeStatuses))));
+
+    const ws = XLSX.utils.json_to_sheet(filteredStudents.map((s) => {
+      const row: any = {
+        'Name': s.name,
+        'Roll No': s.rollNumber,
+        'Class': s.className,
+        'Section': s.section,
+        'Expected': s.expectedPeriod,
+        'Paid': s.collectedPeriod,
+        'Pending': s.dueAmount,
+        'Status': s.status,
+      };
+      allHeaders.forEach(h => {
+        row[h] = s.feeStatuses[h] === 'paid' ? 'Paid' : 'Unpaid';
+      });
+      return row;
+    }));
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Fee Report");
@@ -154,8 +162,39 @@ export default function FeeReport({ classes }: FeeReportProps) {
     { name: 'Due', value: reportData.studentReport.filter((s) => s.status === 'Due').length },
   ] : [];
 
+  // Extract all fee headers across all students to build a full register
+  const feeHeaders = Array.from(new Set(filteredStudents.flatMap(s => Object.keys(s.feeStatuses)))).sort((a, b) => {
+    // Sort logic to keep Admission/Registration first, then months, then Exams
+    const order = (h: string) => {
+      if (h.includes("Admission") || h.includes("Registration")) return 0;
+      if (/\d{4}/.test(h)) return 1; // Month YYYY
+      return 2; // Exams
+    };
+    return order(a) - order(b);
+  });
+
   return (
     <div className="space-y-6">
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #printable-report, #printable-report * {
+            visibility: visible;
+          }
+          #printable-report {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+          .print-hidden {
+            display: none !important;
+          }
+        }
+      `}</style>
+
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4 items-end bg-muted/30 p-4 rounded-lg border print:hidden">
         <div className="w-full md:w-auto">
@@ -215,7 +254,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
 
       {/* Stats Cards */}
       {reportData && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 print:hidden">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Collected (Period)</CardTitle>
@@ -253,7 +292,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
 
       {/* Charts */}
       {reportData && (
-        <div className="grid gap-4 md:grid-cols-2 print:break-inside-avoid">
+        <div className="grid gap-4 md:grid-cols-2 print:hidden">
           <Card>
             <CardHeader>
               <CardTitle>Collection Trend (Daily)</CardTitle>
@@ -303,10 +342,17 @@ export default function FeeReport({ classes }: FeeReportProps) {
       )}
 
       {/* Table & Actions */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center print:hidden">
-          <h3 className="text-lg font-semibold">Fee Details</h3>
-          <div className="flex gap-2">
+      <div id="printable-report" className="space-y-4">
+        <div className="flex justify-between items-center print:border-b-2 print:pb-2 print:mb-4">
+          <div className="flex flex-col">
+            <h3 className="text-lg font-bold">Fee Register Report</h3>
+            <p className="text-sm text-muted-foreground print:text-black">
+              Period: {date?.from ? format(date.from, 'PP') : ''} - {date?.to ? format(date.to, 'PP') : ''}
+              {classId !== 'all' ? ` | Class: ${classes.find(c => c.id === classId)?.name}` : ''}
+              {section !== 'all' ? ` | Section: ${section}` : ''}
+            </p>
+          </div>
+          <div className="flex gap-2 print:hidden">
             <Button variant="outline" size="sm" onClick={handlePrint}>
               <FileText className="mr-2 h-4 w-4" />
               Print / PDF
@@ -318,43 +364,58 @@ export default function FeeReport({ classes }: FeeReportProps) {
           </div>
         </div>
 
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
+        <div className="rounded-md border print:border-0 grid overflow-x-auto">
+          <Table className="print:text-xs">
+            <TableHeader className="bg-muted/50 print:bg-white border-b-2">
               <TableRow>
-                <TableHead>Roll No</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead className="text-left">Due Period</TableHead>
-                <TableHead className="text-right">Expected</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
-                <TableHead className="text-right">Pending</TableHead>
-                <TableHead className="text-right">Status</TableHead>
+                <TableHead className="w-[60px] font-bold border-x">Roll</TableHead>
+                <TableHead className="w-[150px] font-bold border-x">Student Name</TableHead>
+                {feeHeaders.map((header) => (
+                  <TableHead key={header} className="text-center font-bold px-1 whitespace-nowrap min-w-[70px] border-x">
+                    {header}
+                  </TableHead>
+                ))}
+                <TableHead className="text-right font-bold w-[80px] border-x">Pending</TableHead>
+                <TableHead className="text-right font-bold w-[60px] print:hidden border-x">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredStudents.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center h-24 text-muted-foreground">
-                    No data found
+                  <TableCell colSpan={feeHeaders.length + 4} className="text-center h-24 text-muted-foreground border-x">
+                    No records found
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>{student.rollNumber || '-'}</TableCell>
-                    <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell>{student.className}</TableCell>
-                    <TableCell className="text-left text-sm max-w-[80px] truncate" title={student.period}>
-                      {student.period}
+                  <TableRow key={student.id} className="border-b transition-colors hover:bg-muted/30">
+                    <TableCell className="font-medium border-x">{student.rollNumber || '-'}</TableCell>
+                    <TableCell className="font-semibold border-x">{student.name}</TableCell>
+                    {feeHeaders.map((header) => {
+                      const status = student.feeStatuses[header];
+                      return (
+                        <TableCell key={header} className="text-center p-0 border-x">
+                          <div className="flex items-center justify-center w-full h-full min-h-[40px]">
+                            {status === 'paid' ? (
+                              <div className="w-5 h-5 bg-green-500 rounded flex items-center justify-center text-white">
+                                <span className="text-[10px] font-bold">✓</span>
+                              </div>
+                            ) : status === 'unpaid' ? (
+                              <div className="w-5 h-5 border-2 border-foreground/20 rounded"></div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </div>
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell className={`text-right font-bold border-x ${student.dueAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {student.dueAmount > 0 ? `₹${formatNumber(student.dueAmount)}` : 'Nil'}
                     </TableCell>
-                    <TableCell className="text-right">₹{formatNumber(student.expectedPeriod || 0)}</TableCell>
-                    <TableCell className="text-right">₹{formatNumber(student.collectedPeriod || 0)}</TableCell>
-                    <TableCell className={`text-right ${student.dueAmount ? 'text-red-600' : ''}`}>₹{formatNumber(student.dueAmount || 0)}</TableCell>
-                    <TableCell className="text-right font-bold">
-                      <span className={
-                        student.status === 'Due' ? 'text-red-500 bg-red-50 px-2 py-1 rounded' : 'text-green-600 bg-green-50 px-2 py-1 rounded'
-                      }>
+                    <TableCell className="text-right print:hidden border-x">
+                      <span className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
+                        student.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}>
                         {student.status}
                       </span>
                     </TableCell>

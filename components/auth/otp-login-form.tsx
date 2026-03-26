@@ -35,8 +35,7 @@ const otpSchema = z.object({
 export function OtpLoginForm() {
   const { enableParentLogin, enableTeacherLogin } = whatsappConfig;
   
-  // Default to the first enabled role
-  const defaultRole = enableTeacherLogin ? "teacher" : (enableParentLogin ? "parent" : "teacher");
+  const defaultRole = enableParentLogin ? "parent" : "teacher";
   
   const [step, setStep] = useState<"phone" | "otp">("phone")
   const [loading, setLoading] = useState(false)
@@ -111,8 +110,8 @@ export function OtpLoginForm() {
         {enableParentLogin && enableTeacherLogin && (
           <Tabs value={role} onValueChange={(v) => setRole(v as any)} className="mb-6">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="teacher">Teacher</TabsTrigger>
               <TabsTrigger value="parent">Parent</TabsTrigger>
+              <TabsTrigger value="teacher">Teacher</TabsTrigger>
             </TabsList>
           </Tabs>
         )}

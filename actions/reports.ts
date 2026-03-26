@@ -328,6 +328,7 @@ export async function getFeeReport({
       const exams = getExamsForClass(cId);
 
       const dueMonthsList: string[] = [];
+      const feeStatuses: Record<string, string> = {};
 
       // 1. Monthly Fees in Period
       const currentIterDate = startOfMonth(startDate);
@@ -340,15 +341,17 @@ export async function getFeeReport({
       while (tempIterDate <= endIterDate) {
         const y = tempIterDate.getFullYear();
         const m = tempIterDate.getMonth() + 1; // 1-12
+        const monthHeader = tempIterDate.toLocaleString('default', { month: 'short' }) + " " + y;
 
         expectedAmount += monthlyFee;
-
         const paidTxn = studentAllTxns.find(t => t.feeType === 'monthly' && t.month === m && t.year === y);
+        
         if (paidTxn) {
           paidAmount += paidTxn.amount;
+          feeStatuses[monthHeader] = 'paid';
         } else {
-          const monthName = tempIterDate.toLocaleString('default', { month: 'short' });
-          dueMonthsList.push(`${monthName} ${y}`);
+          feeStatuses[monthHeader] = 'unpaid';
+          dueMonthsList.push(monthHeader);
         }
 
         tempIterDate.setMonth(tempIterDate.getMonth() + 1);
@@ -363,16 +366,19 @@ export async function getFeeReport({
           t.feeType === 'registrationFees'
         );
 
+        const headerName = admissionFee ? "Admission" : "Registration";
         if (admissionTxn) {
           // If they paid either, then it's expected and paid.
           expectedAmount += admissionTxn.amount;
           paidAmount += admissionTxn.amount;
+          feeStatuses[headerName] = 'paid';
         } else {
           // If not paid, expect either the admission fee or the registration fee.
           const entryFeeAmount = admissionFee || registrationFee;
           expectedAmount += entryFeeAmount;
           if (entryFeeAmount > 0) {
-            dueMonthsList.push(admissionFee ? "Admission Fee" : "Registration Fee");
+            feeStatuses[headerName] = 'unpaid';
+            dueMonthsList.push(headerName);
           }
         }
       }
@@ -386,6 +392,7 @@ export async function getFeeReport({
           while (examIterDate <= endIterDate) {
             if (examIterDate.getMonth() === examMonthNum) {
               const y = examIterDate.getFullYear();
+              const headerName = exam.title || "Exam";
               expectedAmount += exam.amount;
 
               const paidExamTxn = studentAllTxns.find(t =>
@@ -396,8 +403,10 @@ export async function getFeeReport({
 
               if (paidExamTxn) {
                 paidAmount += paidExamTxn.amount;
+                feeStatuses[headerName] = 'paid';
               } else {
-                dueMonthsList.push(exam.title || "Examination Fee");
+                feeStatuses[headerName] = 'unpaid';
+                dueMonthsList.push(headerName);
               }
             }
             examIterDate.setMonth(examIterDate.getMonth() + 1);
@@ -416,16 +425,16 @@ export async function getFeeReport({
         if (dueMonthsList.length <= 3) {
           periodStr = dueMonthsList.join(", ");
         } else {
-          const monthsOnly = dueMonthsList.filter(m => !m.includes("Fee") && !m.includes("Exam"));
+          const monthsOnly = dueMonthsList.filter(m => !m.includes("Fee") && !m.includes("Exam") && !m.includes("Admission") && !m.includes("Registration"));
           if (monthsOnly.length > 0) {
             periodStr = `${monthsOnly[0]} - ${monthsOnly[monthsOnly.length - 1]} (${monthsOnly.length} Others)`;
           }
-          if (dueMonthsList.includes("Admission Fee")) {
-            periodStr += " + Adm. Fee";
+          if (dueMonthsList.includes("Admission") || dueMonthsList.includes("Registration")) {
+            periodStr += " + Entry";
           }
-          const examDues = dueMonthsList.filter(m => m.includes("Exam"));
+          const examDues = dueMonthsList.filter(m => m.includes("Exam") || m.includes("Term"));
           if (examDues.length > 0) {
-            periodStr += ` + ${examDues.length} Exam(s)`;
+            periodStr += ` + Exams`;
           }
         }
       }
@@ -441,6 +450,7 @@ export async function getFeeReport({
         dueAmount,
         status: dueAmount <= 0 ? 'Paid' : 'Due',
         period: periodStr,
+        feeStatuses,
         lastPaymentDate: studentAllTxns.length > 0 ? studentAllTxns.sort((a, b) => new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime())[0].transactionDate : null,
       };
     });

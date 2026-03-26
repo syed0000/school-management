@@ -155,8 +155,39 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
     { name: 'Absent', value: reportData.summary.totalAbsent },
   ] : [];
 
+  // Group students by class and section for consolidated view
+  const groupedStudents = filteredStudents.reduce((acc, student) => {
+    const key = `${student.className} - ${student.section}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(student);
+    return acc;
+  }, {} as Record<string, StudentReport[]>);
+
   return (
     <div className="space-y-6">
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #printable-report, #printable-report * {
+            visibility: visible;
+          }
+          #printable-report {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+          .print-hidden {
+            display: none !important;
+          }
+          .page-break {
+            page-break-after: always;
+          }
+        }
+      `}</style>
+
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4 items-end bg-muted/30 p-4 rounded-lg border print:hidden">
         <div className="w-full md:w-auto">
@@ -216,7 +247,7 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
 
       {/* Stats Cards */}
       {reportData && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 print:hidden">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Working Days</CardTitle>
@@ -254,7 +285,7 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
 
       {/* Charts */}
       {reportData && (
-        <div className="grid gap-4 md:grid-cols-2 print:break-inside-avoid">
+        <div className="grid gap-4 md:grid-cols-2 print:hidden">
           <Card>
             <CardHeader>
               <CardTitle>Attendance Trend</CardTitle>
@@ -304,10 +335,15 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
       )}
 
       {/* Table & Actions */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center print:hidden">
-          <h3 className="text-lg font-semibold">Student Details</h3>
-          <div className="flex gap-2">
+      <div id="printable-report" className="space-y-8">
+        <div className="flex justify-between items-center print:border-b-2 print:pb-2">
+          <div className="flex flex-col">
+            <h3 className="text-lg font-bold">Attendance Consolidated Report</h3>
+            <p className="text-sm text-muted-foreground print:text-black">
+              Period: {date?.from ? format(date.from, 'PP') : ''} - {date?.to ? format(date.to, 'PP') : ''}
+            </p>
+          </div>
+          <div className="flex gap-2 print:hidden">
             <Button variant="outline" size="sm" onClick={handlePrint}>
               <FileText className="mr-2 h-4 w-4" />
               Print / PDF
@@ -319,50 +355,49 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
           </div>
         </div>
 
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Roll No</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead>Section</TableHead>
-                <TableHead className="text-right">Total Days</TableHead>
-                <TableHead className="text-right">Present</TableHead>
-                <TableHead className="text-right">Absent</TableHead>
-                <TableHead className="text-right">Percentage</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredStudents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center h-24 text-muted-foreground">
-                    No data found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>{student.rollNumber || '-'}</TableCell>
-                    <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell>{student.className}</TableCell>
-                    <TableCell>{student.section}</TableCell>
-                    <TableCell className="text-right">{student.total}</TableCell>
-                    <TableCell className="text-right text-green-600">{student.present}</TableCell>
-                    <TableCell className="text-right text-red-600">{student.absent}</TableCell>
-                    <TableCell className="text-right font-bold">
-                      <span className={
-                        parseFloat(student.percentage) < 75 ? 'text-red-500' : 'text-green-600'
-                      }>
-                        {student.percentage}%
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        {Object.keys(groupedStudents).length === 0 ? (
+          <div className="text-center py-10 border rounded-lg text-muted-foreground">
+            No attendance data found for the selected criteria
+          </div>
+        ) : (
+          Object.entries(groupedStudents).map(([groupKey, students], index) => (
+            <div key={groupKey} className={index > 0 ? "page-break mt-8" : ""}>
+              <div className="bg-muted/50 p-2 border-x border-t rounded-t-md font-bold text-sm">
+                Class: {groupKey}
+              </div>
+              <div className="border rounded-b-md overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="w-[80px] border-x">Roll No</TableHead>
+                      <TableHead className="border-x">Student Name</TableHead>
+                      <TableHead className="text-right border-x">Working Days</TableHead>
+                      <TableHead className="text-right border-x">Present</TableHead>
+                      <TableHead className="text-right border-x">Absent</TableHead>
+                      <TableHead className="text-right border-x">Percentage</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {students.map((student) => (
+                      <TableRow key={student.id} className="border-b last:border-0">
+                        <TableCell className="border-x">{student.rollNumber || '-'}</TableCell>
+                        <TableCell className="font-medium border-x">{student.name}</TableCell>
+                        <TableCell className="text-right border-x">{student.total}</TableCell>
+                        <TableCell className="text-right text-green-600 font-medium border-x">{student.present}</TableCell>
+                        <TableCell className="text-right text-red-600 font-medium border-x">{student.absent}</TableCell>
+                        <TableCell className="text-right font-bold border-x">
+                          <span className={parseFloat(student.percentage) < 75 ? 'text-red-600' : 'text-green-700'}>
+                            {student.percentage}%
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

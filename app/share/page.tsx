@@ -23,7 +23,7 @@ export default function SharePage() {
         await navigator.share({
           title: "School Management System",
           text: "Check out our school management system!",
-          url: origin,
+          url: `${origin}/login/otp`,
         })
       } catch (error) {
         console.error("Error sharing:", error)
@@ -34,7 +34,7 @@ export default function SharePage() {
   }
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(origin)
+    navigator.clipboard.writeText(`${origin}/login/otp`)
     setCopied(true)
     toast.success("URL copied to clipboard")
     setTimeout(() => setCopied(false), 2000)
@@ -57,7 +57,7 @@ export default function SharePage() {
         <CardContent className="flex flex-col items-center pt-8 pb-8 space-y-6">
           <div className="p-4 bg-white rounded-2xl shadow-inner border-4 border-muted">
             <Canvas
-              text={origin}
+              text={`${origin}/login/otp`}
               options={{
                 errorCorrectionLevel: 'M',
                 margin: 1,
