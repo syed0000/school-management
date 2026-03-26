@@ -164,6 +164,11 @@ export function LoginForm({ type }: LoginFormProps) {
                     </div>
                   </FormControl>
                   <FormMessage />
+                  <div className="text-right">
+                    <Link href="/forgot-password" title="Forgot Password" className="text-sm text-primary hover:underline">
+                      Forgot Password?
+                    </Link>
+                  </div>
                 </FormItem>
               )}
             />

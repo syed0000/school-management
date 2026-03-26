@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const OtpSchema = new mongoose.Schema({
   phone: { type: String, required: true },
   otp: { type: String, required: true },
-  role: { type: String, enum: ['teacher', 'parent'], required: true },
+  role: { type: String, enum: ['teacher', 'parent', 'admin', 'staff'], required: true },
   refId: { type: mongoose.Schema.Types.ObjectId, required: true }, // StudentId for parent, TeacherId for teacher
   expiresAt: { type: Date, required: true },
   isUsed: { type: Boolean, default: false },

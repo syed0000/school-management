@@ -79,8 +79,10 @@ export async function requestOtp(phone: string, role: 'teacher' | 'parent') {
                 phone: phone,
                 userName: userName,
                 otp: otpCode,
+                role: role,
+                schoolName: license.schoolName || whatsappConfig.schoolName,
                 validity: "5 minutes",
-                source: "FeeEase Auth"
+                source: `FeeEase ${role} Auth`
             })
         });
 

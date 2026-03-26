@@ -13,6 +13,7 @@ import bcrypt from "bcryptjs"
 const updateProfileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").optional(),
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  phone: z.string().min(10, "Phone number must be at least 10 digits").max(12, "Invalid phone number").optional().or(z.literal("")),
   currentPassword: z.string().optional(),
   newPassword: z.string().min(6, "Password must be at least 6 characters").optional(),
   confirmPassword: z.string().optional(),
@@ -58,6 +59,11 @@ export async function updateProfile(data: z.infer<typeof updateProfileSchema>) {
         return { success: false, error: "Email already in use" };
       }
       user.email = data.email;
+    }
+
+    // Update phone if provided
+    if (data.phone) {
+        user.phone = data.phone;
     }
 
     // Update password if provided
@@ -124,6 +130,7 @@ export async function getUserProfile(userId: string) {
     return {
         name: user.name,
         email: user.email,
+        phone: user.phone || "", // Added phone
         role: user.role,
         id: user._id.toString()
     };

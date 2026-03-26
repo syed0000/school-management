@@ -21,6 +21,7 @@ export default async function AdminStaffPage() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Phone</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created At</TableHead>
@@ -39,6 +40,7 @@ export default async function AdminStaffPage() {
                 <TableRow key={staff.id}>
                   <TableCell className="font-medium">{staff.name}</TableCell>
                   <TableCell>{staff.email}</TableCell>
+                  <TableCell>{staff.phone}</TableCell>
                   <TableCell className="capitalize">{staff.role.replace('_', ' ')}</TableCell>
                   <TableCell>
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${staff.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>

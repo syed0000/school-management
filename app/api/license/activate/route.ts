@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
       key: licenseKey, // Store immutable key
       token: token, // Store signed token
       schoolId: school._id,
+      schoolName: school.name,
       plan: school.subscription.plan,
       expiresAt: expiryDate, // Extracted from verified token
       lastVerifiedAt: new Date(),
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
       await User.create({
         username: school.adminEmail,
         email: school.adminEmail,
+        phone: school.adminMobile, // Populate phone for Forgot Password
         password: hashedPassword,
         name: school.adminName,
         role: 'admin',
@@ -86,7 +88,12 @@ export async function POST(req: NextRequest) {
       
       console.log("Admin user seeded successfully");
     } else {
-        console.log("Admin user already exists, skipping seed.");
+        console.log("Admin user already exists, checking for missing phone.");
+        if (!existingAdmin.phone && school.adminMobile) {
+            existingAdmin.phone = school.adminMobile;
+            await existingAdmin.save();
+            console.log("Admin phone number updated.");
+        }
     }
 
     return NextResponse.json({ success: true });

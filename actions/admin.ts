@@ -11,6 +11,7 @@ import { authOptions } from "@/lib/auth"
 const createStaffSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email"),
+  phone: z.string().min(10, "Phone number must be at least 10 digits").max(12, "Invalid phone number"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(['staff', 'attendance_staff']).default('staff'),
 })
@@ -37,6 +38,7 @@ export async function createStaff(data: z.infer<typeof createStaffSchema>) {
     await User.create({
       name: data.name,
       email: data.email,
+      phone: data.phone, // Added phone
       password: hashedPassword,
       role: data.role,
       isActive: true,
@@ -55,6 +57,7 @@ interface StaffUser {
   _id: { toString: () => string };
   name: string;
   email: string;
+  phone?: string;
   role: string;
   isActive: boolean;
   createdAt: Date;
@@ -69,6 +72,7 @@ export async function getStaffList() {
       id: user._id.toString(),
       name: user.name,
       email: user.email,
+      phone: user.phone || "", // Added phone
       role: user.role,
       isActive: user.isActive,
       createdAt: user.createdAt

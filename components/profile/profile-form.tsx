@@ -22,6 +22,7 @@ import { Loader2, Eye, EyeOff } from "lucide-react"
 const profileFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
+  phone: z.string().min(10, "Phone number must be at least 10 digits").max(12, "Invalid phone number"),
 })
 
 const passwordFormSchema = z.object({
@@ -37,6 +38,7 @@ interface ProfileFormProps {
   user: {
     name: string
     email: string
+    phone?: string
     role?: string
   }
 }
@@ -53,6 +55,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
     defaultValues: {
       name: user.name,
       email: user.email,
+      phone: user.phone || "",
     },
   })
 
@@ -71,7 +74,8 @@ export function ProfileForm({ user }: ProfileFormProps) {
     try {
       const result = await updateProfile({
           name: data.name,
-          email: data.email
+          email: data.email,
+          phone: data.phone
       })
 
       if (result.success) {
@@ -146,6 +150,19 @@ export function ProfileForm({ user }: ProfileFormProps) {
                     <FormLabel>Email</FormLabel>
                     <FormControl>
                       <Input placeholder="email@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={profileForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>WhatsApp Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="10-digit number" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

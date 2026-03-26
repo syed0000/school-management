@@ -39,6 +39,7 @@ import {
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email"),
+  phone: z.string().min(10, "Phone number must be at least 10 digits").max(12, "Invalid phone number"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(['staff', 'attendance_staff']),
 })
@@ -55,6 +56,7 @@ export function CreateStaffDialog() {
     defaultValues: {
       name: "",
       email: "",
+      phone: "",
       password: "",
       role: "staff",
     },
@@ -138,6 +140,19 @@ export function CreateStaffDialog() {
                   <FormLabel>Email</FormLabel>
                   <FormControl>
                     <Input placeholder="staff@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>WhatsApp Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="10-digit number" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
