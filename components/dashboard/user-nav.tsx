@@ -25,6 +25,7 @@ interface UserNavProps {
     name?: string | null
     email?: string | null
     image?: string | null
+    role?: string | null
   }
 }
 
@@ -67,6 +68,17 @@ export function UserNav({ user }: UserNavProps) {
               <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
             </Link>
           </DropdownMenuItem>
+          {user.role === 'admin' && (
+            <DropdownMenuItem asChild>
+              <a
+                href={`${process.env.NEXT_PUBLIC_FEEEASE_URL || 'https://feeease.com'}/school/profile`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                School Profile
+              </a>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => signOut()}>

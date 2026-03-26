@@ -6,6 +6,7 @@ import { AppLogo } from "@/components/ui/app-logo";
 import { getCurrentParentStudents } from "@/actions/parent";
 import { StudentSwitcher } from "@/components/parent/student-switcher";
 import { BottomNav } from "@/components/parent/bottom-nav";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,7 @@ export default async function ParentLayout({
             {students.length > 0 && (
               <StudentSwitcher students={students} activeStudentId={activeStudentId} />
             )}
+            <ThemeToggle />
             <UserNav user={session.user} />
           </div>
         </div>

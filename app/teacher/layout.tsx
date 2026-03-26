@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { UserNav } from "@/components/dashboard/user-nav";
 import Link from "next/link";
 import { AppLogo } from "@/components/ui/app-logo";
-import { LayoutDashboard, UserCheck } from "lucide-react";
+import { LayoutDashboard, UserCheck, Share2 } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 // ... [rest of imports unchanged]
 export const dynamic = 'force-dynamic';
@@ -27,6 +28,7 @@ export default async function TeacherLayout({
   const navItems = [
     { name: "Dashboard", href: "/teacher/dashboard", icon: LayoutDashboard },
     { name: "Profile", href: "/teacher/profile", icon: UserCheck },
+    { name: "Share App", href: "/share", icon: Share2 },
   ];
 
   return (
@@ -35,6 +37,7 @@ export default async function TeacherLayout({
         <div className="flex h-16 items-center px-4 justify-between max-w-7xl mx-auto w-full">
           <AppLogo href="/teacher/dashboard" />
           <div className="flex items-center space-x-4">
+            <ThemeToggle />
             <UserNav user={session.user} />
           </div>
         </div>

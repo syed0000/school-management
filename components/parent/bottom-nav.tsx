@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Home, UserCircle, CalendarDays, CreditCard } from "lucide-react";
+import { Home, UserCircle, CalendarDays, CreditCard, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { name: "Attendance", href: "/parent/attendance", icon: CalendarDays },
   { name: "Fees", href: "/parent/fees", icon: CreditCard },
   { name: "Profile", href: "/parent/profile", icon: UserCircle },
+  { name: "Share", href: "/share", icon: Share2 },
 ];
 
 export function BottomNav() {
@@ -28,7 +29,7 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={href}
-              className="group relative flex flex-col items-center gap-1.5 px-3 py-1 transition-all duration-300 active:scale-95"
+              className="group relative flex flex-col items-center gap-1.5 px-3 py-1 transition-all duration-300 active:scale-95 shrink-0"
             >
               <div
                 className={cn(

@@ -23,8 +23,10 @@ import {
 } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, Printer, Check, ChevronsUpDown } from "lucide-react"
-import { generateIdCard, generateBulkIdCards } from "@/actions/id-card"
+import { generateIdCard, generateBulkIdCards, saveSignature, getSignature } from "@/actions/id-card"
 import { format } from "date-fns"
+import { useEffect } from "react"
+import { Upload, Sliders } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Command,
@@ -77,6 +79,53 @@ export function IDCardGenerator({ students, classes }: IDCardGeneratorProps) {
   const [idCards, setIdCards] = useState<IDCard[]>([])
   const [open, setOpen] = useState(false)
   const [session, setSession] = useState("2026-27")
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null)
+  const [sigConfig, setSigConfig] = useState({ x: 0, y: 0, scale: 80 })
+  const [isUploading, setIsUploading] = useState(false)
+
+  useEffect(() => {
+    getSignature().then(data => {
+      if (data) {
+        setSignatureUrl(data.url)
+        setSigConfig({ x: data.x, y: data.y, scale: data.scale })
+      }
+    })
+  }, [])
+
+  const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await saveSignature(formData, sigConfig)
+      if (res.success) {
+        setSignatureUrl(res.url)
+        toast.success("Signature uploaded and saved")
+      }
+    } catch (error) {
+      toast.error("Failed to upload signature")
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleSaveConfig = async () => {
+    if (!signatureUrl) return
+    setIsUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('signatureUrl', signatureUrl)
+      await saveSignature(formData, sigConfig)
+      toast.success("Signature settings saved")
+    } catch (error) {
+      toast.error("Failed to save settings")
+    } finally {
+      setIsUploading(false)
+    }
+  }
 
   const singleForm = useForm<z.infer<typeof singleFormSchema>>({
     resolver: zodResolver(singleFormSchema),
@@ -266,6 +315,74 @@ export function IDCardGenerator({ students, classes }: IDCardGeneratorProps) {
         </CardContent>
       </Card>
 
+      <Card className="no-print">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sliders className="h-5 w-5" />
+            Signature Management
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
+                <div className="space-y-2">
+                    <Label>Signature File (Transparent PNG)</Label>
+                    <div className="flex gap-2">
+                         <Input 
+                            type="file" 
+                            accept="image/png" 
+                            onChange={handleSignatureUpload}
+                            className="text-xs"
+                            disabled={isUploading}
+                        />
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="sig-x">Pos X (mm)</Label>
+                    <Input 
+                        id="sig-x"
+                        type="number" 
+                        value={sigConfig.x} 
+                        onChange={(e) => setSigConfig(prev => ({ ...prev, x: Number(e.target.value) }))}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="sig-y">Pos Y (mm)</Label>
+                    <Input 
+                        id="sig-y"
+                        type="number" 
+                        value={sigConfig.y} 
+                        onChange={(e) => setSigConfig(prev => ({ ...prev, y: Number(e.target.value) }))}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="sig-scale">Scale (px)</Label>
+                    <Input 
+                        id="sig-scale"
+                        type="number" 
+                        value={sigConfig.scale} 
+                        onChange={(e) => setSigConfig(prev => ({ ...prev, scale: Number(e.target.value) }))}
+                    />
+                </div>
+                <Button onClick={handleSaveConfig} variant="secondary" className="lg:w-full" disabled={isUploading || !signatureUrl}>
+                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                    Save Config
+                </Button>
+            </div>
+            
+            {signatureUrl && (
+                <div className="p-4 bg-muted/50 rounded-lg flex items-center justify-center border border-dashed h-24 relative overflow-hidden">
+                    <img 
+                        src={signatureUrl} 
+                        alt="Current Signature" 
+                        className="max-h-full transition-all"
+                        style={{ transform: `scale(${sigConfig.scale/100})` }}
+                    />
+                    <div className="absolute top-2 right-2 text-[10px] bg-background px-2 py-1 rounded shadow-sm">Current Preview</div>
+                </div>
+            )}
+        </CardContent>
+      </Card>
+
       {idCards.length > 0 && (
         <div className="flex flex-col items-center space-y-8">
           <Button onClick={handlePrint} className="no-print w-full max-w-xs">
@@ -353,14 +470,26 @@ export function IDCardGenerator({ students, classes }: IDCardGeneratorProps) {
                   </div>
 
                   {/* Authority Sign and session */}
-                  <div className="absolute bottom-1 flex flex-row justify-between w-[95%] h-[8mm] overflow-hidden" style={{ alignItems: 'flex-end' }}>
-                    <div className="flex flex-col relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/logo.jpeg" alt="" width="20mm" height="20mm" className="absolute bottom-[4px] left-[4px]" />
-                      <div className="w-full border-t border-black/80" />
-                      <span className="text-[5px] font-bold text-black">Authority Signature</span>
+                  <div className="absolute bottom-1.5 flex flex-row justify-between w-[95%] h-[12mm] overflow-visible items-end px-1 ml-1" style={{ width: 'calc(100% - 10px)' }}>
+                    <div className="flex flex-col relative w-1/2 min-h-[10mm]">
+                      {signatureUrl && (
+                        <div 
+                          className="absolute pointer-events-none"
+                          style={{ 
+                            bottom: `${sigConfig.y}mm`, 
+                            left: `${sigConfig.x}mm`,
+                            width: `${sigConfig.scale}px`,
+                            zIndex: 20
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={signatureUrl} alt="" className="w-full object-contain" />
+                        </div>
+                      )}
+                      <div className="w-full border-t border-black/80 mt-auto" />
+                      <span className="text-[6px] font-black text-black uppercase tracking-[0.5px]">Authority Signature</span>
                     </div>
-                    <span className="text-[6px] text-gray-600 font-bold uppercase tracking-wide bottom-0 left-0">Session: {session}</span>
+                    <span className="text-[7px] text-gray-800 font-black uppercase tracking-widest bg-gray-100/50 px-1 py-0.5 rounded border border-gray-200 shadow-sm mb-0.5">Session: {session}</span>
                   </div>
                 </div>
               </div>

@@ -2,6 +2,8 @@
 
 import dbConnect from "@/lib/db"
 import Student from "@/models/Student"
+import Setting from "@/models/Setting"
+import { saveFile } from "@/lib/upload"
 
 export async function generateIdCard(studentId: string) {
   await dbConnect();
@@ -70,4 +72,38 @@ export async function generateBulkIdCards(classId: string) {
     success: true,
     data
   };
+}
+
+export async function saveSignature(formData: FormData, config: { x: number, y: number, scale: number }) {
+  await dbConnect();
+  
+  const file = formData.get('file') as File;
+  let signatureUrl = formData.get('signatureUrl') as string;
+
+  if (file) {
+    signatureUrl = await saveFile(file, 'signatures');
+  }
+
+  if (!signatureUrl) {
+    throw new Error("No signature URL or file provided");
+  }
+
+  await Setting.findOneAndUpdate(
+    { key: "id_card_signature" },
+    { 
+      value: {
+        url: signatureUrl,
+        ...config
+      } 
+    },
+    { upsert: true, new: true }
+  );
+
+  return { success: true, url: signatureUrl };
+}
+
+export async function getSignature() {
+  await dbConnect();
+  const setting = await Setting.findOne({ key: "id_card_signature" }).lean();
+  return setting ? setting.value : null;
 }

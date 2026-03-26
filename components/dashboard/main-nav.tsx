@@ -106,6 +106,11 @@ export function MainNav({
       label: "Attendance",
       active: pathname.startsWith("/attendance/dashboard"),
     },
+    {
+      href: "/share",
+      label: "Share App",
+      active: pathname === "/share",
+    },
   ]
 
   const staffRoutes = [
@@ -154,6 +159,11 @@ export function MainNav({
       label: "WhatsApp",
       active: pathname.startsWith("/whatsapp"),
     }] : []),
+    {
+      href: "/share",
+      label: "Share App",
+      active: pathname === "/share",
+    },
   ]
 
   const routes = role === "admin" ? adminRoutes : staffRoutes
@@ -171,7 +181,7 @@ export function MainNav({
               key={route.href}
               href={route.href}
               className={cn(
-                "text-sm font-medium transition-colors hover:text-primary",
+                "text-sm font-medium transition-colors hover:text-primary shrink-0",
                 route.active
                   ? "text-black dark:text-white"
                   : "text-muted-foreground"
