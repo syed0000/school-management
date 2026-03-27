@@ -9,16 +9,21 @@ permissions:
   contents: write
   issues: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   sync:
     runs-on: ubuntu-latest
-    if: github.repository != 'lfgraphics/feeease'
+    # Do not run on the main repository family (feeease or school-management)
+    if: github.repository != 'lfgraphics/feeease' && github.repository != 'lfgraphics/school-management'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: main # Ensure we are on the main branch
 
       - name: Configure Git
         run: |
@@ -27,12 +32,14 @@ jobs:
 
       - name: Add Upstream
         run: |
-          git remote add upstream https://github.com/lfgraphics/feeease.git || true
+          # Ensure upstream is set to the correct original source
+          git remote add upstream https://github.com/lfgraphics/school-management.git || true
           git fetch upstream main
 
       - name: Sync Safely
         id: sync
         run: |
+          # Switch to main explicitly
           git checkout main
 
           if git merge --ff-only upstream/main; then
