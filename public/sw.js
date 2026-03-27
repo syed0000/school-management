@@ -24,7 +24,6 @@ self.addEventListener('notificationclick', function (event) {
 
 const CACHE_NAME = 'modern-nursery-cache-v1';
 const urlsToCache = [
-  '/',
   '/logo.jpeg',
   '/android-chrome-192x192.png',
   '/android-chrome-512x512.png',

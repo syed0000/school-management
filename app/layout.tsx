@@ -33,6 +33,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         className="font-sans antialiased"
+        suppressHydrationWarning
       >
         <ServiceWorkerRegister />
         <InstallPrompt />
