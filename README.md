@@ -1,4 +1,4 @@
-# School Documents Management System
+# School Management System
 
 ## Overview
 
