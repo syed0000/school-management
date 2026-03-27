@@ -4,6 +4,18 @@
 
 A specialized, production-ready school management platform designed for nursery and preschool operations. This system streamlines the core administrative and financial workflows of early education institutions, replacing manual record-keeping with a secure, digital-first approach. It focuses heavily on financial integrity, student lifecycle management, and operational transparency.
 
+## 🛠 Microservice Architecture
+
+The FeeEase system is built as a distributed microservice architecture to ensure scalability and separation of concerns:
+
+- **[FeeEase Platform](https://github.com/lfgraphics/feeease)**: The central hub and landing page ([feeease.com](https://feeease.com)). Handles school discovery and registration.
+- **[Modern Nursery](https://github.com/lfgraphics/feeease)**: This project - the primary School Management System (SMS). A secure, role-based application for registered schools to manage students, fees, and staff.
+- **[FeeEase Worker](https://github.com/lfgraphics/feeease-worker)**: A high-performance background worker handling asynchronous tasks such as WhatsApp broadcasting, automated reminders, and future biometric integrations.
+- **[Try FeeEase](https://github.com/lfgraphics/try-school-management)**: A browser-based trial environment ([try.feeease.com](https://try.feeease.com)) that allows prospective schools to explore the system with zero-configuration and local storage.
+
+> [!TIP]
+> **Automated Updates**: This repository includes a GitHub Action (`.github/workflows/sync-upstream.yml`) that automatically synchronizes forked versions with the upstream `lfgraphics/feeease` repository every day. To enable this, ensure your repository's **Actions Settings** have **Read and write permissions** enabled. If a conflict occurs, the system will automatically open an **Issue** in your repository to notify you.
+
 ## Problem It Solves
 
 Running a nursery school involves complex recurring billing (monthly fees, exam fees) and strict student safety requirements. Manual ledgers lead to:
