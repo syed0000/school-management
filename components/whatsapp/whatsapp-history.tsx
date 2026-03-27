@@ -77,7 +77,7 @@ export function WhatsAppHistory({ history, summary }: WhatsAppHistoryProps) {
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead className="max-w-[250px]">Description</TableHead>
                 <TableHead>Recipients</TableHead>
                 <TableHead>Cost</TableHead>
                 <TableHead>Status</TableHead>
@@ -90,7 +90,7 @@ export function WhatsAppHistory({ history, summary }: WhatsAppHistoryProps) {
                 <TableRow key={item._id}>
                   <TableCell>{format(new Date(item.createdAt), "dd MMM yyyy, hh:mm a")}</TableCell>
                   <TableCell><Badge variant="secondary">{item.type}</Badge></TableCell>
-                  <TableCell>{item.description}</TableCell>
+                  <TableCell className="max-w-[250px] wrap-break-word">{item.description}</TableCell>
                   <TableCell>{item.recipientCount}</TableCell>
                   <TableCell>₹{item.cost.toFixed(2)}</TableCell>
                   <TableCell><Badge variant={item.status === 'success' ? 'default' : 'destructive'}>{item.status}</Badge></TableCell>

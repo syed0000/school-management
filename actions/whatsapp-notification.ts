@@ -75,14 +75,23 @@ export async function sendBulkNotification(formData: FormData) {
     const costPerMessage = await WhatsAppPricing.getCurrentPrice();
     const totalCost = costPerMessage * students.length;
 
-    // 4. Create a pending stat record — the webhook will update it to final status
+    // 4. Create a pending stat record
     const batchId = new mongoose.Types.ObjectId().toHexString();
+    
+    // Improved description: show student names if small count, or first few + count
+    let recipientNames = "";
+    if (students.length <= 2) {
+      recipientNames = students.map(s => s.name).join(", ");
+    } else {
+      recipientNames = `${students[0].name} and ${students.length - 1} others`;
+    }
+
     const stat = new WhatsAppStat({
       type: messageType,
-      description: `Bulk notification (${notificationType}) to ${classIds.join(', ')}`,
+      description: `Bulk notification (${notificationType || 'General'}) to ${recipientNames}`,
       recipientCount: students.length,
       cost: totalCost,
-      status: 'pending',  // ← starts pending; webhook updates to success/partial/failed
+      status: 'pending',
       batchId,
       mediaUrl,
     });

@@ -49,9 +49,18 @@ export async function sendBulkReminders(
 
     // 2. Create pending stat record
     const batchId = new mongoose.Types.ObjectId().toHexString();
+    
+    // Improved description showing student names/summary
+    let recipientNames = "";
+    if (validStudents.length <= 2) {
+      recipientNames = validStudents.map(s => s.name).join(", ");
+    } else {
+      recipientNames = `${validStudents[0].name} and ${validStudents.length - 1} others`;
+    }
+
     await WhatsAppStat.create({
       type: 'reminder',
-      description: `Bulk fee reminders (${language}) — ${validStudents.length} students`,
+      description: `Bulk fee reminders (${language}) to ${recipientNames}`,
       recipientCount: validStudents.length,
       cost: costPerMessage * validStudents.length,
       status: 'pending',
