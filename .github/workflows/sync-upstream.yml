@@ -16,7 +16,7 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     # Do not run on the main repository family (feeease or school-management)
-    # if: github.repository != 'lfgraphics/feeease' && github.repository != 'lfgraphics/school-management'
+    if: github.repository != 'lfgraphics/feeease' && github.repository != 'lfgraphics/school-management'
 
     steps:
       - name: Checkout
