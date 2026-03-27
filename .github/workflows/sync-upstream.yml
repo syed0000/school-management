@@ -79,20 +79,20 @@ jobs:
               let diff = fs.readFileSync('conflict-diff.txt', 'utf8');
 
               const body = `
-A merge conflict occurred while syncing with upstream.
+              A merge conflict occurred while syncing with upstream.
 
-### Details:
-\`\`\`
-${status}
-\`\`\`
+              ### Details:
+              \`\`\`
+              ${status}
+              \`\`\`
 
-### Diff:
-\`\`\`
-${diff.substring(0, 5000)}
-\`\`\`
+              ### Diff:
+              \`\`\`
+              ${diff.substring(0, 5000)}
+              \`\`\`
 
-### Action Required:
-Manually resolve conflicts and push changes.
+              ### Action Required:
+              Manually resolve conflicts and push changes.
               `;
 
               await github.rest.issues.create({
