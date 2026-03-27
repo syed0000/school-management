@@ -173,7 +173,7 @@ export function MainNav({
       {/* Desktop Navigation */}
       {!mobileOnly && (
         <nav
-          className={cn("flex items-center space-x-4 lg:space-x-6 whitespace-nowrap", className)}
+          className={cn("flex items-center space-x-4 lg:space-x-6 whitespace-nowrap overflow-x-auto", className)}
           {...props}
         >
           {routes.map((route) => (
