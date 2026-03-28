@@ -248,6 +248,39 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
           const mobile = student.contacts.mobile[0];
           // We can't put all details in URL params efficiently.
           // Just put basic info and total amount.
+          // Extract and format unique months/fee types for display
+          // 1. Monthly fees - sorting by school session (April to March)
+          const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          const getSessionRank = (m: number) => (m - 3 + 12) % 12; // April (3) becomes rank 0
+          
+          const uniqueMonths = Array.from(new Set(
+            data.fees
+              .filter(f => f.feeType === 'monthly' && f.months)
+              .flatMap(f => f.months!)
+          )).sort((a, b) => getSessionRank(a) - getSessionRank(b));
+
+          // 2. Non-monthly fee types (e.g., Admission, Exam Fee)
+          const otherTypes = Array.from(new Set(
+            data.fees
+              .filter(f => f.feeType !== 'monthly')
+              .map(f => {
+                // Return a descriptive name for other types
+                if (f.feeType === 'examination' && f.examType) return `${f.examType} Exam`;
+                if (f.feeType === 'admission' || f.feeType === 'admissionFees') return "Admission";
+                if (f.feeType === 'registration' || f.feeType === 'registrationFees') return "Registration";
+                if (f.feeType === 'annual' || f.feeType === 'annualFees') return "Annual";
+                return f.feeType.charAt(0).toUpperCase() + f.feeType.slice(1);
+              })
+          ));
+
+          // 3. Combine both for a descriptive 'month/details' field
+          const combinedDescription = [
+            ...uniqueMonths.map(m => monthNames[m]),
+            ...otherTypes
+          ].join(", ");
+
+          const monthsStr = combinedDescription || "Current";
+
           const queryParams = new URLSearchParams({
             studentName: student.name,
             studentRegNo: student.registrationNumber || 'N/A',
@@ -256,8 +289,8 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
             section: student.section || 'A',
             amount: totalAmount.toString(),
             date: new Date().toISOString(),
-            // Just indicate multiple
-            feeType: 'Multiple Fees',
+            feeType: 'Multiple Fees', // Use a special flag to show the summary
+            months: monthsStr, // Pass the consolidated comma-separated months/types
             year: new Date().getFullYear().toString(),
           });
 
@@ -291,7 +324,7 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
             studentName: student.name,
             amount: totalAmount.toString(),
             receiptNumber: baseReceiptNumber,
-            month: "Current", // simplified
+            month: monthsStr,
             media: { url: receiptUrl, filename: `Receipt-${baseReceiptNumber}.png` }
           };
 
