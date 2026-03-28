@@ -7,7 +7,7 @@ import { ConfirmProvider } from "@/context/ConfirmDialogContext";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
+    <SessionProvider refetchOnWindowFocus={true} refetchInterval={30 * 60}>
       <NextThemesProvider
         attribute="class"
         defaultTheme="system"

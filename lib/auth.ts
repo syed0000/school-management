@@ -112,38 +112,44 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: "jwt",
-    maxAge: 7 * 24 * 60 * 60, // 7 days
+    maxAge: 365 * 24 * 60 * 60, // 1 year persistence (long lived token)
+    updateAge: 30 * 60, // Throttle cookie writes to once every 30 minutes (refresh logic)
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.role = user.role;
         token.requiresPasswordChange = user.requiresPasswordChange;
         token.id = user.id;
+        token.lastRefetchedAt = Math.floor(Date.now() / 1000);
       }
       
-      // On subsequent calls, check if user is still active for non-OTP roles
+      // Allow manual refresh via update() if needed
+      if (trigger === "update" && session) {
+        token.role = session.user?.role || token.role;
+        token.lastRefetchedAt = Math.floor(Date.now() / 1000);
+      }
+
+      // Throttled re-validation for non-OTP roles
       if (token.id && !['teacher', 'parent'].includes(token.role as string)) {
-        try {
-          await dbConnect();
-          const dbUser = await User.findById(token.id);
-          if (!dbUser || !dbUser.isActive) {
-             // Return null or empty token to invalidate?
-             // Actually, returning null here might cause issues. 
-             // Better to throw error or handle in session callback?
-             // NextAuth doesn't handle errors well in jwt callback (it just logs them).
-             // But if we return an invalid token, session will be invalid.
-             // Let's set an error flag.
-             return { ...token, error: "AccountInactive" };
+        const now = Math.floor(Date.now() / 1000);
+        const lastRefetched = (token.lastRefetchedAt as number) || 0;
+
+        // Only hit the DB if 30 minutes (1800s) have passed since the last fetch
+        if (now - lastRefetched > 1800) {
+          try {
+            await dbConnect();
+            const dbUser = await User.findById(token.id);
+            if (!dbUser || !dbUser.isActive) {
+               return { ...token, error: "AccountInactive" };
+            }
+            // Update token with latest user data
+            token.role = dbUser.role;
+            token.requiresPasswordChange = dbUser.requiresPasswordChange;
+            token.lastRefetchedAt = now;
+          } catch (error) {
+            console.error("Error checking user status:", error);
           }
-          // Update token with latest user data if needed
-          token.role = dbUser.role;
-          token.requiresPasswordChange = dbUser.requiresPasswordChange;
-        } catch (error) {
-          console.error("Error checking user status:", error);
-          // If DB fails, we might want to let the user continue with existing token
-          // or force logout. For safety, let's keep the token but maybe log the error.
-          // Returning existing token allows temporary DB glitches without logging out users immediately.
         }
       }
       
@@ -151,8 +157,6 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (token.error === "AccountInactive") {
-         // Return null or invalid session to force signout
-         // eslint-disable-next-line @typescript-eslint/no-explicit-any
          return null as any; 
       }
       
