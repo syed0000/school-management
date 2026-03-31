@@ -47,6 +47,14 @@ export async function sendBulkReminders(
       return { success: false, error: "No students with valid contact numbers" };
     }
 
+    const { getWhatsAppSummary } = await import("@/actions/whatsapp-stats");
+    const { balance } = await getWhatsAppSummary();
+    const totalCost = costPerMessage * validStudents.length;
+
+    if (balance < totalCost) {
+        return { success: false, error: `Insufficient WhatsApp balance. You need ₹${totalCost.toFixed(2)} but your current balance is ₹${balance.toFixed(2)}.` };
+    }
+
     // 2. Create pending stat record
     const batchId = new mongoose.Types.ObjectId().toHexString();
     

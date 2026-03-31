@@ -2,14 +2,13 @@
 
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Globe, MessageCircle, Phone, Send } from "lucide-react"
+import { Globe, MessageCircle, Phone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { toast } from "sonner"
-import { sendBulkReminders } from "@/actions/whatsapp-reminders"
+import { SendReminderButton } from "@/components/whatsapp/send-reminder-button"
 import { formatNumber } from "@/lib/utils"
 import {
   DropdownMenu,
@@ -49,7 +48,6 @@ interface UnpaidStudentsTableProps {
 export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
   const [language, setLanguage] = useState("en")
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [sending, setSending] = useState(false)
 
   const normalizePhoneDigits = (value: string) => value.replace(/[^\d]/g, "")
 
@@ -71,35 +69,6 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
     setSelected(next)
   }
 
-  const handleSendReminders = async () => {
-    if (selected.size === 0) return
-    setSending(true)
-    try {
-      const lang = language === 'hi' ? 'hindi' : language === 'ur' ? 'urdu' : 'english'
-
-      const studentsToSend = students.filter(s => selected.has(s.id)).map(s => ({
-        id: s.id,
-        name: s.name,
-        contactNumber: formatForWaMe(s.mobile?.[0] || ''),
-        className: s.className,
-        details: s.months,
-        amount: s.amount
-      }));
-
-      const result = await sendBulkReminders(studentsToSend, lang)
-      if (result.success) {
-        toast.success(result.message || 'Reminders sheduled to send one by one, you may check the process form you AI Sensy dashbaord')
-        setSelected(new Set())
-      } else {
-        toast.error(`Failed to send reminders: ${result.error}`)
-      }
-    } catch {
-      toast.error("An error occurred")
-    } finally {
-      setSending(false)
-    }
-  }
-
   const formatForWaMe = (value: string) => {
     const digits = normalizePhoneDigits(value)
     if (digits.length === 10) return `91${digits}`
@@ -115,6 +84,16 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
     if (digits.startsWith("91") && digits.length === 12) return `+${digits}`
     return value
   }
+
+  const lang = language === 'hi' ? 'hindi' : language === 'ur' ? 'urdu' : 'english'
+  const studentsToSend = students.filter(s => selected.has(s.id)).map(s => ({
+    id: s.id,
+    name: s.name,
+    contactNumber: formatForWaMe(s.mobile?.[0] || ''),
+    className: s.className,
+    details: s.months,
+    amount: s.amount,
+  }))
 
   const buildWhatsAppMessage = (student: UnpaidStudent) => {
     const monthsText = student.months.length > 0 ? student.months.join(", ") : "the selected period"
@@ -140,16 +119,13 @@ export function UnpaidStudentsTable({ students }: UnpaidStudentsTableProps) {
           </div>
           <div className="flex items-center gap-2">
             {selected.size > 0 && isWhatsAppEnabled && (
-              <Button
+              <SendReminderButton
+                students={studentsToSend}
+                language={lang as "english" | "hindi" | "urdu"}
+                onSuccess={() => setSelected(new Set())}
                 size="sm"
-                variant="default"
-                onClick={handleSendReminders}
-                disabled={sending}
-                className="h-8 text-xs gap-2"
-              >
-                <Send className="h-3 w-3" />
-                {sending ? 'Sending...' : `Send (${selected.size})`}
-              </Button>
+                className="h-8 text-xs"
+              />
             )}
             <Globe className="h-4 w-4 text-muted-foreground" />
             <Select value={language} onValueChange={setLanguage}>

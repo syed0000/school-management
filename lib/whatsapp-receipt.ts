@@ -44,6 +44,13 @@ export async function sendWhatsAppReceipt({ student, totalAmount, receiptNumber,
 
         // 3. Track statistics
         const cost = await WhatsAppPricing.getCurrentPrice();
+
+        const { getWhatsAppSummary } = await import("@/actions/whatsapp-stats");
+        const { balance } = await getWhatsAppSummary();
+
+        if (balance < cost) {
+            return { success: false, reason: "Insufficient WhatsApp balance." };
+        }
         const stat = new WhatsAppStat({
             type: 'receipt',
             description: `Fee receipt for ${student.name} (₹${totalAmount})`,

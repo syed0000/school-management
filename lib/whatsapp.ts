@@ -42,6 +42,16 @@ export async function sendWhatsAppMessage({
       throw new Error("Worker configuration missing (Could not find License in DB)");
     }
 
+    const WhatsAppPricing = (await import("@/models/WhatsAppPricing")).default;
+    const costPerMessage = await WhatsAppPricing.getCurrentPrice();
+
+    const { getWhatsAppSummary } = await import("@/actions/whatsapp-stats");
+    const { balance } = await getWhatsAppSummary();
+
+    if (balance < costPerMessage) {
+        return { success: false, error: "Insufficient WhatsApp balance." };
+    }
+
     const validatedPhone = validatePhoneNumber(to);
     if (!validatedPhone) {
       throw new Error(`Invalid phone number: ${to}`);

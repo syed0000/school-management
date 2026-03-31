@@ -25,6 +25,42 @@ interface StudentWithContact {
   parents?: { father?: { name?: string } };
 }
 
+export async function getNotificationEstimate(classIds: string[]) {
+  try {
+    await dbConnect();
+    
+    const query: { isActive: boolean; classId?: { $in: string[] } } = { isActive: true };
+    if (!classIds.includes('all')) {
+      query.classId = { $in: classIds };
+    }
+
+    const students = await Student.find(query).select('contacts').lean();
+    
+    // Count valid phones exactly like send does
+    const validCount = students.filter(s => {
+       const typed = s as StudentWithContact;
+       return !!typed.contacts?.mobile?.[0];
+    }).length;
+
+    const costPerMessage = await WhatsAppPricing.getCurrentPrice();
+    const totalCost = validCount * costPerMessage;
+    
+    const { getWhatsAppSummary } = await import("@/actions/whatsapp-stats");
+    const { balance } = await getWhatsAppSummary();
+
+    return {
+       success: true,
+       validCount,
+       costPerMessage,
+       totalCost,
+       balance,
+       hasSufficientBalance: balance >= totalCost
+    };
+  } catch (err) {
+    return { success: false, error: "Failed to estimate cost" };
+  }
+}
+
 export async function sendBulkNotification(formData: FormData) {
   try {
     await dbConnect();
@@ -74,6 +110,13 @@ export async function sendBulkNotification(formData: FormData) {
     // 3. Pricing
     const costPerMessage = await WhatsAppPricing.getCurrentPrice();
     const totalCost = costPerMessage * students.length;
+
+    const { getWhatsAppSummary } = await import("@/actions/whatsapp-stats");
+    const { balance } = await getWhatsAppSummary();
+
+    if (balance < totalCost) {
+        return { success: false, error: `Insufficient WhatsApp balance. You need ₹${totalCost.toFixed(2)} but your current balance is ₹${balance.toFixed(2)}.` };
+    }
 
     // 4. Create a pending stat record
     const batchId = new mongoose.Types.ObjectId().toHexString();

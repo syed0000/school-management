@@ -4,11 +4,9 @@ import { useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Users, Send, Globe } from 'lucide-react'
-import { Button } from "@/components/ui/button"
+import { Users, Globe } from 'lucide-react'
 import { Checkbox } from "@/components/ui/checkbox"
-import { toast } from "sonner"
-import { sendBulkReminders } from "@/actions/whatsapp-reminders"
+import { SendReminderButton } from "@/components/whatsapp/send-reminder-button"
 import {
   Select,
   SelectContent,
@@ -39,7 +37,6 @@ interface UnpaidStudentListProps {
 export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
   const [language, setLanguage] = useState("en")
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [sending, setSending] = useState(false)
 
   const toggleSelectAll = () => {
     if (selected.size === students.length) {
@@ -59,34 +56,15 @@ export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
     setSelected(next)
   }
 
-  const handleSendReminders = async () => {
-    if (selected.size === 0) return
-    setSending(true)
-    try {
-      const lang = language === 'hi' ? 'hindi' : language === 'ur' ? 'urdu' : 'english'
-      
-      const studentsToSend = students.filter(s => selected.has(s.id)).map(s => ({
-        id: s.id,
-        name: s.name,
-        contactNumber: s.contactNumber || '',
-        className: s.className,
-        details: s.details,
-        amount: s.amount
-      }));
-
-      const result = await sendBulkReminders(studentsToSend, lang)
-      if (result.success) {
-        toast.success(result.message || 'Reminders sheduled to send one by one, you may check the process form you AI Sensy dashbaord')
-        setSelected(new Set())
-      } else {
-        toast.error(`Failed to send reminders: ${result.error}`)
-      }
-    } catch {
-      toast.error("An error occurred")
-    } finally {
-      setSending(false)
-    }
-  }
+  const lang = language === 'hi' ? 'hindi' : language === 'ur' ? 'urdu' : 'english'
+  const studentsToSend = students.filter(s => selected.has(s.id)).map(s => ({
+    id: s.id,
+    name: s.name,
+    contactNumber: s.contactNumber || '',
+    className: s.className,
+    details: s.details,
+    amount: s.amount,
+  }))
 
   if (students.length === 0) {
     return (
@@ -115,16 +93,13 @@ export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
                 <SelectItem value="ur">Urdu</SelectItem>
               </SelectContent>
             </Select>
-            <Button 
-                size="sm" 
-                variant="default"
-                onClick={handleSendReminders} 
-                disabled={sending}
-                className="h-8 text-xs gap-2"
-            >
-                <Send className="h-3 w-3" />
-                {sending ? 'Sending...' : 'Send Reminder'}
-            </Button>
+            <SendReminderButton
+              students={studentsToSend}
+              language={lang as "english" | "hindi" | "urdu"}
+              onSuccess={() => setSelected(new Set())}
+              size="sm"
+              className="h-8 text-xs"
+            />
           </div>
         </div>
       )}
