@@ -1,4 +1,5 @@
 import { getHolidays } from "@/actions/holiday";
+import { getClasses } from "@/actions/class";
 import { HolidayManager } from "@/components/attendance/holiday-manager";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getServerSession } from "next-auth";
@@ -14,6 +15,7 @@ export default async function HolidaysPage() {
   }
 
   const holidays = await getHolidays();
+  const classes = await getClasses();
 
   return (
     <div className="flex-1 space-y-4">
@@ -27,7 +29,7 @@ export default async function HolidaysPage() {
           <CardTitle>Manage School Holidays</CardTitle>
         </CardHeader>
         <CardContent>
-          <HolidayManager holidays={holidays} />
+          <HolidayManager holidays={holidays} classes={classes} />
         </CardContent>
       </Card>
     </div>

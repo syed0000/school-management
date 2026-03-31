@@ -57,7 +57,9 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   interface AttendanceSummary {
+    totalDays: number;
     totalWorkingDays: number;
+    totalHolidays: number;
     averageAttendance: number | string;
     totalPresent: number;
     totalAbsent: number;
@@ -76,7 +78,9 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
     rollNumber: string;
     className: string;
     section: string;
-    total: number;
+    totalDays: number;
+    workingDays: number;
+    holidays: number;
     present: number;
     absent: number;
     percentage: string;
@@ -133,7 +137,9 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
       'Roll No': s.rollNumber,
       'Class': s.className,
       'Section': s.section,
-      'Total Days': s.total,
+      'Work Days': s.workingDays,
+      'Holidays': s.holidays,
+      'Total Days': s.totalDays,
       'Present': s.present,
       'Absent': s.absent,
       'Percentage': s.percentage + '%',
@@ -178,6 +184,22 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
             left: 0;
             top: 0;
             width: 100%;
+            height: auto !important;
+            overflow: visible !important;
+          }
+          .relative.overflow-auto.max-h-\[65vh\] {
+            max-height: none !important;
+            height: auto !important;
+            overflow: visible !important;
+            display: block !important;
+          }
+          thead {
+            display: table-header-group !important;
+            position: static !important;
+          }
+          th, td {
+            background-color: transparent !important;
+            color: black !important;
           }
           .print-hidden {
             display: none !important;
@@ -247,39 +269,62 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
 
       {/* Stats Cards */}
       {reportData && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 print:hidden">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Working Days</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{reportData.summary.totalWorkingDays}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Average Attendance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{reportData.summary.averageAttendance}%</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Present</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{reportData.summary.totalPresent}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Absent</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{reportData.summary.totalAbsent}</div>
-            </CardContent>
-          </Card>
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 print:hidden">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Range Days</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{reportData.summary.totalDays}</div>
+                <p className="text-xs text-muted-foreground">Calendar Days</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Working Days</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{reportData.summary.totalWorkingDays}</div>
+                <p className="text-xs text-muted-foreground">Actual School Days</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Holidays</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">{reportData.summary.totalHolidays}</div>
+                <p className="text-xs text-muted-foreground">Incl. Sundays</p>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3 print:hidden mt-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Average Attendance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{reportData.summary.averageAttendance}%</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Present</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{reportData.summary.totalPresent}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Absent</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">{reportData.summary.totalAbsent}</div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 
@@ -362,38 +407,52 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
         ) : (
           Object.entries(groupedStudents).map(([groupKey, students], index) => (
             <div key={groupKey} className={index > 0 ? "page-break mt-8" : ""}>
-              <div className="bg-muted/50 p-2 border-x border-t rounded-t-md font-bold text-sm">
-                Class: {groupKey}
+              <div className="bg-muted/50 p-3 border-x border-t rounded-t-lg flex flex-wrap items-center justify-between gap-4">
+                <div className="font-bold text-base flex items-center gap-2">
+                  <span className="text-muted-foreground font-normal text-xs uppercase tracking-wider">Class:</span> {groupKey}
+                </div>
+                <div className="flex gap-4 text-xs font-medium">
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] text-muted-foreground uppercase">Range Days</span>
+                    <span className="font-bold">{students[0].totalDays || reportData?.summary.totalDays}</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] text-muted-foreground uppercase">Work Days</span>
+                    <span className="font-bold text-green-600">{students[0].workingDays || reportData?.summary.totalWorkingDays}</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] text-muted-foreground uppercase">Holidays</span>
+                    <span className="font-bold text-orange-600">{students[0].holidays || reportData?.summary.totalHolidays}</span>
+                  </div>
+                </div>
               </div>
-              <div className="border rounded-b-md overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow>
-                      <TableHead className="w-[80px] border-x">Roll No</TableHead>
-                      <TableHead className="border-x">Student Name</TableHead>
-                      <TableHead className="text-right border-x">Working Days</TableHead>
-                      <TableHead className="text-right border-x">Present</TableHead>
-                      <TableHead className="text-right border-x">Absent</TableHead>
-                      <TableHead className="text-right border-x">Percentage</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+              <div className="border rounded-b-md relative overflow-auto max-h-[65vh]">
+                <table className="w-full text-sm border-separate border-spacing-0">
+                  <thead className="sticky top-0 z-20 bg-background shadow-sm">
+                    <tr className="border-b">
+                      <th className="p-2 border-x border-b bg-background text-left w-[80px]">Roll No</th>
+                      <th className="p-2 border-x border-b bg-background text-left z-20">Student Name</th>
+                      <th className="p-2 border-x border-b bg-background text-right">Present</th>
+                      <th className="p-2 border-x border-b bg-background text-right">Absent</th>
+                      <th className="p-2 border-x border-b bg-background text-right">Percentage</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-card">
                     {students.map((student) => (
-                      <TableRow key={student.id} className="border-b last:border-0">
-                        <TableCell className="border-x">{student.rollNumber || '-'}</TableCell>
-                        <TableCell className="font-medium border-x">{student.name}</TableCell>
-                        <TableCell className="text-right border-x">{student.total}</TableCell>
-                        <TableCell className="text-right text-green-600 font-medium border-x">{student.present}</TableCell>
-                        <TableCell className="text-right text-red-600 font-medium border-x">{student.absent}</TableCell>
-                        <TableCell className="text-right font-bold border-x">
+                      <tr key={student.id} className="border-b hover:bg-muted/30 transition-colors">
+                        <td className="p-2 border-x border-b">{student.rollNumber || '-'}</td>
+                        <td className="p-2 font-medium border-x border-b z-20">{student.name}</td>
+                        <td className="p-2 text-right text-green-600 font-medium border-x border-b">{student.present}</td>
+                        <td className="p-2 text-right text-red-600 font-medium border-x border-b">{student.absent}</td>
+                        <td className="p-2 text-right font-bold border-x border-b">
                           <span className={parseFloat(student.percentage) < 75 ? 'text-red-600' : 'text-green-700'}>
                             {student.percentage}%
                           </span>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             </div>
           ))

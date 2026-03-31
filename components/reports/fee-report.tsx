@@ -189,6 +189,26 @@ export default function FeeReport({ classes }: FeeReportProps) {
             top: 0;
             width: 100%;
           }
+          .relative.overflow-auto.max-h-\[70vh\] {
+            max-height: none !important;
+            height: auto !important;
+            overflow: visible !important;
+            display: block !important;
+          }
+          table {
+            border-collapse: collapse !important;
+            width: 100% !important;
+          }
+          thead {
+            display: table-header-group !important;
+            position: static !important;
+          }
+          th, td {
+            position: static !important;
+            background-color: transparent !important;
+            color: black !important;
+            border: 1px solid #ddd !important;
+          }
           .print-hidden {
             display: none !important;
           }
@@ -364,66 +384,65 @@ export default function FeeReport({ classes }: FeeReportProps) {
           </div>
         </div>
 
-        <div className="rounded-md border print:border-0 grid overflow-x-auto">
-          <Table className="print:text-xs">
-            <TableHeader className="bg-muted/50 print:bg-white border-b-2">
-              <TableRow>
-                <TableHead className="w-[60px] font-bold border-x">Roll</TableHead>
-                <TableHead className="w-[150px] font-bold border-x">Student Name</TableHead>
+        <div className="rounded-md border print:border-0 relative overflow-auto max-h-[70vh]">
+          <table className="w-full text-xs border-separate border-spacing-0 print:border-collapse">
+            <thead className="sticky top-0 z-20 bg-background shadow-sm">
+              <tr className="border-b-2">
+                <th className="p-2 font-bold border-x border-b bg-background text-left sticky left-0 z-10 w-[60px]">Roll</th>
+                <th className="p-2 font-bold border-x border-b bg-background text-left sticky left-[60px] z-10 w-[150px]">Student Name</th>
                 {feeHeaders.map((header) => (
-                  <TableHead key={header} className="text-center font-bold px-1 whitespace-nowrap min-w-[70px] border-x">
+                  <th key={header} className="p-2 text-center font-bold px-1 whitespace-nowrap min-w-[70px] border-x border-b bg-background">
                     {header}
-                  </TableHead>
+                  </th>
                 ))}
-                <TableHead className="text-right font-bold w-[80px] border-x">Pending</TableHead>
-                <TableHead className="text-right font-bold w-[60px] print:hidden border-x">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+                <th className="p-2 text-right font-bold w-[80px] border-x border-b bg-background whitespace-nowrap">Pending</th>
+                <th className="p-2 text-right font-bold w-[60px] print:hidden border-x border-b bg-background whitespace-nowrap">Status</th>
+              </tr>
+            </thead>
+            <tbody className="bg-card">
               {filteredStudents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={feeHeaders.length + 4} className="text-center h-24 text-muted-foreground border-x">
+                <tr>
+                  <td colSpan={feeHeaders.length + 4} className="p-4 text-center h-24 text-muted-foreground border-b">
                     No records found
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               ) : (
                 filteredStudents.map((student) => (
-                  <TableRow key={student.id} className="border-b transition-colors hover:bg-muted/30">
-                    <TableCell className="font-medium border-x">{student.rollNumber || '-'}</TableCell>
-                    <TableCell className="font-semibold border-x">{student.name}</TableCell>
+                  <tr key={student.id} className="border-b hover:bg-muted/30 transition-colors group">
+                    <td className="p-2 font-medium border-x border-b bg-background sticky left-0 z-5 group-hover:bg-muted/50">{student.rollNumber || '-'}</td>
+                    <td className="p-2 font-semibold border-x border-b bg-background sticky left-[60px] z-5 group-hover:bg-muted/50">{student.name}</td>
                     {feeHeaders.map((header) => {
                       const status = student.feeStatuses[header];
                       return (
-                        <TableCell key={header} className="text-center p-0 border-x">
+                        <td key={header} className="p-1 text-center border-x border-b">
                           <div className="flex items-center justify-center w-full h-full min-h-[40px]">
                             {status === 'paid' ? (
-                              <div className="w-5 h-5 bg-green-500 rounded flex items-center justify-center text-white">
+                              <div className="w-5 h-5 bg-green-500 rounded flex items-center justify-center text-white shadow-sm">
                                 <span className="text-[10px] font-bold">✓</span>
                               </div>
                             ) : status === 'unpaid' ? (
-                              <div className="w-5 h-5 border-2 border-foreground/20 rounded"></div>
+                                <div className="w-5 h-5 border-2 border-slate-300 rounded bg-white/50"></div>
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}
                           </div>
-                        </TableCell>
+                        </td>
                       );
                     })}
-                    <TableCell className={`text-right font-bold border-x ${student.dueAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    <td className={`p-2 text-right font-bold border-x border-b ${student.dueAmount > 0 ? 'text-red-700' : 'text-green-700'}`}>
                       {student.dueAmount > 0 ? `₹${formatNumber(student.dueAmount)}` : 'Nil'}
-                    </TableCell>
-                    <TableCell className="text-right print:hidden border-x">
-                      <span className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
-                        student.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                      }`}>
+                    </td>
+                    <td className="p-2 text-right print:hidden border-x border-b">
+                      <span className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded shadow-sm ${student.status === 'Paid' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'
+                        }`}>
                         {student.status}
                       </span>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))
               )}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

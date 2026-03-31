@@ -4,6 +4,7 @@ const HolidaySchema = new mongoose.Schema({
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },
   description: { type: String, required: true },
+  affectedClasses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Class' }],
   createdAt: { type: Date, default: Date.now }
 });
 

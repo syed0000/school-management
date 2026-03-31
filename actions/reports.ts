@@ -5,6 +5,7 @@ import Student from '@/models/Student';
 import Attendance from '@/models/Attendance';
 import FeeTransaction from '@/models/FeeTransaction';
 import ClassFee from '@/models/ClassFee';
+import Holiday from '@/models/Holiday';
 import { startOfDay, endOfDay, format, eachDayOfInterval, isBefore, isAfter, startOfMonth, endOfMonth } from 'date-fns';
 import logger from "@/lib/logger";
 import { Types } from "mongoose";
@@ -145,55 +146,92 @@ export async function getAttendanceReport({
       };
     });
 
-    const workingDays = new Set<string>();
+    // 1. Get all days in the interval
+    const daysInterval = eachDayOfInterval({ start: startDate, end: endDate });
+    const totalCalendarDays = daysInterval.length;
 
+    // 2. Get holidays from DB
+    const dbHolidays = await Holiday.find({
+      $or: [
+        { startDate: { $gte: startOfDay(startDate), $lte: endOfDay(endDate) } },
+        { endDate: { $gte: startOfDay(startDate), $lte: endOfDay(endDate) } },
+        { startDate: { $lte: startOfDay(startDate) }, endDate: { $gte: endOfDay(endDate) } }
+      ]
+    }).lean();
+
+    // 3. Helper to get stats per class
+    const classStatsCache: Record<string, { workingDaysCount: number, holidaysCount: number, isWorkingDate: (d: Date) => boolean }> = {};
+    
+    const getStatsForClass = (cId: string) => {
+      if (classStatsCache[cId]) return classStatsCache[cId];
+      
+      const relevantHolidays = dbHolidays.filter((h: any) => 
+        !h.affectedClasses || 
+        h.affectedClasses.length === 0 || 
+        h.affectedClasses.some((ac: any) => ac.toString() === cId)
+      );
+
+      const isWorkingDate = (d: Date) => {
+        if (d.getDay() === 0) return false;
+        return !relevantHolidays.some((h: any) => {
+          const hStart = startOfDay(new Date(h.startDate));
+          const hEnd = endOfDay(new Date(h.endDate));
+          return d >= hStart && d <= hEnd;
+        });
+      };
+
+      const workingDaysCount = daysInterval.filter(isWorkingDate).length;
+      
+      classStatsCache[cId] = {
+        workingDaysCount,
+        holidaysCount: totalCalendarDays - workingDaysCount,
+        isWorkingDate
+      };
+      return classStatsCache[cId];
+    };
+
+    // 4. Process Attendance Records
     attendanceRecords.forEach((record) => {
       const dateStr = format(new Date(record.date), 'yyyy-MM-dd');
-      let isWorkingDay = false;
-
+      
       record.records.forEach((studentRec) => {
         if (!studentRec.studentId) return;
         const sId = studentRec.studentId._id.toString();
-
         if (studentId && sId !== studentId) return;
 
         if (studentStats[sId]) {
           const status = studentRec.status;
-
-          if (status !== 'Holiday') {
-            isWorkingDay = true;
-            studentStats[sId].total += 1;
-            if (status === 'Present') {
+          if (status === 'Present') {
               studentStats[sId].present += 1;
               totalPresent += 1;
-            } else if (status === 'Absent') {
+          } else if (status === 'Absent') {
               studentStats[sId].absent += 1;
-              totalAbsent += 1;
-            }
-
-            studentStats[sId].history.push({
-              date: dateStr,
-              status: status,
-            });
           }
+          studentStats[sId].history.push({ date: dateStr, status });
         }
       });
-
-      if (isWorkingDay) {
-        workingDays.add(dateStr);
-      }
     });
 
-    totalDays = workingDays.size;
-
-    const studentReport = Object.values(studentStats).map((stat) => {
-      stat.percentage = stat.total > 0 ? ((stat.present / stat.total) * 100).toFixed(1) : 0;
-      return stat;
+    // 5. Finalize Statistics (Per Student)
+    const studentReport = students.map((s: any) => {
+      const sId = s._id.toString();
+      const cId = s.classId?._id.toString() || 'unknown';
+      const stats = getStatsForClass(cId);
+      
+      return {
+        ...studentStats[sId],
+        totalDays: totalCalendarDays,
+        workingDays: stats.workingDaysCount,
+        holidays: stats.holidaysCount,
+        absent: stats.workingDaysCount - studentStats[sId].present,
+        percentage: stats.workingDaysCount > 0 ? ((studentStats[sId].present / stats.workingDaysCount) * 100).toFixed(1) : 0,
+      };
     });
 
+    // For Daily Stats - using a global/default working day check or filtering
+    const globalStats = getStatsForClass('global'); // Fallback logic
+    
     const dailyStats: DailyStat[] = [];
-    const daysInterval = eachDayOfInterval({ start: startDate, end: endDate });
-
     const attendanceByDate: Record<string, AttendanceRecordDoc[]> = {};
     attendanceRecords.forEach((record) => {
       const d = format(new Date(record.date), 'yyyy-MM-dd');
@@ -204,38 +242,40 @@ export async function getAttendanceReport({
     daysInterval.forEach((day) => {
       const dateStr = format(day, 'yyyy-MM-dd');
       const recordsForDay = attendanceByDate[dateStr];
+      
+      let dayPresent = 0;
+      let dayTotal = 0;
 
-      if (recordsForDay) {
-        let dayPresent = 0;
-        let dayTotal = 0;
+      students.forEach((s: any) => {
+         const stats = getStatsForClass(s.classId?._id.toString() || 'unknown');
+         if (stats.isWorkingDate(day)) {
+            dayTotal++;
+            const studentAttendance = recordsForDay?.flatMap(r => r.records).find(rec => rec.studentId?._id.toString() === s._id.toString());
+            if (studentAttendance?.status === 'Present') dayPresent++;
+         }
+      });
 
-        recordsForDay.forEach((record) => {
-          record.records.forEach((s) => {
-            if (studentId && s.studentId?._id.toString() !== studentId) return;
-            if (s.studentId && studentStats[s.studentId._id.toString()]) {
-              if (s.status === 'Present') dayPresent++;
-              if (s.status !== 'Holiday') dayTotal++;
-            }
-          });
+      if (dayTotal > 0) {
+        dailyStats.push({
+          date: dateStr,
+          percentage: ((dayPresent / dayTotal) * 100).toFixed(1),
+          present: dayPresent,
+          total: dayTotal,
         });
-
-        if (dayTotal > 0) {
-          dailyStats.push({
-            date: dateStr,
-            percentage: ((dayPresent / dayTotal) * 100).toFixed(1),
-            present: dayPresent,
-            total: dayTotal,
-          });
-        }
       }
     });
 
+    // Use aggregate summary from first student or calculate averages
+    const firstStudent = studentReport[0] || { workingDays: 0, holidays: 0 };
+
     return {
       summary: {
-        totalWorkingDays: totalDays,
-        averageAttendance: totalDays > 0 ? (totalPresent / (totalPresent + totalAbsent) * 100).toFixed(1) : 0,
+        totalDays: totalCalendarDays,
+        totalWorkingDays: firstStudent.workingDays, 
+        totalHolidays: firstStudent.holidays,
+        averageAttendance: totalPresent > 0 ? ((totalPresent / studentReport.reduce((acc, s) => acc + (s as any).workingDays, 0)) * 100).toFixed(1) : 0,
         totalPresent,
-        totalAbsent,
+        totalAbsent: studentReport.reduce((acc, s) => acc + (s as any).absent, 0),
       },
       dailyStats,
       studentReport,

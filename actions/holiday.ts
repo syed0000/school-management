@@ -9,6 +9,7 @@ const holidaySchema = z.object({
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   description: z.string().min(1, "Description is required"),
+  affectedClasses: z.array(z.string()).optional(),
 }).refine((data) => {
   const start = new Date(data.startDate);
   const end = new Date(data.endDate);
@@ -46,7 +47,8 @@ export async function addHoliday(data: z.infer<typeof holidaySchema>) {
     await Holiday.create({
       startDate,
       endDate,
-      description: validatedData.description
+      description: validatedData.description,
+      affectedClasses: validatedData.affectedClasses || []
     });
 
     revalidatePath("/attendance/dashboard");
@@ -65,6 +67,7 @@ export async function getHolidays(limit: number = 20) {
   // For now, let's just fetch and handle the missing fields.
   const holidays = await Holiday.find()
     .sort({ startDate: -1, date: -1 }) 
+    .populate('affectedClasses', 'name')
     .limit(limit)
     .lean();
     
@@ -74,6 +77,7 @@ export async function getHolidays(limit: number = 20) {
     endDate?: Date;
     date?: Date; // Backwards compatibility
     description: string;
+    affectedClasses?: { _id: any; name: string }[];
   }
     
   return holidays.map((h: unknown) => {
@@ -86,7 +90,8 @@ export async function getHolidays(limit: number = 20) {
       id: holiday._id.toString(),
       startDate: start.toISOString(),
       endDate: end.toISOString(),
-      description: holiday.description
+      description: holiday.description,
+      affectedClasses: holiday.affectedClasses?.map(c => ({ id: c._id.toString(), name: c.name })) || []
     };
   });
 }
@@ -104,37 +109,41 @@ export async function deleteHoliday(id: string) {
   }
 }
 
-export async function checkIsHoliday(dateStr: string) {
+export async function checkIsHoliday(dateStr: string, classId?: string) {
   await dbConnect();
   
   const checkDate = new Date(dateStr);
-  checkDate.setHours(12, 0, 0, 0); // Set to noon to avoid boundary issues with 00:00:00 if timezones are tricky
-
-  // Check Sunday
+  checkDate.setHours(12, 0, 0, 0); 
+  
+  // 1. Check Sunday
   if (checkDate.getDay() === 0) {
       return { isHoliday: true, reason: "Sunday" };
   }
 
-  // Find a holiday where startDate <= checkDate <= endDate
-  // We need to be careful with time components.
-  // Let's rely on the fact that stored startDate is 00:00 and endDate is 23:59 (local or UTC depending on server)
-  // MongoDB stores in UTC.
-  // If we query: startDate <= checkDate AND endDate >= checkDate
-  
-  const startOfDay = new Date(dateStr);
-  startOfDay.setHours(0,0,0,0);
-  const endOfDay = new Date(dateStr);
-  endOfDay.setHours(23,59,59,999);
+  const startOfDay = (d: Date) => { const n = new Date(d); n.setHours(0,0,0,0); return n; };
+  const endOfDay = (d: Date) => { const n = new Date(d); n.setHours(23,59,59,999); return n; };
 
-  const holiday = await Holiday.findOne({
+  const query: any = {
     $or: [
-      { startDate: { $lte: endOfDay }, endDate: { $gte: startOfDay } },
-      { date: { $gte: startOfDay, $lte: endOfDay } }
+      { startDate: { $lte: endOfDay(new Date(dateStr)) }, endDate: { $gte: startOfDay(new Date(dateStr)) } },
+      { date: { $gte: startOfDay(new Date(dateStr)), $lte: endOfDay(new Date(dateStr)) } }
     ]
-  }).lean();
+  };
 
-  if (holiday) {
-    return { isHoliday: true, reason: (holiday as { description: string }).description };
+  // 2. Filter by Class if provided
+  // If a holiday has affectedClasses, and classId is NOT in it, it's not a holiday for this class.
+  // If affectedClasses is empty, it's a holiday for ALL classes.
+  
+  const holidays = await Holiday.find(query).lean();
+
+  const relevantHoliday = holidays.find((h: any) => {
+     if (!h.affectedClasses || h.affectedClasses.length === 0) return true;
+     if (classId && h.affectedClasses.some((ac: any) => ac.toString() === classId)) return true;
+     return false;
+  });
+
+  if (relevantHoliday) {
+    return { isHoliday: true, reason: (relevantHoliday as any).description };
   }
 
   return { isHoliday: false, reason: null };

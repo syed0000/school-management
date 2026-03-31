@@ -5,10 +5,12 @@ import { useForm, Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { format } from "date-fns"
-import { CalendarIcon, Loader2, Trash } from "lucide-react"
+import { CalendarIcon, Loader2, Trash, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
 import {
   Form,
   FormControl,
@@ -43,13 +45,15 @@ const formSchema = z.object({
     to: z.date().optional(),
   }),
   description: z.string().min(1, "Description is required"),
+  affectedClasses: z.array(z.string()).optional(),
 })
 
 interface HolidayListProps {
-  holidays: { id: string; startDate: string; endDate: string; description: string }[]
+  holidays: { id: string; startDate: string; endDate: string; description: string; affectedClasses: { id: string; name: string }[] }[]
+  classes: { id: string; name: string }[]
 }
 
-export function HolidayManager({ holidays: initialHolidays }: HolidayListProps) {
+export function HolidayManager({ holidays: initialHolidays, classes }: HolidayListProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -60,6 +64,7 @@ export function HolidayManager({ holidays: initialHolidays }: HolidayListProps) 
     resolver: zodResolver(formSchema) as Resolver<z.infer<typeof formSchema>>,
     defaultValues: {
       description: "",
+      affectedClasses: [],
     },
   })
 
@@ -73,13 +78,15 @@ export function HolidayManager({ holidays: initialHolidays }: HolidayListProps) 
         startDate: fromDate.toISOString(),
         endDate: toDate.toISOString(),
         description: values.description,
+        affectedClasses: values.affectedClasses,
       })
 
       if (result.success) {
         toast.success("Holiday added successfully")
         form.reset({
             dateRange: undefined,
-            description: ""
+          description: "",
+          affectedClasses: [],
         })
         router.refresh()
       } else {
@@ -174,6 +181,68 @@ export function HolidayManager({ holidays: initialHolidays }: HolidayListProps) 
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="affectedClasses"
+              render={({ field }) => (
+                <FormItem className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Affected Classes (Optional)</FormLabel>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-[10px]"
+                      onClick={() => {
+                        const allIds = classes.map(c => c.id);
+                        if (field.value?.length === allIds.length) {
+                          field.onChange([]);
+                        } else {
+                          field.onChange(allIds);
+                        }
+                      }}
+                    >
+                      {field.value?.length === classes.length ? "Deselect All" : "Select All"}
+                    </Button>
+                  </div>
+                  <FormControl>
+                    <div className="border rounded-md p-4 bg-muted/50">
+                      <div className="h-[150px] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-muted">
+                        <div className="grid grid-cols-2 gap-4">
+                          {classes.map((cls) => (
+                            <div key={cls.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={cls.id}
+                                checked={field.value?.includes(cls.id)}
+                                onCheckedChange={(checked) => {
+                                  const current = field.value || [];
+                                  if (checked) {
+                                    field.onChange([...current, cls.id]);
+                                  } else {
+                                    field.onChange(current.filter((id) => id !== cls.id));
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor={cls.id}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {cls.name}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </FormControl>
+                  <p className="text-[10px] text-muted-foreground italic">
+                    * If no classes are selected, the holiday will apply to all classes by default.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <Button type="submit" disabled={loading} className="w-full">
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add Holiday
@@ -190,6 +259,7 @@ export function HolidayManager({ holidays: initialHolidays }: HolidayListProps) 
               <TableRow>
                 <TableHead>Date(s)</TableHead>
                 <TableHead>Description</TableHead>
+                <TableHead>Affected Classes</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -215,6 +285,17 @@ export function HolidayManager({ holidays: initialHolidays }: HolidayListProps) 
                         }
                       </TableCell>
                       <TableCell>{holiday.description}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {holiday.affectedClasses.length === 0 ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Global (All)</Badge>
+                          ) : (
+                            holiday.affectedClasses.map(c => (
+                              <Badge key={c.id} variant="secondary" className="text-[10px] h-5">{c.name}</Badge>
+                            ))
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"
