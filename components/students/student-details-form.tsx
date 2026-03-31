@@ -31,6 +31,7 @@ const formSchema = z.object({
   dateOfBirth: z.string().min(1, "Date of Birth is required"),
   dateOfAdmission: z.string().optional(),
   gender: z.enum(["Male", "Female", "Other"]).optional(),
+  aadhaar: z.string().regex(/^\d{12}$/, "Aadhaar number must be 12 digits").optional().or(z.literal("")),
   
   // Parents
   parents: z.object({
@@ -69,6 +70,7 @@ interface StudentData {
   section: string;
   rollNumber: string;
   gender: "Male" | "Female" | "Other";
+  aadhaar?: string;
   fatherName: string;
   fatherAadhaar: string;
   motherName: string;
@@ -111,6 +113,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
       dateOfBirth: student.dateOfBirth ? new Date(student.dateOfBirth).toISOString().split('T')[0] : "",
       dateOfAdmission: student.dateOfAdmission ? new Date(student.dateOfAdmission).toISOString().split('T')[0] : "",
       gender: student.gender || "Male",
+      aadhaar: student.aadhaar || "",
       
       parents: {
         father: { 
@@ -279,6 +282,20 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                             <FormLabel>Date of Birth</FormLabel>
                             <FormControl>
                             <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="aadhaar"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Student Aadhaar (Optional)</FormLabel>
+                            <FormControl>
+                            <Input placeholder="12-digit Aadhaar" maxLength={12} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>

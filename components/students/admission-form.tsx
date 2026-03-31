@@ -33,6 +33,7 @@ const formSchema = z.object({
     dateOfBirth: z.string().min(1, "Date of Birth is required"),
     dateOfAdmission: z.string().optional(),
     gender: z.enum(["Male", "Female", "Other"]).optional(),
+    aadhaar: z.string().regex(/^\d{12}$/, "Aadhaar number must be 12 digits").optional().or(z.literal("")),
 
     // Parents
     parents: z.object({
@@ -89,6 +90,7 @@ export function AdmissionForm({ classes }: AdmissionFormProps) {
       dateOfBirth: "",
       dateOfAdmission: new Date().toISOString().split('T')[0],
       gender: "Male",
+      aadhaar: "",
       parents: {
         father: { name: "", aadhaarNumber: "" },
         mother: { name: "", aadhaarNumber: "" }
@@ -149,6 +151,7 @@ export function AdmissionForm({ classes }: AdmissionFormProps) {
             formData.append('dateOfBirth', values.dateOfBirth);
             if (values.dateOfAdmission) formData.append('dateOfAdmission', values.dateOfAdmission);
             if (values.gender) formData.append('gender', values.gender);
+            if (values.aadhaar) formData.append('aadhaar', values.aadhaar);
             formData.append('address', values.address);
 
             // Parents
@@ -315,6 +318,20 @@ export function AdmissionForm({ classes }: AdmissionFormProps) {
                                                 <FormLabel>Date of Birth</FormLabel>
                                                 <FormControl>
                                                     <Input type="date" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="aadhaar"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Student Aadhaar (Optional)</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="12-digit Aadhaar" maxLength={12} {...field} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>

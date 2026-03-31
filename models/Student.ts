@@ -8,6 +8,12 @@ const StudentSchema = new mongoose.Schema({
   rollNumber: { type: String }, // Unique within class + section
   dateOfBirth: { type: Date, required: true },
   gender: { type: String, enum: ['Male', 'Female', 'Other'], default: null },
+  aadhaar: { type: String, validate: {
+    validator: function(v: string) {
+      return !v || /^\d{12}$/.test(v);
+    },
+    message: 'Aadhaar number must be 12 digits'
+  }},
   
   // Parent Details Restructuring
   parents: {

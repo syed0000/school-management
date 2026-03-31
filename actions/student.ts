@@ -43,6 +43,7 @@ const registerStudentSchema = z.object({
   dateOfBirth: z.string().min(1, "Date of Birth is required"),
   dateOfAdmission: z.string().optional(), // Can be string from form
   gender: z.enum(["Male", "Female", "Other"]).optional().nullable(),
+  aadhaar: z.string().optional().or(z.literal("")),
   
   parents: z.object({
     father: parentSchema,
@@ -130,6 +131,7 @@ export async function registerStudent(formData: FormData) {
       dateOfBirth: formData.get('dateOfBirth') as string,
       dateOfAdmission: formData.get('dateOfAdmission') as string,
       gender: formData.get('gender') as "Male" | "Female" | "Other",
+      aadhaar: formData.get('aadhaar') as string,
       address: formData.get('address') as string,
       fatherName: formData.get('fatherName') as string,
       fatherAadhaar: formData.get('fatherAadhaar') as string,
@@ -225,10 +227,11 @@ export async function registerStudent(formData: FormData) {
       name: rawData.name,
       classId: rawData.classId,
       section: rawData.section,
-      rollNumber: rawData.rollNumber,
+      rollNumber: rawData.rollNumber?.trim() || undefined,
       dateOfBirth: new Date(rawData.dateOfBirth),
       dateOfAdmission: rawData.dateOfAdmission ? new Date(rawData.dateOfAdmission) : new Date(),
       gender: rawData.gender,
+      aadhaar: rawData.aadhaar,
       
       parents,
       fatherName: parents.father.name,
@@ -310,6 +313,7 @@ export async function updateStudent(id: string, data: z.infer<typeof registerStu
           dateOfBirth: Date;
           dateOfAdmission?: Date;
           gender?: string | null;
+          aadhaar?: string;
           parents?: {
             father: { name?: string; aadhaarNumber?: string };
             mother: { name?: string; aadhaarNumber?: string };
@@ -330,10 +334,11 @@ export async function updateStudent(id: string, data: z.infer<typeof registerStu
         name: data.name,
         classId: data.classId,
         section: data.section,
-        rollNumber: data.rollNumber,
+        rollNumber: data.rollNumber?.trim() || undefined,
         dateOfBirth: new Date(data.dateOfBirth),
         dateOfAdmission: data.dateOfAdmission ? new Date(data.dateOfAdmission) : undefined,
         gender: data.gender,
+        aadhaar: data.aadhaar,
         
         parents,
         fatherName: parents.father.name || "",
@@ -364,7 +369,16 @@ export async function updateStudent(id: string, data: z.infer<typeof registerStu
         updateData.registrationNumber = data.registrationNumber;
       }
       
-      await Student.findByIdAndUpdate(id, updateData);
+      // Robustly handle empty rollNumbers by explicitly unsetting them
+      // This circumvents the duplicate key partial index collision for empty strings.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const finalUpdateObj: any = { $set: updateData, $unset: {} };
+      if (!updateData.rollNumber) {
+          delete updateData.rollNumber;
+          finalUpdateObj.$unset.rollNumber = 1;
+      }
+      
+      await Student.findByIdAndUpdate(id, finalUpdateObj);
       
       revalidatePath("/students/list");
       revalidatePath(`/students/${id}`);
@@ -399,6 +413,7 @@ interface StudentDoc {
     registrationNumber: string;
     name: string;
     gender?: string;
+    aadhaar?: string;
     classId?: { name: string; _id: { toString: () => string } };
     section?: string;
     rollNumber?: string;
@@ -449,6 +464,7 @@ export async function getStudents(searchQuery?: string, classId?: string) {
       registrationNumber: student.registrationNumber,
       name: student.name,
       gender: student.gender,
+      aadhaar: student.aadhaar,
       className: student.classId?.name || 'Unknown',
       section: student.section,
       rollNumber: student.rollNumber,
@@ -481,6 +497,7 @@ export async function getStudentById(id: string) {
     section: s.section || 'A',
     rollNumber: s.rollNumber || '',
     gender: (s.gender as "Male" | "Female" | "Other") || "Male",
+    aadhaar: s.aadhaar || '',
     
     fatherName: s.parents?.father?.name || s.fatherName,
     fatherAadhaar: s.parents?.father?.aadhaarNumber || '',

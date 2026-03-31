@@ -72,7 +72,10 @@ export async function migrateStudents(studentIds: string[], targetClassId: strin
 
     const result = await Student.updateMany(
         { _id: { $in: studentIds } },
-        { $set: { classId: targetClassId } }
+        { 
+          $set: { classId: targetClassId },
+          $unset: { rollNumber: 1 }
+        }
     );
 
     revalidatePath("/students/list");

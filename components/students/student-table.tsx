@@ -19,6 +19,7 @@ interface Student {
   section?: string
   rollNumber?: string
   fatherName: string
+  aadhaar?: string
   mobile: string
   photo?: string
 }
@@ -46,6 +47,7 @@ export function StudentTable({ students, isAdmin }: StudentTableProps) {
             <TableHead>Reg No</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Class</TableHead>
+            <TableHead>Aadhaar</TableHead>
             <TableHead>Father Name</TableHead>
             <TableHead>Mobile</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -70,6 +72,7 @@ export function StudentTable({ students, isAdmin }: StudentTableProps) {
               <TableCell>
                 {student.className} {student.section && `(${student.section})`}
               </TableCell>
+              <TableCell>{student.aadhaar || "-"}</TableCell>
               <TableCell>{student.fatherName}</TableCell>
               <TableCell>{student.mobile}</TableCell>
               <TableCell className="text-right">
