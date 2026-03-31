@@ -2,10 +2,11 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { WhatsAppToggle } from "@/components/admin/school-profile/whatsapp-toggle"
-import { getWhatsAppReceiptSetting } from "@/actions/school-settings"
+import { CounterEditor } from "@/components/admin/school-profile/counter-editor"
+import { getWhatsAppReceiptSetting, getCounters } from "@/actions/school-settings"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ExternalLink, Settings, MessageSquare, AlertCircle } from "lucide-react"
+import { ExternalLink, Settings, MessageSquare, AlertCircle, Hash } from "lucide-react"
 import { whatsappConfig } from "@/lib/whatsapp-config"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
@@ -16,7 +17,11 @@ export default async function SchoolProfilePage() {
     redirect("/admin/dashboard")
   }
 
-  const initialWhatsAppSetting = await getWhatsAppReceiptSetting()
+  const [initialWhatsAppSetting, counters] = await Promise.all([
+    getWhatsAppReceiptSetting(),
+    getCounters(),
+  ])
+
   const externalSchoolProfileUrl = `${process.env.NEXT_PUBLIC_FEEEASE_URL || 'https://feeease.com'}/school/profile`
   const isWhatsAppGloballyDisabled = !whatsappConfig.enabled
 
@@ -89,7 +94,25 @@ export default async function SchoolProfilePage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Counter Management — full width */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Hash className="h-5 w-5 text-primary" />
+              <CardTitle>Sequence Counter Management</CardTitle>
+            </div>
+            <CardDescription>
+              Adjust the auto-increment counters for student registration numbers and fee receipt numbers.
+              The <strong>next</strong> issued number will be <em>current&nbsp;sequence&nbsp;+&nbsp;1</em>.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CounterEditor counters={counters} />
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
 }
+
