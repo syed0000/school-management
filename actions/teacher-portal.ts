@@ -19,6 +19,7 @@ interface AssignedClassDoc {
   classId: { _id: Types.ObjectId; name: string } | Types.ObjectId;
   section: string;
   attendanceAccess: boolean;
+  feeAccess: boolean;
 }
 
 interface TeacherDoc {
@@ -56,6 +57,7 @@ export async function getTeacherClassAccess(teacherSessionId: string): Promise<T
           className: cls.name,
           section: ac.section,
           attendanceAccess: ac.attendanceAccess,
+          feeAccess: ac.feeAccess ?? false,
         } satisfies TeacherClassAccess;
       });
     },
@@ -79,18 +81,19 @@ async function validateTeacherClassAccess(
   teacherSessionId: string,
   classId: string,
   section: string,
-): Promise<{ allowed: boolean; attendanceAccess: boolean }> {
+): Promise<{ allowed: boolean; attendanceAccess: boolean; feeAccess: boolean }> {
   const session = await getServerSession(authOptions);
-  if (!session) return { allowed: false, attendanceAccess: false };
+  if (!session) return { allowed: false, attendanceAccess: false, feeAccess: false };
 
   // Admins bypass all checks
-  if (session.user.role === 'admin') return { allowed: true, attendanceAccess: true };
+  if (session.user.role === 'admin') return { allowed: true, attendanceAccess: true, feeAccess: true };
 
   const classes = await getTeacherClassAccess(teacherSessionId);
   const entry = classes.find((c) => c.classId === classId && c.section === section);
   return {
     allowed: !!entry,
     attendanceAccess: entry?.attendanceAccess ?? false,
+    feeAccess: entry?.feeAccess ?? false,
   };
 }
 
@@ -134,8 +137,11 @@ export async function getTeacherClassFeeReport(
   if (!session) return { success: false, error: 'Unauthorized' };
 
   const teacherSessionId = session.user.id;
-  const { allowed } = await validateTeacherClassAccess(teacherSessionId, classId, section);
+  const { allowed, feeAccess } = await validateTeacherClassAccess(teacherSessionId, classId, section);
   if (!allowed) return { success: false, error: 'Access denied to this class' };
+  if (!feeAccess && session.user.role !== 'admin') {
+    return { success: false, error: 'You do not have fee report access for this class.' };
+  }
 
   try {
     const data = await getFeeReport({ startDate, endDate, classId, section });
@@ -143,6 +149,29 @@ export async function getTeacherClassFeeReport(
   } catch (error) {
     logger.error(error, 'getTeacherClassFeeReport failed');
     return { success: false, error: 'Failed to fetch fee report' };
+  }
+}
+
+export async function updateTeacherProfilePhoto(formData: FormData) {
+  try {
+    await dbConnect();
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== 'teacher') return { success: false, error: 'Unauthorized' };
+
+    const photoFile = formData.get('photo') as File;
+    if (!photoFile || photoFile.size === 0) return { success: false, error: 'No photo provided' };
+
+    const { saveFile } = await import('@/lib/upload');
+    const photoUrl = await saveFile(photoFile, 'teachers/photos');
+    
+    // Using import('@/models/Teacher').then(m => m.default) since it might not be imported at top level
+    const Teacher = (await import('@/models/Teacher')).default;
+    await Teacher.findByIdAndUpdate(session.user.id, { photo: photoUrl });
+    
+    return { success: true, photoUrl };
+  } catch (error) {
+    logger.error(error, "Error updating teacher photo");
+    return { success: false, error: "An error occurred while updating photo" };
   }
 }
 

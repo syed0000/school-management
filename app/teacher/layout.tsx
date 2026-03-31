@@ -43,47 +43,27 @@ export default async function TeacherLayout({
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] flex-1 max-w-7xl mx-auto w-full">
-        {/* Sidebar for Desktop */}
-        <aside className="hidden lg:block border-r bg-background p-6 space-y-6">
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-4 mb-2">Main Menu</p>
-            <nav className="space-y-1">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-primary/10 hover:text-primary group"
-                >
-                  <item.icon className="h-4 w-4 group-hover:scale-110 transition-transform" />
-                  {item.name}
-                </Link>
-              ))}
-            </nav>
-          </div>
-        </aside>
-
-        <main className="flex-1 p-4 md:p-8 pt-6">
+      <div className="flex-1 max-w-2xl mx-auto w-full mb-16">
+        <main className="p-4 md:p-6 pt-6">
           {children}
         </main>
       </div>
 
-      {/* Bottom Nav for Mobile */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-background border-t flex items-center justify-around px-2 z-30">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="flex flex-col items-center gap-1 text-muted-foreground hover:text-primary transition-colors flex-1"
-          >
-            <item.icon className="h-5 w-5" />
-            <span className="text-[9px] font-medium whitespace-nowrap">{item.name}</span>
-          </Link>
-        ))}
+      {/* Floating Bottom Nav for all screen sizes (Native App approach) */}
+      <div className="fixed bottom-0 left-0 right-0 h-16 bg-background/95 backdrop-blur-md border-t flex items-center justify-center z-30 supports-backdrop-filter:bg-background/60">
+        <div className="flex justify-around items-center w-full max-w-2xl px-2 h-full">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-primary transition-all flex-1 h-full rounded-xl hover:bg-muted/50 active:scale-95"
+            >
+              <item.icon className="h-5 w-5" />
+              <span className="text-[10px] font-medium whitespace-nowrap">{item.name}</span>
+            </Link>
+          ))}
+        </div>
       </div>
-
-      {/* Spacer for bottom nav */}
-      <div className="h-16 lg:hidden" />
     </div>
   );
 }

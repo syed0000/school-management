@@ -31,14 +31,14 @@ export function ClassAttendanceTab({ classId, section, attendanceAccess }: Class
   const fetchAttendance = () => {
     startTransition(async () => {
       try {
-        const res = await getStudentsForAttendance(date.toISOString(), classId, section);
+        const res = await getStudentsForAttendance(classId, section, date.toISOString());
         if (res.success && res.students) {
           setStudents(res.students);
           setIsHoliday(res.isHoliday || false);
 
           const newState: Record<string, { status: string; remarks: string }> = {};
           res.students.forEach((s) => {
-            const status = s.currentStatus || "Present";
+            const status = s.currentStatus || "Absent";
             newState[s.id] = { status, remarks: s.remarks || "" };
           });
           setAttendanceState(newState);

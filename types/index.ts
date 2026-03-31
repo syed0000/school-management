@@ -141,5 +141,6 @@ export interface TeacherClassAccess {
   className: string;
   section: string;
   attendanceAccess: boolean; // per-class: can this teacher mark/edit attendance here?
+  feeAccess: boolean;        // per-class: can this teacher view fee reports here?
 }
 

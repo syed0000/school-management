@@ -37,6 +37,7 @@ const TeacherSchema = new mongoose.Schema({
     classId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true },
     section: { type: String, enum: ['A', 'B', 'C', 'D'], required: true },
     attendanceAccess: { type: Boolean, default: false },
+    feeAccess: { type: Boolean, default: false },
   }],
 
   createdAt: { type: Date, default: Date.now },

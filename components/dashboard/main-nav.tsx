@@ -183,7 +183,7 @@ export function MainNav({
               className={cn(
                 "text-sm font-medium transition-colors hover:text-primary shrink-0",
                 route.active
-                  ? "text-black dark:text-white"
+                  ? "dark:text-primary"
                   : "text-muted-foreground"
               )}
             >

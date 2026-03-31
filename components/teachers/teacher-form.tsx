@@ -39,6 +39,7 @@ const assignedClassSchema = z.object({
   classId: z.string().min(1, "Class is required"),
   section: z.enum(SECTIONS),
   attendanceAccess: z.boolean().default(false),
+  feeAccess: z.boolean().default(false),
 })
 
 const formSchema = z.object({
@@ -121,10 +122,11 @@ export function TeacherForm({ teacher, isEdit = false }: TeacherFormProps) {
         effectiveDate: teacher?.salary?.effectiveDate ? new Date(teacher.salary.effectiveDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       },
       documents: teacher?.documents || [],
-      assignedClasses: teacher?.assignedClasses?.map((ac) => ({
-        classId: ac.classId,
+      assignedClasses: teacher?.assignedClasses?.map((ac: any) => ({
+        classId: typeof ac.classId === 'object' && ac.classId !== null ? String(ac.classId._id || ac.classId) : String(ac.classId || ''),
         section: ac.section as typeof SECTIONS[number],
-        attendanceAccess: ac.attendanceAccess,
+        attendanceAccess: Boolean(ac.attendanceAccess),
+        feeAccess: Boolean(ac.feeAccess),
       })) || [],
     },
   })
@@ -362,7 +364,7 @@ export function TeacherForm({ teacher, isEdit = false }: TeacherFormProps) {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => appendClass({ classId: "", section: "A", attendanceAccess: false })}
+                  onClick={() => appendClass({ classId: "", section: "A", attendanceAccess: false, feeAccess: false })}
                 >
                   <Plus className="mr-2 h-4 w-4" /> Add Class
                 </Button>
@@ -430,21 +432,41 @@ export function TeacherForm({ teacher, isEdit = false }: TeacherFormProps) {
                         )} />
                       </div>
 
-                      {/* Attendance Access toggle */}
-                      <FormField control={form.control} name={`assignedClasses.${index}.attendanceAccess`} render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-md border px-3 py-2">
-                          <div>
-                            <FormLabel className="text-xs font-medium cursor-pointer">Attendance Access</FormLabel>
-                            <p className="text-[10px] text-muted-foreground">Can mark &amp; edit attendance</p>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )} />
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Attendance Access toggle */}
+                        <FormField control={form.control} name={`assignedClasses.${index}.attendanceAccess`} render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-md border px-3 py-2 bg-green-50/50">
+                            <div>
+                              <FormLabel className="text-xs font-medium cursor-pointer">Attendance</FormLabel>
+                              <p className="text-[9px] text-muted-foreground">Mark/edit</p>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                className="scale-75 data-[state=checked]:bg-green-500"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )} />
+
+                        {/* Fee Access toggle */}
+                        <FormField control={form.control} name={`assignedClasses.${index}.feeAccess`} render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-md border px-3 py-2 bg-blue-50/50">
+                            <div>
+                              <FormLabel className="text-xs font-medium cursor-pointer">Fee Reports</FormLabel>
+                              <p className="text-[9px] text-muted-foreground">View dues</p>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                className="scale-75 data-[state=checked]:bg-blue-500"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )} />
+                      </div>
 
                       {/* Preview badge */}
                       <div className="flex gap-1 flex-wrap">
@@ -455,8 +477,13 @@ export function TeacherForm({ teacher, isEdit = false }: TeacherFormProps) {
                           </Badge>
                         )}
                         {form.watch(`assignedClasses.${index}.attendanceAccess`) && (
-                          <Badge className="text-[10px] bg-green-100 text-green-700 hover:bg-green-100">
-                            Attendance ✓
+                          <Badge className="text-[10px] bg-green-100 text-green-700 hover:bg-green-100 px-1 py-0 h-4">
+                            Att ✓
+                          </Badge>
+                        )}
+                        {form.watch(`assignedClasses.${index}.feeAccess`) && (
+                          <Badge className="text-[10px] bg-blue-100 text-blue-700 hover:bg-blue-100 px-1 py-0 h-4">
+                            Fee ✓
                           </Badge>
                         )}
                       </div>

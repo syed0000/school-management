@@ -358,7 +358,7 @@ export async function getTeacherById(id: string) {
     const session = await getServerSession(authOptions)
     if (!session) return null
 
-    const teacher = await Teacher.findById(id)
+    const teacher = await Teacher.findById(id).populate("assignedClasses.classId", "name");
     if (!teacher) return null
 
     return JSON.parse(JSON.stringify(teacher))
