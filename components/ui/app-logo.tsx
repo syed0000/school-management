@@ -11,10 +11,11 @@ export function AppLogo({ href }: AppLogoProps) {
   const content = (
     <div className="flex items-center gap-2 sm:gap-3 transition-opacity hover:opacity-90">
       <div className="relative h-8 w-24 md:h-10 md:w-32 flex items-center justify-center rounded-md overflow-hidden bg-background">
-        <Image 
+        <Image
           src="/images/assets/logo-horizontal.png"
-          alt="FeeEase" 
-          fill
+          alt="FeeEase"
+          width={100}
+          height={100}
           className="object-contain p-1"
           priority
         />

@@ -70,13 +70,9 @@ export function UserNav({ user }: UserNavProps) {
           </DropdownMenuItem>
           {user.role === 'admin' && (
             <DropdownMenuItem asChild>
-              <a
-                href={`${process.env.NEXT_PUBLIC_FEEEASE_URL || 'https://feeease.com'}/school/profile`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <Link href="/admin/school-profile">
                 School Profile
-              </a>
+              </Link>
             </DropdownMenuItem>
           )}
         </DropdownMenuGroup>

@@ -13,6 +13,7 @@ import { getYearForMonth } from "@/lib/utils"
 import WhatsAppStat from "@/models/WhatsAppStat"
 import WhatsAppPricing from "@/models/WhatsAppPricing"
 import License from "@/models/License"
+import Setting from "@/models/Setting"
 
 const feeItemSchema = z.object({
   feeType: z.string().min(1, "Fee type is required"),
@@ -47,11 +48,11 @@ export async function getStudentFeeDetails(studentId: string) {
   const mappedFees = fees.map((f: unknown) => {
     // Define an interface for the fee object from database
     interface DBFee {
-        type: string;
-        amount: number;
-        _id: { toString(): string };
-        title?: string;
-        month?: number;
+      type: string;
+      amount: number;
+      _id: { toString(): string };
+      title?: string;
+      month?: number;
     }
     const fee = f as DBFee;
     return {
@@ -124,18 +125,18 @@ async function generateReceiptNumber(): Promise<string> {
 }
 
 interface TransactionDoc {
-    receiptNumber: string;
-    studentId: string;
-    feeType: string;
-    amount: number;
-    month?: number;
-    year: number;
-    remarks?: string;
-    collectedBy: string;
-    status: string;
-    transactionDate: Date;
-    examType?: string;
-    title?: string;
+  receiptNumber: string;
+  studentId: string;
+  feeType: string;
+  amount: number;
+  month?: number;
+  year: number;
+  remarks?: string;
+  collectedBy: string;
+  status: string;
+  transactionDate: Date;
+  examType?: string;
+  title?: string;
 }
 
 export async function collectFees(data: z.infer<typeof collectFeesSchema>, userId: string) {
@@ -170,69 +171,69 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
             status: { $ne: 'rejected' }
           });
           if (existing) {
-             return { success: false, error: `Fee for month ${dbMonth}/${actualYear} already paid/pending.` };
+            return { success: false, error: `Fee for month ${dbMonth}/${actualYear} already paid/pending.` };
           }
         }
-        
+
         // Create transactions per month
         const amountPerMonth = feeItem.amount / monthsToProcess.length;
         for (const m of monthsToProcess) {
-            const dbMonth = m + 1;
-            const actualYear = getYearForMonth(m, feeItem.year);
-            // Use unique suffix for each transaction part of this receipt
-            const uniqueSuffix = transactionDocs.length + 1;
-            const receiptNumber = `${baseReceiptNumber}-${uniqueSuffix}`;
-            
-            transactionDocs.push({
-                receiptNumber,
-                studentId: data.studentId,
-                feeType: 'monthly',
-                amount: amountPerMonth,
-                month: dbMonth,
-                year: actualYear,
-                remarks: feeItem.remarks,
-                collectedBy: userId,
-                status: 'verified',
-                transactionDate: new Date(),
-            });
+          const dbMonth = m + 1;
+          const actualYear = getYearForMonth(m, feeItem.year);
+          // Use unique suffix for each transaction part of this receipt
+          const uniqueSuffix = transactionDocs.length + 1;
+          const receiptNumber = `${baseReceiptNumber}-${uniqueSuffix}`;
+
+          transactionDocs.push({
+            receiptNumber,
+            studentId: data.studentId,
+            feeType: 'monthly',
+            amount: amountPerMonth,
+            month: dbMonth,
+            year: actualYear,
+            remarks: feeItem.remarks,
+            collectedBy: userId,
+            status: 'verified',
+            transactionDate: new Date(),
+          });
         }
       } else {
         // Other fees
         // Check duplicates
         if (feeItem.feeType === 'examination') {
-             const existing = await FeeTransaction.findOne({
-                studentId: data.studentId,
-                feeType: 'examination',
-                examType: feeItem.examType,
-                year: feeItem.year,
-                status: { $ne: 'rejected' }
-              });
-              if (existing) return { success: false, error: `Fee for ${feeItem.examType} ${feeItem.year} already paid/pending.` };
+          const existing = await FeeTransaction.findOne({
+            studentId: data.studentId,
+            feeType: 'examination',
+            examType: feeItem.examType,
+            year: feeItem.year,
+            status: { $ne: 'rejected' }
+          });
+          if (existing) return { success: false, error: `Fee for ${feeItem.examType} ${feeItem.year} already paid/pending.` };
         } else if (['admission', 'admissionFees', 'registrationFees'].includes(feeItem.feeType)) {
-             const existing = await FeeTransaction.findOne({
-                studentId: data.studentId,
-                feeType: feeItem.feeType,
-                year: feeItem.year,
-                status: { $ne: 'rejected' }
-              });
-              if (existing) return { success: false, error: `${feeItem.feeType} for ${feeItem.year} already paid/pending.` };
+          const existing = await FeeTransaction.findOne({
+            studentId: data.studentId,
+            feeType: feeItem.feeType,
+            year: feeItem.year,
+            status: { $ne: 'rejected' }
+          });
+          if (existing) return { success: false, error: `${feeItem.feeType} for ${feeItem.year} already paid/pending.` };
         }
 
         const uniqueSuffix = transactionDocs.length + 1;
         const receiptNumber = `${baseReceiptNumber}-${uniqueSuffix}`;
 
         transactionDocs.push({
-            receiptNumber,
-            studentId: data.studentId,
-            feeType: feeItem.feeType,
-            amount: feeItem.amount,
-            year: feeItem.year,
-            examType: feeItem.examType,
-            title: feeItem.title,
-            remarks: feeItem.remarks,
-            collectedBy: userId,
-            status: 'verified',
-            transactionDate: new Date(),
+          receiptNumber,
+          studentId: data.studentId,
+          feeType: feeItem.feeType,
+          amount: feeItem.amount,
+          year: feeItem.year,
+          examType: feeItem.examType,
+          title: feeItem.title,
+          remarks: feeItem.remarks,
+          collectedBy: userId,
+          status: 'verified',
+          transactionDate: new Date(),
         });
       }
     }
@@ -242,111 +243,110 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
 
     revalidatePath("/fees/collect");
 
-    // Send WhatsApp Receipt (Consolidated)
     try {
-        if (whatsappConfig.enabled && student?.contacts?.mobile?.[0]) {
-          const mobile = student.contacts.mobile[0];
-          // We can't put all details in URL params efficiently.
-          // Just put basic info and total amount.
-          // Extract and format unique months/fee types for display
-          // 1. Monthly fees - sorting by school session (April to March)
-          const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-          const getSessionRank = (m: number) => (m - 3 + 12) % 12; // April (3) becomes rank 0
-          
-          const uniqueMonths = Array.from(new Set(
-            data.fees
-              .filter(f => f.feeType === 'monthly' && f.months)
-              .flatMap(f => f.months!)
-          )).sort((a, b) => getSessionRank(a) - getSessionRank(b));
+      // Check if WhatsApp receipt alerts are enabled in settings
+      const whatsappReceiptEnabled = await Setting.findOne({ key: "whatsapp_receipt_alert" }).lean();
+      const isEnabled = whatsappReceiptEnabled ? (whatsappReceiptEnabled as any).value === true : false; // Default to false
 
-          // 2. Non-monthly fee types (e.g., Admission, Exam Fee)
-          const otherTypes = Array.from(new Set(
-            data.fees
-              .filter(f => f.feeType !== 'monthly')
-              .map(f => {
-                // Return a descriptive name for other types
-                if (f.feeType === 'examination' && f.examType) return `${f.examType} Exam`;
-                if (f.feeType === 'admission' || f.feeType === 'admissionFees') return "Admission";
-                if (f.feeType === 'registration' || f.feeType === 'registrationFees') return "Registration";
-                if (f.feeType === 'annual' || f.feeType === 'annualFees') return "Annual";
-                return f.feeType.charAt(0).toUpperCase() + f.feeType.slice(1);
-              })
-          ));
+      if (whatsappConfig.enabled && student?.contacts?.mobile?.[0] && isEnabled) {
+        const mobile = student.contacts.mobile[0];
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const getSessionRank = (m: number) => (m - 3 + 12) % 12; // April (3) becomes rank 0
 
-          // 3. Combine both for a descriptive 'month/details' field
-          const combinedDescription = [
-            ...uniqueMonths.map(m => monthNames[m]),
-            ...otherTypes
-          ].join(", ");
+        const uniqueMonths = Array.from(new Set(
+          data.fees
+            .filter(f => f.feeType === 'monthly' && f.months)
+            .flatMap(f => f.months!)
+        )).sort((a, b) => getSessionRank(a) - getSessionRank(b));
 
-          const monthsStr = combinedDescription || "Current";
+        // 2. Non-monthly fee types (e.g., Admission, Exam Fee)
+        const otherTypes = Array.from(new Set(
+          data.fees
+            .filter(f => f.feeType !== 'monthly')
+            .map(f => {
+              // Return a descriptive name for other types
+              if (f.feeType === 'examination' && f.examType) return `${f.examType} Exam`;
+              if (f.feeType === 'admission' || f.feeType === 'admissionFees') return "Admission";
+              if (f.feeType === 'registration' || f.feeType === 'registrationFees') return "Registration";
+              if (f.feeType === 'annual' || f.feeType === 'annualFees') return "Annual";
+              return f.feeType.charAt(0).toUpperCase() + f.feeType.slice(1);
+            })
+        ));
 
-          const queryParams = new URLSearchParams({
-            studentName: student.name,
-            studentRegNo: student.registrationNumber || 'N/A',
-            rollNumber: student.rollNumber || 'N/A',
-            className: student.classId?.name || 'N/A',
-            section: student.section || 'A',
-            amount: totalAmount.toString(),
-            date: new Date().toISOString(),
-            feeType: 'Multiple Fees', // Use a special flag to show the summary
-            months: monthsStr, // Pass the consolidated comma-separated months/types
-            year: new Date().getFullYear().toString(),
-          });
+        // 3. Combine both for a descriptive 'month/details' field
+        const combinedDescription = [
+          ...uniqueMonths.map(m => monthNames[m]),
+          ...otherTypes
+        ].join(", ");
 
-          const receiptUrl = `${whatsappConfig.appUrl}/api/receipt/image?receiptNumber=${baseReceiptNumber}&${queryParams.toString()}`;
+        const monthsStr = combinedDescription || "Current";
 
-          // Get current pricing
-          const cost = await WhatsAppPricing.getCurrentPrice();
+        const queryParams = new URLSearchParams({
+          studentName: student.name,
+          studentRegNo: student.registrationNumber || 'N/A',
+          rollNumber: student.rollNumber || 'N/A',
+          className: student.classId?.name || 'N/A',
+          section: student.section || 'A',
+          amount: totalAmount.toString(),
+          date: new Date().toISOString(),
+          feeType: 'Multiple Fees', // Use a special flag to show the summary
+          months: monthsStr, // Pass the consolidated comma-separated months/types
+          year: new Date().getFullYear().toString(),
+        });
 
-          const stat = new WhatsAppStat({
-            type: 'receipt',
-            description: `Fee receipt for ${student.name} (₹${totalAmount})`,
-            recipientCount: 1,
-            cost,
-            status: 'failed',
-            mediaUrl: receiptUrl,
-          });
-          await stat.save();
-          
-          const license = await License.findOne().sort({ createdAt: -1 }).lean();
-          if (!license || !license.schoolId || !license.key) {
-             console.error("Worker configuration missing for WhatsApp integration.")
-             return;
-          }
+        const receiptUrl = `${whatsappConfig.appUrl}/api/receipt/image?receiptNumber=${baseReceiptNumber}&${queryParams.toString()}`;
 
-          const payload = {
-            schoolId: license.schoolId,
-            licenseKey: license.key,
-            mode: 'single',
-            phone: mobile,
-            parentName: student.name, // using student as parent fallback
-            studentName: student.name,
-            amount: totalAmount.toString(),
-            receiptNumber: baseReceiptNumber,
-            month: monthsStr,
-            media: { url: receiptUrl, filename: `Receipt-${baseReceiptNumber}.png` }
-          };
+        // Get current pricing
+        const cost = await WhatsAppPricing.getCurrentPrice();
 
-          const workerRes = await fetch(`${whatsappConfig.worker.url}/api/v1/whatsapp/receipt`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
+        const stat = new WhatsAppStat({
+          type: 'receipt',
+          description: `Fee receipt for ${student.name} (₹${totalAmount})`,
+          recipientCount: 1,
+          cost,
+          status: 'failed',
+          mediaUrl: receiptUrl,
+        });
+        await stat.save();
 
-          if (workerRes.ok) {
-            await WhatsAppStat.findByIdAndUpdate(stat._id, { status: 'success' });
-          } else {
-             console.error("Failed to send WhatsApp receipt via Worker:", await workerRes.text());
-          }
+        const license = await License.findOne().sort({ createdAt: -1 }).lean();
+        if (!license || !license.schoolId || !license.key) {
+          console.error("Worker configuration missing for WhatsApp integration.")
+          return;
         }
+
+        const payload = {
+          schoolId: license.schoolId,
+          licenseKey: license.key,
+          mode: 'single',
+          phone: mobile,
+          parentName: student.name, // using student as parent fallback
+          studentName: student.name,
+          amount: totalAmount.toString(),
+          receiptNumber: baseReceiptNumber,
+          month: monthsStr,
+          media: { url: receiptUrl, filename: `Receipt-${baseReceiptNumber}.png` }
+        };
+
+        const workerRes = await fetch(`${whatsappConfig.worker.url}/api/v1/whatsapp/receipt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (workerRes.ok) {
+          await WhatsAppStat.findByIdAndUpdate(stat._id, { status: 'success' });
+        } else {
+          console.error("Failed to send WhatsApp receipt via Worker:", await workerRes.text());
+        }
+      }
     } catch (error) {
-        console.error("Failed to send WhatsApp receipt:", error);
+      console.error("Failed to send WhatsApp receipt:", error);
     }
 
     return {
-        success: true,
-        receiptNumber: baseReceiptNumber,
+      success: true,
+      receiptNumber: baseReceiptNumber,
     };
 
   } catch (error: unknown) {
@@ -356,89 +356,89 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
 }
 
 export async function getReceiptDetails(receiptNumber: string) {
-    await dbConnect();
+  await dbConnect();
 
-    // Extract base receipt number if it contains a suffix (e.g., 1201-1 -> 1201)
-    // Assuming base receipt number is numeric (from counter)
-    const baseReceiptNumber = receiptNumber.split('-')[0];
+  // Extract base receipt number if it contains a suffix (e.g., 1201-1 -> 1201)
+  // Assuming base receipt number is numeric (from counter)
+  const baseReceiptNumber = receiptNumber.split('-')[0];
 
-    // Regex to match baseReceiptNumber (exact) or baseReceiptNumber-suffix
-    const regex = new RegExp(`^${baseReceiptNumber}(-[0-9]+)?$`);
-    
-    const transactions = await FeeTransaction.find({ receiptNumber: { $regex: regex } })
-        .populate({
-            path: 'studentId',
-            select: 'name registrationNumber rollNumber classId section',
-            populate: { path: 'classId', select: 'name' }
-        })
-        .lean();
+  // Regex to match baseReceiptNumber (exact) or baseReceiptNumber-suffix
+  const regex = new RegExp(`^${baseReceiptNumber}(-[0-9]+)?$`);
 
-    if (!transactions || transactions.length === 0) {
-        return null;
+  const transactions = await FeeTransaction.find({ receiptNumber: { $regex: regex } })
+    .populate({
+      path: 'studentId',
+      select: 'name registrationNumber rollNumber classId section',
+      populate: { path: 'classId', select: 'name' }
+    })
+    .lean();
+
+  if (!transactions || transactions.length === 0) {
+    return null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const firstTx = transactions[0] as any;
+  const student = firstTx.studentId;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const items = transactions.map((t: any) => ({
+    feeType: t.feeType,
+    amount: t.amount,
+    months: t.month ? [t.month] : [],
+    year: t.year,
+    examType: t.examType,
+    title: t.title,
+    remarks: t.remarks
+  }));
+
+  // Consolidate monthly fees into one item if needed, or keep separate
+  // For receipt display, maybe grouping monthly fees by year makes sense?
+  // Let's do a simple grouping
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const consolidatedItems: any[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const monthlyGroups: Record<string, any> = {};
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  items.forEach((item: any) => {
+    if (item.feeType === 'monthly') {
+      const key = `${item.year}`;
+      if (!monthlyGroups[key]) {
+        monthlyGroups[key] = {
+          feeType: 'monthly',
+          amount: 0,
+          months: [],
+          year: item.year,
+          remarks: item.remarks // Take first remark?
+        };
+        consolidatedItems.push(monthlyGroups[key]);
+      }
+      monthlyGroups[key].amount += item.amount;
+      monthlyGroups[key].months.push(...item.months);
+    } else {
+      consolidatedItems.push(item);
     }
+  });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const firstTx = transactions[0] as any;
-    const student = firstTx.studentId;
+  // Sort months
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Object.values(monthlyGroups).forEach((group: any) => {
+    group.months.sort((a: number, b: number) => a - b);
+  });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const items = transactions.map((t: any) => ({
-        feeType: t.feeType,
-        amount: t.amount,
-        months: t.month ? [t.month] : [],
-        year: t.year,
-        examType: t.examType,
-        title: t.title,
-        remarks: t.remarks
-    }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const totalAmount = transactions.reduce((sum: number, t: any) => sum + t.amount, 0);
 
-    // Consolidate monthly fees into one item if needed, or keep separate
-    // For receipt display, maybe grouping monthly fees by year makes sense?
-    // Let's do a simple grouping
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const consolidatedItems: any[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const monthlyGroups: Record<string, any> = {};
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    items.forEach((item: any) => {
-        if (item.feeType === 'monthly') {
-            const key = `${item.year}`;
-            if (!monthlyGroups[key]) {
-                monthlyGroups[key] = {
-                    feeType: 'monthly',
-                    amount: 0,
-                    months: [],
-                    year: item.year,
-                    remarks: item.remarks // Take first remark?
-                };
-                consolidatedItems.push(monthlyGroups[key]);
-            }
-            monthlyGroups[key].amount += item.amount;
-            monthlyGroups[key].months.push(...item.months);
-        } else {
-            consolidatedItems.push(item);
-        }
-    });
-
-    // Sort months
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Object.values(monthlyGroups).forEach((group: any) => {
-        group.months.sort((a: number, b: number) => a - b);
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const totalAmount = transactions.reduce((sum: number, t: any) => sum + t.amount, 0);
-
-    return {
-        receiptNumber: baseReceiptNumber,
-        studentName: student?.name || 'Unknown',
-        studentRegNo: student?.registrationNumber || 'N/A',
-        rollNumber: student?.rollNumber || 'N/A',
-        className: student?.classId?.name || 'N/A',
-        section: student?.section || 'A',
-        date: firstTx.transactionDate,
-        items: consolidatedItems,
-        totalAmount
-    };
+  return {
+    receiptNumber: baseReceiptNumber,
+    studentName: student?.name || 'Unknown',
+    studentRegNo: student?.registrationNumber || 'N/A',
+    rollNumber: student?.rollNumber || 'N/A',
+    className: student?.classId?.name || 'N/A',
+    section: student?.section || 'A',
+    date: firstTx.transactionDate,
+    items: consolidatedItems,
+    totalAmount
+  };
 }
