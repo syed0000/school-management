@@ -98,7 +98,7 @@ export function MainNav({
     },
     ...(whatsappConfig.enabled ? [{
       href: "/whatsapp",
-      label: "WhatsApp",
+      label: "Notifications",
       active: pathname.startsWith("/whatsapp"),
     }] : []),
     {
@@ -156,7 +156,7 @@ export function MainNav({
     },
     ...(whatsappConfig.enabled ? [{
       href: "/whatsapp",
-      label: "WhatsApp",
+      label: "Notifications",
       active: pathname.startsWith("/whatsapp"),
     }] : []),
     {

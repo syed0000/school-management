@@ -11,6 +11,9 @@ import { Loader2, Camera, Phone, Mail, IdCard, CalendarDays, Wallet, BadgeCheck,
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { PushNotificationToggle } from "@/components/notifications/push-toggle";
+import { Settings as SettingsIcon } from "lucide-react";
+
 
 export function TeacherProfileClient({ teacher }: { teacher: Teacher }) {
   const router = useRouter();
@@ -189,9 +192,31 @@ export function TeacherProfileClient({ teacher }: { teacher: Teacher }) {
         </Card>
       </div>
       
-      <div className="flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
-        <p>If you need to update other details, please contact the administrators.</p>
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Account Settings */}
+        <Card className="border-0 shadow-sm sm:border">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center">
+              <SettingsIcon className="mr-2 h-5 w-5 text-primary" />
+              Account Settings
+            </CardTitle>
+            <CardDescription>Manage your app preferences</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PushNotificationToggle
+              userId={teacher._id}
+              role="teacher"
+              initialEnabled={teacher.notificationSettings?.pushEnabled ?? false}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Placeholder or Help */}
+        <div className="flex flex-col justify-center p-6 text-center text-sm text-muted-foreground border-2 border-dashed rounded-xl">
+          <p>If you need to update profile details or salary info, please contact the administrators.</p>
+        </div>
       </div>
+
     </div>
   );
 }

@@ -10,6 +10,8 @@ import { Camera, Loader2 } from "lucide-react";
 import { updateStudentPhotoForParent } from "@/actions/parent";
 import { useRouter } from "next/navigation";
 import type { ParentStudentProfile } from "@/types";
+import { PushNotificationToggle } from "@/components/notifications/push-toggle";
+
 
 interface StudentProfileCardProps {
   profile: ParentStudentProfile;
@@ -144,11 +146,28 @@ export function StudentProfileCard({ profile }: StudentProfileCardProps) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader className="pb-3 border-b bg-muted/20">
+          <CardTitle className="text-base flex items-center justify-between font-bold">
+            Notification Settings
+            <Badge variant="outline" className="text-[10px] bg-white font-normal border-primary/20">Real-time alerts</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <PushNotificationToggle
+            userId={profile._id}
+            role="parent"
+            initialEnabled={profile.notificationSettings?.pushEnabled ?? false}
+          />
+        </CardContent>
+      </Card>
+
       {/* Details table */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Student Details</CardTitle>
         </CardHeader>
+
         <CardContent className="pt-0">
           <dl className="divide-y">
             {infoRows.map((row) => (

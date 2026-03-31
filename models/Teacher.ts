@@ -40,8 +40,13 @@ const TeacherSchema = new mongoose.Schema({
     feeAccess: { type: Boolean, default: false },
   }],
 
+  pushTokens: [String],
+  notificationSettings: {
+    pushEnabled: { type: Boolean, default: true }
+  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
+
 });
 
 // Delete existing model to prevent hot-reload errors with schema changes

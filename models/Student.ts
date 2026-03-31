@@ -67,8 +67,13 @@ const StudentSchema = new mongoose.Schema({
   tcNumber: { type: String },
 
   isActive: { type: Boolean, default: true },
+  pushTokens: [String],
+  notificationSettings: {
+    pushEnabled: { type: Boolean, default: true }
+  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
+
 });
 
 // Compound index for unique roll number within class and section

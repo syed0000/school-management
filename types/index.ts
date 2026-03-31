@@ -37,9 +37,12 @@ export interface Student {
   dateOfAdmission?: string | Date;
   lastInstitution?: string;
   tcNumber?: string;
-  isActive: boolean;
-  createdAt: string | Date;
   updatedAt: string | Date;
+  pushTokens?: string[];
+  notificationSettings?: {
+    pushEnabled: boolean;
+  };
+
   
   // Legacy/Fallback fields for UI components that might expect flat structure
   fatherName?: string;
@@ -83,8 +86,12 @@ export interface Teacher {
   salary: Salary;
   documents: Document[];
   assignedClasses: AssignedClass[];
-  createdAt: string | Date;
   updatedAt: string | Date;
+  pushTokens?: string[];
+  notificationSettings?: {
+    pushEnabled: boolean;
+  };
+
 }
 
 // --- Parent Portal Types ---
@@ -105,7 +112,11 @@ export interface ParentStudentProfile {
   parents: Parents;
   dateOfAdmission?: string;
   isActive: boolean;
+  notificationSettings?: {
+    pushEnabled: boolean;
+  };
 }
+
 
 export type AttendanceStatus = 'Present' | 'Absent' | 'Holiday' | null;
 

@@ -76,6 +76,21 @@ export async function sendBulkReminders(
     });
 
     // 3. Build strictly typed fields for Reminders
+    // 3. Build strictly typed fields for Reminders and fetch push tokens
+    const studentIds = validStudents.map(s => s.id);
+    const { default: Student } = await import("@/models/Student");
+    const studentDocs = await Student.find({ _id: { $in: studentIds } }, 'pushTokens notificationSettings').lean();
+    
+    const pushTargets: { studentId: string, tokens: string[] }[] = [];
+    studentDocs.forEach(doc => {
+      if (doc.notificationSettings?.pushEnabled && doc.pushTokens && doc.pushTokens.length > 0) {
+        pushTargets.push({
+          studentId: doc._id.toString(),
+          tokens: doc.pushTokens
+        });
+      }
+    });
+
     const recipients = validStudents.map((student) => {
       const duesList = student.details.join(', ');
       const totalAmount = `₹${student.amount.toLocaleString()}`;
@@ -86,7 +101,8 @@ export async function sendBulkReminders(
         parentName: student.name, // Fallback to student name if parent name not supplied in struct
         dueAmount: totalAmount,
         dueDate: "Immediately",
-        month: duesList
+        month: duesList,
+        studentId: student.id,
       };
     });
 
@@ -102,10 +118,12 @@ export async function sendBulkReminders(
         mode: 'bulk',
         language,
         recipients,
+        pushTargets,
         webhookUrl,
         jobId: batchId,
       }),
     });
+
 
     if (!workerRes.ok) {
       const err = await workerRes.json().catch(() => ({ error: 'Worker error' }));
