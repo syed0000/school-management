@@ -53,6 +53,7 @@ const feeItemInputSchema = z.object({
 const formSchema = z.object({
   classId: z.string().optional(),
   studentId: z.string().min(1, "Student is required"),
+  transactionDate: z.string().min(1, "Collection date is required"),
   // Current fee item fields
   ...feeItemInputSchema.shape,
 })
@@ -99,6 +100,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
       examType: "",
       title: "",
       remarks: "",
+      transactionDate: new Date().toISOString().split('T')[0],
     },
   })
 
@@ -291,6 +293,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
     try {
       const payload = {
         studentId: selectedStudentId,
+        transactionDate: form.getValues("transactionDate"),
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         fees: itemsToSubmit.map(({ id, ...rest }) => rest)
       }
@@ -422,6 +425,20 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
                           </Command>
                         </PopoverContent>
                       </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="transactionDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col mt-2">
+                      <FormLabel>Collection Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

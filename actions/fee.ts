@@ -6,6 +6,7 @@ import FeeTransaction from "@/models/FeeTransaction"
 import "@/models/Student"
 import "@/models/Class"
 import { revalidatePath } from "next/cache"
+import { sendWhatsAppReceipt } from "@/lib/whatsapp-receipt"
 
 export async function getPendingFees() {
   await dbConnect();
@@ -71,11 +72,36 @@ export async function verifyFee(transactionId: string, action: 'approve' | 'reje
     
     const status = action === 'approve' ? 'verified' : 'rejected';
     
-    await FeeTransaction.findByIdAndUpdate(transactionId, {
+    const updatedTransaction = await FeeTransaction.findByIdAndUpdate(transactionId, {
       status,
       verifiedAt: new Date(),
       verifiedBy: userId
-    });
+    }, { new: true }).populate({
+      path: 'studentId',
+      populate: { path: 'classId' }
+    }).lean();
+
+    if (action === 'approve' && updatedTransaction) {
+      // Trigger WhatsApp Receipt
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+      let monthsStr = "Current";
+      if (updatedTransaction.feeType === 'monthly' && updatedTransaction.month) {
+        monthsStr = monthNames[updatedTransaction.month - 1];
+      } else if (updatedTransaction.feeType === 'examination') {
+        monthsStr = `${updatedTransaction.examType} Exam`;
+      } else {
+        monthsStr = updatedTransaction.feeType.charAt(0).toUpperCase() + updatedTransaction.feeType.slice(1);
+      }
+
+      await sendWhatsAppReceipt({
+        student: updatedTransaction.studentId,
+        totalAmount: updatedTransaction.amount,
+        receiptNumber: updatedTransaction.receiptNumber,
+        monthsStr: monthsStr,
+        transactionDate: updatedTransaction.transactionDate
+        });
+    }
     
     revalidatePath("/admin/fees/verify");
     revalidatePath("/admin/dashboard"); // Update stats

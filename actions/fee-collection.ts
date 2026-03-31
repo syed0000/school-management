@@ -8,12 +8,9 @@ import Class from "@/models/Class"
 import Counter from "@/models/Counter"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
-import { whatsappConfig } from "@/lib/whatsapp-config"
 import { getYearForMonth } from "@/lib/utils"
-import WhatsAppStat from "@/models/WhatsAppStat"
-import WhatsAppPricing from "@/models/WhatsAppPricing"
-import License from "@/models/License"
-import Setting from "@/models/Setting"
+import User from "@/models/User"
+import { sendWhatsAppReceipt } from "@/lib/whatsapp-receipt"
 
 const feeItemSchema = z.object({
   feeType: z.string().min(1, "Fee type is required"),
@@ -28,6 +25,7 @@ const feeItemSchema = z.object({
 const collectFeesSchema = z.object({
   studentId: z.string().min(1, "Student is required"),
   fees: z.array(feeItemSchema).min(1, "At least one fee is required"),
+  transactionDate: z.string().optional(),
 })
 
 export async function getStudentFeeDetails(studentId: string) {
@@ -147,6 +145,12 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
     const student = await Student.findById(data.studentId).populate('classId', 'name').lean();
     if (!student) throw new Error("Student not found");
 
+    const submissionDate = data.transactionDate ? new Date(data.transactionDate) : new Date();
+
+    const submissionUser = await User.findById(userId).lean();
+    const isActuallyAdmin = submissionUser?.role === 'admin';
+    const initialStatus = isActuallyAdmin ? 'verified' : 'pending';
+
     const baseReceiptNumber = await generateReceiptNumber();
     let totalAmount = 0;
     const transactionDocs: TransactionDoc[] = [];
@@ -193,8 +197,8 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
             year: actualYear,
             remarks: feeItem.remarks,
             collectedBy: userId,
-            status: 'verified',
-            transactionDate: new Date(),
+            status: initialStatus,
+            transactionDate: submissionDate,
           });
         }
       } else {
@@ -232,8 +236,8 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
           title: feeItem.title,
           remarks: feeItem.remarks,
           collectedBy: userId,
-          status: 'verified',
-          transactionDate: new Date(),
+          status: initialStatus,
+          transactionDate: submissionDate,
         });
       }
     }
@@ -244,12 +248,7 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
     revalidatePath("/fees/collect");
 
     try {
-      // Check if WhatsApp receipt alerts are enabled in settings
-      const whatsappReceiptEnabled = await Setting.findOne({ key: "whatsapp_receipt_alert" }).lean();
-      const isEnabled = whatsappReceiptEnabled ? (whatsappReceiptEnabled as any).value === true : false; // Default to false
-
-      if (whatsappConfig.enabled && student?.contacts?.mobile?.[0] && isEnabled) {
-        const mobile = student.contacts.mobile[0];
+      if (initialStatus === 'verified') {
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const getSessionRank = (m: number) => (m - 3 + 12) % 12; // April (3) becomes rank 0
 
@@ -259,89 +258,33 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
             .flatMap(f => f.months!)
         )).sort((a, b) => getSessionRank(a) - getSessionRank(b));
 
-        // 2. Non-monthly fee types (e.g., Admission, Exam Fee)
-        const otherTypes = Array.from(new Set(
-          data.fees
-            .filter(f => f.feeType !== 'monthly')
-            .map(f => {
-              // Return a descriptive name for other types
-              if (f.feeType === 'examination' && f.examType) return `${f.examType} Exam`;
-              if (f.feeType === 'admission' || f.feeType === 'admissionFees') return "Admission";
-              if (f.feeType === 'registration' || f.feeType === 'registrationFees') return "Registration";
-              if (f.feeType === 'annual' || f.feeType === 'annualFees') return "Annual";
-              return f.feeType.charAt(0).toUpperCase() + f.feeType.slice(1);
-            })
-        ));
+          const otherTypes = Array.from(new Set(
+            data.fees
+              .filter(f => f.feeType !== 'monthly')
+              .map(f => {
+                      if (f.feeType === 'examination' && f.examType) return `${f.examType} Exam`;
+                      if (f.feeType === 'admission' || f.feeType === 'admissionFees') return "Admission";
+                      if (f.feeType === 'registration' || f.feeType === 'registrationFees') return "Registration";
+                      if (f.feeType === 'annual' || f.feeType === 'annualFees') return "Annual";
+                      return f.feeType.charAt(0).toUpperCase() + f.feeType.slice(1);
+                    })
+            ));
 
-        // 3. Combine both for a descriptive 'month/details' field
-        const combinedDescription = [
-          ...uniqueMonths.map(m => monthNames[m]),
-          ...otherTypes
-        ].join(", ");
+          const monthsStr = [
+            ...uniqueMonths.map(m => monthNames[m]),
+            ...otherTypes
+            ].join(", ") || "Current";
 
-        const monthsStr = combinedDescription || "Current";
-
-        const queryParams = new URLSearchParams({
-          studentName: student.name,
-          studentRegNo: student.registrationNumber || 'N/A',
-          rollNumber: student.rollNumber || 'N/A',
-          className: student.classId?.name || 'N/A',
-          section: student.section || 'A',
-          amount: totalAmount.toString(),
-          date: new Date().toISOString(),
-          feeType: 'Multiple Fees', // Use a special flag to show the summary
-          months: monthsStr, // Pass the consolidated comma-separated months/types
-          year: new Date().getFullYear().toString(),
-        });
-
-        const receiptUrl = `${whatsappConfig.appUrl}/api/receipt/image?receiptNumber=${baseReceiptNumber}&${queryParams.toString()}`;
-
-        // Get current pricing
-        const cost = await WhatsAppPricing.getCurrentPrice();
-
-        const stat = new WhatsAppStat({
-          type: 'receipt',
-          description: `Fee receipt for ${student.name} (₹${totalAmount})`,
-          recipientCount: 1,
-          cost,
-          status: 'failed',
-          mediaUrl: receiptUrl,
-        });
-        await stat.save();
-
-        const license = await License.findOne().sort({ createdAt: -1 }).lean();
-        if (!license || !license.schoolId || !license.key) {
-          console.error("Worker configuration missing for WhatsApp integration.")
-          return;
+          await sendWhatsAppReceipt({
+            student,
+            totalAmount,
+            receiptNumber: baseReceiptNumber,
+              monthsStr,
+              transactionDate: submissionDate
+            });
         }
-
-        const payload = {
-          schoolId: license.schoolId,
-          licenseKey: license.key,
-          mode: 'single',
-          phone: mobile,
-          parentName: student.name, // using student as parent fallback
-          studentName: student.name,
-          amount: totalAmount.toString(),
-          receiptNumber: baseReceiptNumber,
-          month: monthsStr,
-          media: { url: receiptUrl, filename: `Receipt-${baseReceiptNumber}.png` }
-        };
-
-        const workerRes = await fetch(`${whatsappConfig.worker.url}/api/v1/whatsapp/receipt`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (workerRes.ok) {
-          await WhatsAppStat.findByIdAndUpdate(stat._id, { status: 'success' });
-        } else {
-          console.error("Failed to send WhatsApp receipt via Worker:", await workerRes.text());
-        }
-      }
     } catch (error) {
-      console.error("Failed to send WhatsApp receipt:", error);
+      console.error("Failed to trigger WhatsApp receipt helper:", error);
     }
 
     return {
