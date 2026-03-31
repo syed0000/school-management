@@ -6,16 +6,17 @@ import { StudentProfileCard } from "@/components/parent/student-profile-card";
 import dbConnect from "@/lib/db";
 import Student from "@/models/Student";
 
-type SearchParams = Promise<{ studentId?: string }>;
+import { cookies } from "next/headers";
 
-export default async function ParentProfilePage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ParentProfilePage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login/otp");
   if (session.user.role !== 'parent' && session.user.role !== 'admin') redirect("/dashboard");
 
-  const { studentId: queryStudentId } = await searchParams;
+  const cookieStore = await cookies();
+  const activeStudentCookie = cookieStore.get('activeParentStudentId')?.value;
   const sessionStudentId = session.user.id;
-  const targetStudentId = queryStudentId || sessionStudentId;
+  const targetStudentId = activeStudentCookie || sessionStudentId;
 
   await dbConnect();
   const student = await Student.findById(sessionStudentId).select('contacts').lean() as { contacts?: { mobile?: string[] } } | null;

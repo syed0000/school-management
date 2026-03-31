@@ -123,6 +123,7 @@ export interface MonthlyFeeStatus {
   paid: number;
   due: number;
   status: 'Paid' | 'Due' | 'Partial';
+  transactionDate?: string;
 }
 
 export interface StudentFeeOverview {
@@ -130,7 +131,7 @@ export interface StudentFeeOverview {
   totalPaid: number;
   totalDue: number;
   monthlyBreakdown: MonthlyFeeStatus[];
-  otherFees: { label: string; expected: number; paid: number; due: number }[];
+  otherFees: { label: string; expected: number; paid: number; due: number; transactionDate?: string }[];
 }
 
 // --- Teacher Portal Types ---

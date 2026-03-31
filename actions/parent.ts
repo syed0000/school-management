@@ -10,6 +10,7 @@ import Attendance from '@/models/Attendance';
 import FeeTransaction from '@/models/FeeTransaction';
 import ClassFee from '@/models/ClassFee';
 import { Types } from 'mongoose';
+import { cookies } from 'next/headers';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, eachMonthOfInterval, isAfter, isBefore } from 'date-fns';
 import logger from '@/lib/logger';
 import { saveFile } from '@/lib/upload';
@@ -192,6 +193,40 @@ export async function getParentStudents(phone: string): Promise<ParentStudentPro
     logger.error(error, 'getParentStudents failed');
     return [];
   }
+}
+
+// ---------------------------------------------------------------------------
+// setActiveParentStudentId — stores active student toggle in cookie
+// ---------------------------------------------------------------------------
+export async function setActiveParentStudentId(studentId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user.role !== 'parent' && session.user.role !== 'admin')) return { success: false };
+
+  const cookieStore = await cookies();
+  cookieStore.set('activeParentStudentId', studentId, {
+    path: '/',
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+  });
+
+  return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// getActiveParentStudentId — retrieves active student from cookie or session
+// ---------------------------------------------------------------------------
+export async function getActiveParentStudentId(): Promise<string | null> {
+  const session = await getServerSession(authOptions);
+  if (!session) return null;
+
+  const cookieStore = await cookies();
+  const activeId = cookieStore.get('activeParentStudentId')?.value;
+  
+  if (activeId) return activeId;
+  
+  // Fallback to session user ID if it's a student/parent account
+  return session.user.id;
 }
 
 // ---------------------------------------------------------------------------
@@ -494,7 +529,14 @@ export async function getStudentFeeOverview(
         status: 'verified',
       }).lean() as unknown as FeeTransactionDoc[];
 
-      const admissionDate = new Date(student.dateOfAdmission ?? student.createdAt);
+      // Check if admissionDate is valid. If inherited from createdAt mid-session due to data import,
+      // without actual dateOfAdmission, it shouldn't chop the fees. We'll default to sessionStart
+      // if dateOfAdmission isn't explicitly defined and we rely on createdAt (which is often late).
+      const hasExplicitAdmissionDate = !!student.dateOfAdmission;
+      const parsedAdmissionDate = new Date(student.dateOfAdmission ?? student.createdAt);
+      
+      const admissionDate = hasExplicitAdmissionDate ? parsedAdmissionDate : new Date(0); // Far past so it covers the full session
+
       const sessionStartYear = getCurrentSessionStartYear();
 
       // Session range: April of start year → March of next year
@@ -504,29 +546,36 @@ export async function getStudentFeeOverview(
       // Effective start = whichever is later: session start or admission date
       const effectiveStart = isAfter(admissionDate, sessionStart) ? startOfMonth(admissionDate) : sessionStart;
 
-      const monthsInSession = eachMonthOfInterval({ start: effectiveStart, end: sessionEnd });
+      const monthsInSession = eachMonthOfInterval({ start: sessionStart, end: sessionEnd });
 
       const monthlyFeeConf = classFees.find((f) => f.type === 'monthly');
       const monthlyAmount = monthlyFeeConf?.amount ?? 0;
 
-      const monthlyBreakdown: MonthlyFeeStatus[] = monthsInSession.map((date) => {
+      const monthlyBreakdown = monthsInSession.map((date): MonthlyFeeStatus => {
         const m = date.getMonth() + 1; // 1-12
         const y = date.getFullYear();
 
         const paidTxn = allTxns.find((t) => t.feeType === 'monthly' && t.month === m && t.year === y);
         const paid = paidTxn ? paidTxn.amount : 0;
-        const due = Math.max(0, monthlyAmount - paid);
+        
+        let expected = 0;
+        if (date >= effectiveStart || paid > 0) {
+            expected = monthlyAmount;
+        }
+
+        const due = Math.max(0, expected - paid);
 
         return {
           month: m,
           year: y,
           monthName: MONTH_NAMES[m - 1],
-          expected: monthlyAmount,
+          expected,
           paid,
           due,
           status: due <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Due',
+          transactionDate: paidTxn ? format(new Date(paidTxn.transactionDate), 'dd-MM-yy') : undefined,
         };
-      });
+      }).filter(m => m.expected > 0 || m.paid > 0);
 
       // Other fees: admission, registration, exam
       const otherFeeTypes = ['admissionFees', 'registrationFees', 'admission', 'examination'];
@@ -545,7 +594,13 @@ export async function getStudentFeeOverview(
         const expected = entryFee.amount;
         const due = Math.max(0, expected - paid);
         const label = entryFee.type === 'registrationFees' ? 'Registration Fee' : 'Admission Fee';
-        otherFees.push({ label: `${label} (${admYear})`, expected, paid, due });
+        otherFees.push({ 
+          label: `${label} (${admYear})`, 
+          expected, 
+          paid, 
+          due,
+          transactionDate: paidTxn ? format(new Date(paidTxn.transactionDate), 'dd-MM-yy') : undefined
+        });
       }
 
       // Exam fees
@@ -561,14 +616,22 @@ export async function getStudentFeeOverview(
               (t) => t.feeType === 'examination' && t.year === y && (t.examType === ef.title || !t.examType),
             );
             const paid = paidTxn?.amount ?? 0;
-            const expected = ef.amount;
+            
+            let expected = 0;
+            if (date >= startOfMonth(effectiveStart) || paid > 0) {
+                expected = ef.amount;
+            }
+            
             const due = Math.max(0, expected - paid);
-            otherFees.push({
-              label: `${ef.title ?? 'Exam Fee'} (${MONTH_NAMES[examMonthIndex]} ${y})`,
-              expected,
-              paid,
-              due,
-            });
+            if (expected > 0 || paid > 0) {
+                otherFees.push({
+                  label: `${ef.title ?? 'Exam Fee'} (${MONTH_NAMES[examMonthIndex]} ${y})`,
+                  expected,
+                  paid,
+                  due,
+                  transactionDate: paidTxn ? format(new Date(paidTxn.transactionDate), 'dd-MM-yy') : undefined
+                });
+            }
           }
         });
       });

@@ -8,7 +8,7 @@ import { getTeacherClassFeeReport } from "@/actions/teacher-portal";
 import { CalendarDateRangePicker } from "@/components/dashboard/date-range-picker";
 import { formatCurrency, getCurrentSessionRange } from "@/lib/utils";
 import { toast } from "sonner";
-import { Loader2, Search, FileDown } from "lucide-react";
+import { Loader2, Search, FileDown, Clock, AlertCircle } from "lucide-react";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
@@ -29,8 +29,8 @@ interface StudentFeeRecord {
   expectedPeriod: number;
   collectedPeriod: number;
   dueAmount: number;
-  status: string;
   photo?: string;
+  feeStatuses: Record<string, any>;
 }
 
 interface FeeReportData {
@@ -88,7 +88,7 @@ export function ClassFeeTab({ classId, section }: ClassFeeTabProps) {
         "Expected": s.expectedPeriod,
         "Paid": s.collectedPeriod,
         "Due": s.dueAmount,
-        "Status": s.status,
+        "Status": s.dueAmount <= 0 ? "Paid" : "Due",
       }))
     );
     const wb = XLSX.utils.book_new();
@@ -165,15 +165,37 @@ export function ClassFeeTab({ classId, section }: ClassFeeTabProps) {
                       {student.rollNumber && <div className="text-xs text-muted-foreground">Roll: {student.rollNumber}</div>}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(student.expectedPeriod)}</td>
-                    <td className="px-4 py-3 text-right text-green-600 font-medium tabular-nums">{formatCurrency(student.collectedPeriod)}</td>
-                    <td className="px-4 py-3 text-right text-red-600 font-medium tabular-nums">{formatCurrency(student.dueAmount)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex flex-col items-end">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+                          <span className="font-medium tabular-nums">{formatCurrency(student.collectedPeriod)}</span>
+                        </div>
+                        {Object.values(student.feeStatuses).some(s => s.status === 'paid') && (
+                          <div className="text-[10px] text-muted-foreground italic mt-0.5">
+                            {(() => {
+                              const paidDates = Object.values(student.feeStatuses)
+                                .filter(s => s.status === 'paid' && s.date)
+                                .map(s => s.date);
+                              if (paidDates.length === 1) return `Paid on: ${paidDates[0]}`;
+                              if (paidDates.length > 1) return `${paidDates.length} payments, last: ${paidDates[paidDates.length-1]}`;
+                              return null;
+                            })()}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                        <span className="font-medium text-red-600 tabular-nums">{formatCurrency(student.dueAmount)}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-1 rounded-full text-[10px] font-medium leading-none ${
-                        student.status === "Paid" ? "bg-green-100 text-green-700" :
-                        student.status === "Due" ? "bg-red-100 text-red-700" :
-                        "bg-yellow-100 text-yellow-700"
+                        student.dueAmount <= 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                       }`}>
-                        {student.status}
+                        {student.dueAmount <= 0 ? "Paid" : "Due"}
                       </span>
                     </td>
                   </tr>

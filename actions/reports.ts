@@ -368,7 +368,7 @@ export async function getFeeReport({
       const exams = getExamsForClass(cId);
 
       const dueMonthsList: string[] = [];
-      const feeStatuses: Record<string, string> = {};
+      const feeStatuses: Record<string, any> = {};
 
       // 1. Monthly Fees in Period
       const currentIterDate = startOfMonth(startDate);
@@ -388,9 +388,12 @@ export async function getFeeReport({
         
         if (paidTxn) {
           paidAmount += paidTxn.amount;
-          feeStatuses[monthHeader] = 'paid';
+          feeStatuses[monthHeader] = { 
+            status: 'paid', 
+            date: format(new Date(paidTxn.transactionDate || (paidTxn as any).createdAt), 'dd-MM-yy') 
+          };
         } else {
-          feeStatuses[monthHeader] = 'unpaid';
+          feeStatuses[monthHeader] = { status: 'unpaid' };
           dueMonthsList.push(monthHeader);
         }
 
@@ -411,13 +414,16 @@ export async function getFeeReport({
           // If they paid either, then it's expected and paid.
           expectedAmount += admissionTxn.amount;
           paidAmount += admissionTxn.amount;
-          feeStatuses[headerName] = 'paid';
+          feeStatuses[headerName] = { 
+            status: 'paid', 
+            date: format(new Date(admissionTxn.transactionDate || (admissionTxn as any).createdAt), 'dd-MM-yy') 
+          };
         } else {
           // If not paid, expect either the admission fee or the registration fee.
           const entryFeeAmount = admissionFee || registrationFee;
           expectedAmount += entryFeeAmount;
           if (entryFeeAmount > 0) {
-            feeStatuses[headerName] = 'unpaid';
+            feeStatuses[headerName] = { status: 'unpaid' };
             dueMonthsList.push(headerName);
           }
         }
@@ -443,9 +449,12 @@ export async function getFeeReport({
 
               if (paidExamTxn) {
                 paidAmount += paidExamTxn.amount;
-                feeStatuses[headerName] = 'paid';
+                feeStatuses[headerName] = { 
+                  status: 'paid', 
+                  date: format(new Date(paidExamTxn.transactionDate || (paidExamTxn as any).createdAt), 'dd-MM-yy') 
+                };
               } else {
-                feeStatuses[headerName] = 'unpaid';
+                feeStatuses[headerName] = { status: 'unpaid' };
                 dueMonthsList.push(headerName);
               }
             }

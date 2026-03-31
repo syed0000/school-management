@@ -1,18 +1,15 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { useSearchParams } from "next/navigation";
+
 import { AttendanceCalendar } from "@/components/parent/attendance-calendar";
-import { getStudentAttendanceCalendar } from "@/actions/parent";
+import { getStudentAttendanceCalendar, getActiveParentStudentId } from "@/actions/parent";
 import type { AttendanceCalendarEntry } from "@/types";
 import { toast } from "sonner";
-import { useSession } from "next-auth/react";
 
 export default function ParentAttendancePage() {
-  const searchParams = useSearchParams();
-  const studentIdParam = searchParams.get("studentId");
-  const { data: session } = useSession();
-
+  const [studentId, setStudentId] = useState<string | null>(null);
+  
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [entries, setEntries] = useState<AttendanceCalendarEntry[]>([]);
@@ -20,7 +17,12 @@ export default function ParentAttendancePage() {
   
   const [isPending, startTransition] = useTransition();
 
-  const studentId = studentIdParam || session?.user?.id;
+  // Fetch active student from cookies/session
+  useEffect(() => {
+    getActiveParentStudentId().then(id => {
+      if (id) setStudentId(id);
+    });
+  }, []);
 
   useEffect(() => {
     if (!studentId) return;

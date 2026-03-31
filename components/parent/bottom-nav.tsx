@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Home, UserCircle, CalendarDays, CreditCard, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,20 +15,16 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const studentId = searchParams.get("studentId");
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 flex h-20 items-center justify-around border-t bg-background/95 pb-safe backdrop-blur-md transition-all duration-300 md:h-24 lg:justify-center">
       <div className="flex w-full items-center justify-around max-w-md mx-auto lg:max-w-lg lg:gap-12">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
-          const href = studentId ? `${item.href}?studentId=${studentId}` : item.href;
-
           return (
             <Link
               key={item.href}
-              href={href}
+              href={item.href}
               className="group relative flex flex-col items-center gap-1.5 px-3 py-1 transition-all duration-300 active:scale-95 shrink-0"
             >
               <div

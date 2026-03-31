@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -27,7 +28,14 @@ export default async function ParentLayout({
 
   // Fetch all students linked to this parent's phone
   const students = await getCurrentParentStudents();
-  let activeStudentId = session.user.id;
+  
+  const cookieStore = await cookies();
+  const activeStudentCookie = cookieStore.get('activeParentStudentId')?.value;
+  let activeStudentId = activeStudentCookie || session.user.id;
+
+  if (activeStudentCookie && students.length > 0 && !students.some(s => s._id === activeStudentCookie)) {
+    activeStudentId = session.user.id;
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-muted/40">

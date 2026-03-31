@@ -58,15 +58,22 @@ export function FeeOverview({ feeData }: FeeOverviewProps) {
                 >
                   <div className="flex items-center gap-2">
                     {entry.status === "Paid" ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
                     ) : entry.status === "Partial" ? (
-                      <Clock className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                      <Clock className="h-4 w-4 text-yellow-500 shrink-0" />
                     ) : (
-                      <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                      <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
                     )}
-                    <span className="text-sm font-medium">
-                      {entry.monthName} {entry.year}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">
+                        {entry.monthName} {entry.year}
+                      </span>
+                      {(entry as any).transactionDate && (
+                        <span className="text-[10px] text-muted-foreground italic flex items-center gap-1">
+                          Paid on: {(entry as any).transactionDate}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-3">
@@ -109,11 +116,18 @@ export function FeeOverview({ feeData }: FeeOverviewProps) {
                 >
                   <div className="flex items-center gap-2">
                     {fee.due <= 0 ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
                     ) : (
-                      <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                      <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
                     )}
-                    <span className="text-sm font-medium">{fee.label}</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{fee.label}</span>
+                      {(fee as any).transactionDate && (
+                        <span className="text-[10px] text-muted-foreground italic flex items-center gap-1">
+                          Paid on: {(fee as any).transactionDate}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right hidden sm:block">

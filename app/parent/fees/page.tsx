@@ -4,16 +4,17 @@ import { redirect } from "next/navigation";
 import { getStudentFeeOverview } from "@/actions/parent";
 import { FeeOverview } from "@/components/parent/fee-overview";
 
-type SearchParams = Promise<{ studentId?: string }>;
+import { cookies } from "next/headers";
 
-export default async function ParentFeesPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ParentFeesPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login/otp");
   if (session.user.role !== 'parent' && session.user.role !== 'admin') redirect("/dashboard");
 
-  const { studentId: queryStudentId } = await searchParams;
+  const cookieStore = await cookies();
+  const activeStudentCookie = cookieStore.get('activeParentStudentId')?.value;
   const sessionStudentId = session.user.id;
-  const targetStudentId = queryStudentId || sessionStudentId;
+  const targetStudentId = activeStudentCookie || sessionStudentId;
 
   // The server action now fetches the phone from the session internally.
   const feeData = await getStudentFeeOverview(targetStudentId);

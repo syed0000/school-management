@@ -68,7 +68,7 @@ interface StudentFeeReport {
   dueAmount: number;
   period: string;
   status: string;
-  feeStatuses: Record<string, string>;
+  feeStatuses: Record<string, any>;
 }
 
 interface FeeReportData {
@@ -416,11 +416,14 @@ export default function FeeReport({ classes }: FeeReportProps) {
                       return (
                         <td key={header} className="p-1 text-center border-x border-b">
                           <div className="flex items-center justify-center w-full h-full min-h-[40px]">
-                            {status === 'paid' ? (
-                              <div className="w-5 h-5 bg-green-500 rounded flex items-center justify-center text-white shadow-sm">
-                                <span className="text-[10px] font-bold">✓</span>
+                            {status && typeof status === 'object' && status.status === 'paid' ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <div className="w-4 h-4 bg-green-500 rounded flex items-center justify-center text-white shadow-sm">
+                                  <span className="text-[8px] font-bold">✓</span>
+                                </div>
+                                <span className="text-[9px] text-muted-foreground font-medium whitespace-nowrap">{status.date}</span>
                               </div>
-                            ) : status === 'unpaid' ? (
+                            ) : status === 'unpaid' || (status && typeof status === 'object' && status.status === 'unpaid') ? (
                                 <div className="w-5 h-5 border-2 border-slate-300 rounded bg-white/50"></div>
                             ) : (
                               <span className="text-muted-foreground">-</span>

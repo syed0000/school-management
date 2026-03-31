@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,15 +20,13 @@ interface StudentSwitcherProps {
   activeStudentId: string;
 }
 
+import { setActiveParentStudentId } from "@/actions/parent";
+
 export function StudentSwitcher({ students, activeStudentId }: StudentSwitcherProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
 
-  const queryStudentId = searchParams.get("studentId");
-  const effectiveActiveId = queryStudentId || activeStudentId;
-
-  const activeStudent = students.find((s) => s._id === effectiveActiveId) ?? students[0];
+  const activeStudent = students.find((s) => s._id === activeStudentId) ?? students[0];
 
   if (!activeStudent) return null;
 
@@ -46,9 +44,11 @@ export function StudentSwitcher({ students, activeStudentId }: StudentSwitcherPr
     );
   }
 
-  const switchStudent = (studentId: string) => {
+  const switchStudent = async (studentId: string) => {
     setOpen(false);
-    router.replace(`/parent/dashboard?studentId=${studentId}`);
+    await setActiveParentStudentId(studentId);
+    // Hard refresh to reload server components with the new cookie
+    window.location.href = window.location.pathname;
   };
 
   return (
@@ -69,7 +69,7 @@ export function StudentSwitcher({ students, activeStudentId }: StudentSwitcherPr
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="my-1" />
         {students.map((student) => {
-          const isActive = student._id === effectiveActiveId;
+          const isActive = student._id === activeStudentId;
           return (
             <DropdownMenuItem
               key={student._id}
@@ -89,7 +89,7 @@ export function StudentSwitcher({ students, activeStudentId }: StudentSwitcherPr
                 </div>
               </div>
               {isActive && (
-                <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
               )}
             </DropdownMenuItem>
           );

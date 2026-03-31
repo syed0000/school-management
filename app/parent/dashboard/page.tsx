@@ -12,18 +12,19 @@ import Student from "@/models/Student";
 
 import { DashboardPhotoUpload } from "@/components/parent/dashboard-photo-upload";
 
-type SearchParams = Promise<{ studentId?: string }>;
+import { cookies } from "next/headers";
 
-export default async function ParentDashboardPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ParentDashboardPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login/otp");
   if (session.user.role !== 'parent' && session.user.role !== 'admin') redirect("/dashboard");
 
-  const { studentId: queryStudentId } = await searchParams;
+  const cookieStore = await cookies();
+  const activeStudentCookie = cookieStore.get('activeParentStudentId')?.value;
   const sessionStudentId = session.user.id;
 
   // Resolve which student to show
-  let targetStudentId = queryStudentId || sessionStudentId;
+  let targetStudentId = activeStudentCookie || sessionStudentId;
   let phone = "";
 
   if (session.user.role === 'parent') {
@@ -33,9 +34,9 @@ export default async function ParentDashboardPage({ searchParams }: { searchPara
   }
 
   // Validate access if switching student
-  if (queryStudentId && queryStudentId !== sessionStudentId && phone) {
+  if (activeStudentCookie && activeStudentCookie !== sessionStudentId && phone) {
     const students = await getParentStudents(phone);
-    const hasAccess = students.some((s) => s._id === queryStudentId);
+    const hasAccess = students.some((s) => s._id === activeStudentCookie);
     if (!hasAccess) targetStudentId = sessionStudentId;
   }
 
@@ -56,38 +57,38 @@ export default async function ParentDashboardPage({ searchParams }: { searchPara
     {
       label: "View Profile",
       description: "Personal details & photo",
-      href: `/parent/profile?studentId=${targetStudentId}`,
+      href: `/parent/profile`,
       icon: User2,
       color: "bg-purple-50 text-purple-700 border-purple-200",
     },
     {
       label: "Attendance",
       description: "Monthly attendance calendar",
-      href: `/parent/attendance?studentId=${targetStudentId}`,
+      href: `/parent/attendance`,
       icon: CalendarDays,
       color: "bg-blue-50 text-blue-700 border-blue-200",
     },
     {
       label: "Fee Status",
       description: "Paid & pending dues",
-      href: `/parent/fees?studentId=${targetStudentId}`,
+      href: `/parent/fees`,
       icon: CreditCard,
       color: "bg-green-50 text-green-700 border-green-200",
     },
-    {
-      label: "Academics",
-      description: "Class & section info",
-      href: `/parent/profile?studentId=${targetStudentId}`,
-      icon: BookOpen,
-      color: "bg-orange-50 text-orange-700 border-orange-200",
-    },
+    // {
+    //   label: "Academics",
+    //   description: "Class & section info",
+    //   href: `/parent/profile`,
+    //   icon: BookOpen,
+    //   color: "bg-orange-50 text-orange-700 border-orange-200",
+    // },
   ];
 
   return (
     <div className="space-y-6">
       {/* Student profile card */}
       <Card className="overflow-hidden">
-        <div className="h-20 bg-gradient-to-r from-primary/20 to-primary/5" />
+        <div className="h-20 bg-linear-to-r from-primary/20 to-primary/5" />
         <CardContent className="pt-0 relative">
           <div className="flex items-end gap-4 -mt-10 mb-4">
             <DashboardPhotoUpload
