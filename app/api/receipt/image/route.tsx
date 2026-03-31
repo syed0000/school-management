@@ -12,12 +12,11 @@ export async function GET(request: NextRequest) {
     try {
         const searchParams = request.nextUrl.searchParams;
         const receiptNumber = searchParams.get('receiptNumber') || 'N/A';
-        const origin = request.nextUrl.origin;
 
         // Load Font from stable CDN
         let fontData: ArrayBuffer | null = null;
         try {
-            const fontRes = await fetch(FONT_URL);
+            const fontRes = await fetch(FONT_URL, { cache: 'force-cache' });
             if (fontRes.ok) {
                 const contentType = fontRes.headers.get('content-type') || '';
                 if (!contentType.includes('html')) {
@@ -43,7 +42,7 @@ export async function GET(request: NextRequest) {
         const dateStr = searchParams.get('date') || new Date().toISOString();
         const date = new Date(dateStr);
         const feeType = searchParams.get('feeType') || 'Fee Payment';
-        const monthsParam = searchParams.get('months') || searchParams.get('period'); // Support both 'months' and 'period'
+        const monthsParam = searchParams.get('months') || searchParams.get('period'); 
         const yearStr = searchParams.get('year');
 
         // Format fee description
@@ -51,16 +50,14 @@ export async function GET(request: NextRequest) {
         const year = yearStr ? parseInt(yearStr) : date.getFullYear();
 
         if (monthsParam) {
-            // Favor the detailed string from the collection action (e.g. "Apr, May, Admission")
             feeDescription = monthsParam;
         } else if (feeType === 'monthly') {
             feeDescription = `Monthly Fee - ${format(date, 'MMM yyyy')}`;
         } else if (feeType !== 'Multiple Fees' && feeType !== 'Fee Payment') {
-            // For single non-monthly payments like "admission"
             feeDescription = feeType.charAt(0).toUpperCase() + feeType.slice(1) + ` (${year})`;
         }
 
-        return new ImageResponse(
+        const imageResponse = new ImageResponse(
             (
                 <div
                     style={{
@@ -190,12 +187,19 @@ export async function GET(request: NextRequest) {
                 fonts: [
                     { name: 'Noto Sans', data: fontData, style: 'normal' as const },
                 ],
-                headers: {
-                    'Content-Type': 'image/png',
-                    'Cache-Control': 'public, max-age=31536000, immutable',
-                }
             }
         );
+
+        const imageBuffer = await imageResponse.arrayBuffer();
+
+        return new Response(imageBuffer, {
+            headers: {
+                'Content-Type': 'image/png',
+                'Content-Length': imageBuffer.byteLength.toString(),
+                'Content-Disposition': `inline; filename="receipt-${receiptNumber}.png"`,
+                'Cache-Control': 'public, max-age=3600',
+            }
+        });
     } catch (error) {
         console.error('Error generating receipt image:', error);
         return new Response('Error rendering image', { status: 500 });
