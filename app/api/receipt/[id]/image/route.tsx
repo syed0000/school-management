@@ -2,16 +2,29 @@ import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 import { format } from 'date-fns';
 import { schoolConfig } from '@/lib/config';
+import dbConnect from '@/lib/db';
+import WhatsAppReceipt from '@/models/WhatsAppReceipt';
 
-export const runtime = 'edge';
+// Removed edge runtime to allow for database connection and standard Node.js response behavior
+// export const runtime = 'edge';
 
-// Reliable, verified Font CDN URL (jsDelivr)
 const FONT_URL = 'https://cdn.jsdelivr.net/npm/notosans-fontface@1.3.0/fonts/NotoSans-Regular.ttf';
 
-export async function GET(request: NextRequest) {
+export async function GET(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
     try {
-        const searchParams = request.nextUrl.searchParams;
-        const receiptNumber = searchParams.get('receiptNumber') || 'N/A';
+        const { id } = await params;
+        await dbConnect();
+
+        const receipt = await WhatsAppReceipt.findById(id).lean();
+
+        if (!receipt) {
+            return new Response('Receipt not found', { status: 404 });
+        }
+
+        const receiptNumber = receipt.receiptNumber || 'N/A';
 
         // Load Font from stable CDN
         let fontData: ArrayBuffer | null = null;
@@ -27,28 +40,23 @@ export async function GET(request: NextRequest) {
             console.error('Error fetching font:', e);
         }
 
-        // Satori requires at least one font
         if (!fontData) {
             return new Response('Error: Font loading failed.', { status: 500 });
         }
 
-        const studentName = searchParams.get('studentName') || 'Unknown';
-        const studentRegNo = searchParams.get('studentRegNo') || 'N/A';
-        const rollNumber = searchParams.get('rollNumber') || 'N/A';
-        const className = searchParams.get('className') || 'N/A';
-        const section = searchParams.get('section') || 'A';
-        const amountStr = searchParams.get('amount') || '0';
-        const amount = parseFloat(amountStr);
-        const dateStr = searchParams.get('date') || new Date().toISOString();
-        const date = new Date(dateStr);
-        const feeType = searchParams.get('feeType') || 'Fee Payment';
-        const monthsParam = searchParams.get('months') || searchParams.get('period'); 
-        const yearStr = searchParams.get('year');
+        const studentName = receipt.studentName || 'Unknown';
+        const studentRegNo = receipt.studentRegNo || 'N/A';
+        const rollNumber = receipt.rollNumber || 'N/A';
+        const className = receipt.className || 'N/A';
+        const section = receipt.section || 'A';
+        const amount = receipt.amount || 0;
+        const date = receipt.date ? new Date(receipt.date) : new Date();
+        const feeType = receipt.feeType || 'Fee Payment';
+        const monthsParam = receipt.months;
+        const year = receipt.year || date.getFullYear().toString();
 
         // Format fee description
         let feeDescription = 'Fee Payment';
-        const year = yearStr ? parseInt(yearStr) : date.getFullYear();
-
         if (monthsParam) {
             feeDescription = monthsParam;
         } else if (feeType === 'monthly') {
@@ -70,7 +78,6 @@ export async function GET(request: NextRequest) {
                         fontFamily: '"Noto Sans", sans-serif',
                     }}
                 >
-                    {/* Header - Text-only optimization */}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '20px' }}>
                         <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: '0', textAlign: 'center', color: '#111' }}>
                             {schoolConfig.name}
@@ -84,7 +91,6 @@ export async function GET(request: NextRequest) {
                         }}>FEE RECEIPT</p>
                     </div>
 
-                    {/* Receipt Info */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '16px', marginBottom: '10px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span>Receipt# {receiptNumber}</span>
@@ -92,7 +98,6 @@ export async function GET(request: NextRequest) {
                         </div>
                     </div>
 
-                    {/* Student Info */}
                     <div style={{
                         display: 'flex',
                         flexDirection: 'column',
@@ -118,7 +123,6 @@ export async function GET(request: NextRequest) {
                         </div>
                     </div>
 
-                    {/* Fee Details */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '18px', marginBottom: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '6px' }}>
                             <span style={{ fontWeight: 'bold' }}>Description</span>
@@ -130,7 +134,6 @@ export async function GET(request: NextRequest) {
                         </div>
                     </div>
 
-                    {/* Total */}
                     <div style={{
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -145,7 +148,6 @@ export async function GET(request: NextRequest) {
                         <span>₹{amount.toLocaleString()}</span>
                     </div>
 
-                    {/* Hindi Notes */}
                     <div style={{
                         display: 'flex',
                         flexDirection: 'column',
@@ -163,7 +165,6 @@ export async function GET(request: NextRequest) {
                         <p style={{ margin: 0 }}>• बच्चे को नियमित और समय पर स्कूल भेजें</p>
                     </div>
 
-                    {/* Footer */}
                     <div style={{
                         display: 'flex',
                         flexDirection: 'column',
@@ -180,7 +181,7 @@ export async function GET(request: NextRequest) {
                         <p style={{ margin: 0 }}>Generated via FeeEase System | feeease.com</p>
                     </div>
                 </div>
-            ),
+            ) as any,
             {
                 width: 800,
                 height: 800,

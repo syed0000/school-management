@@ -3,6 +3,7 @@ import WhatsAppStat from "@/models/WhatsAppStat"
 import WhatsAppPricing from "@/models/WhatsAppPricing"
 import License from "@/models/License"
 import Setting from "@/models/Setting"
+import WhatsAppReceipt from "@/models/WhatsAppReceipt"
 import dbConnect from "./db"
 
 interface SendReceiptParams {
@@ -26,21 +27,23 @@ export async function sendWhatsAppReceipt({ student, totalAmount, receiptNumber,
 
         const mobile = student.contacts.mobile[0];
 
-        // 2. Prepare receipt image URL
-        const queryParams = new URLSearchParams({
+        // 2. Create Receipt Snapshot for clean URL
+        const receiptSnapshot = new WhatsAppReceipt({
+            receiptNumber,
             studentName: student.name,
             studentRegNo: student.registrationNumber || 'N/A',
             rollNumber: student.rollNumber || 'N/A',
             className: student.classId?.name || student.className || 'N/A',
             section: student.section || 'A',
-            amount: totalAmount.toString(),
-            date: (transactionDate || new Date()).toISOString(),
+            amount: totalAmount,
+            date: transactionDate || new Date(),
             feeType: 'Multiple Fees',
             months: monthsStr,
             year: (transactionDate || new Date()).getFullYear().toString(),
         });
+        await receiptSnapshot.save();
 
-        const receiptUrl = `${whatsappConfig.appUrl}/api/receipt/image?receiptNumber=${receiptNumber}&${queryParams.toString()}`;
+        const receiptUrl = `${whatsappConfig.appUrl}/api/receipt/${receiptSnapshot._id}/image`;
 
         // 3. Track statistics
         const cost = await WhatsAppPricing.getCurrentPrice();
