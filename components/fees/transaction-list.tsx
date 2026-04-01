@@ -30,6 +30,7 @@ interface Transaction {
   studentRegNo: string
   studentPhoto?: string
   className?: string
+  section?: string
   feeType: string
   month?: number
   year: number
@@ -209,7 +210,9 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
                     </Avatar>
                     <div>
                       <div className="font-medium">{t.studentName}</div>
-                      <div className="text-xs text-muted-foreground">{t.studentRegNo}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {t.studentRegNo} • {t.className} - {t.section || 'A'}
+                      </div>
                     </div>
                   </div>
                 </TableCell>

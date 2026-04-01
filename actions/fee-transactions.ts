@@ -87,6 +87,7 @@ export async function getFeeTransactions(filter: TransactionFilter, page: number
     studentId?: {
       name: string
       registrationNumber: string
+      section?: string
       photo?: string
       classId?: {
         name: string
@@ -109,7 +110,7 @@ export async function getFeeTransactions(filter: TransactionFilter, page: number
     FeeTransaction.find(query)
       .populate({
         path: 'studentId',
-        select: 'name registrationNumber photo classId',
+        select: 'name registrationNumber photo classId section',
         populate: {
           path: 'classId',
           select: 'name'
@@ -148,6 +149,7 @@ export async function getFeeTransactions(filter: TransactionFilter, page: number
         studentRegNo: tx.studentId?.registrationNumber || 'N/A',
         studentPhoto: tx.studentId?.photo,
         className: tx.studentId?.classId?.name || 'Unknown',
+        section: tx.studentId?.section || 'A',
         feeType: tx.feeType,
         month: tx.month,
         year: tx.year,
