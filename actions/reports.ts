@@ -5,6 +5,7 @@ import Student from '@/models/Student';
 import Attendance from '@/models/Attendance';
 import FeeTransaction from '@/models/FeeTransaction';
 import ClassFee from '@/models/ClassFee';
+import Setting from '@/models/Setting';
 import Holiday from '@/models/Holiday';
 import { startOfDay, endOfDay, format, eachDayOfInterval, isBefore, isAfter, startOfMonth, endOfMonth } from 'date-fns';
 import logger from "@/lib/logger";
@@ -299,6 +300,12 @@ export async function getFeeReport({
   await dbConnect();
 
   try {
+    const [admSetting, regSetting] = await Promise.all([
+        Setting.findOne({ key: "admission_fee_includes_april" }).lean(),
+        Setting.findOne({ key: "registration_fee_includes_april" }).lean()
+    ]);
+    const admIncludesApril = admSetting ? admSetting.value === true : true;
+    const regIncludesApril = regSetting ? regSetting.value === true : true;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const studentQuery: any = {};
     if (classId && classId !== 'all') studentQuery.classId = classId;
@@ -383,18 +390,36 @@ export async function getFeeReport({
         const m = tempIterDate.getMonth() + 1; // 1-12
         const monthHeader = tempIterDate.toLocaleString('default', { month: 'short' }) + " " + y;
 
-        expectedAmount += monthlyFee;
         const paidTxn = studentAllTxns.find(t => t.feeType === 'monthly' && t.month === m && t.year === y);
         
-        if (paidTxn) {
-          paidAmount += paidTxn.amount;
-          feeStatuses[monthHeader] = { 
-            status: 'paid', 
-            date: format(new Date(paidTxn.transactionDate || (paidTxn as any).createdAt), 'dd-MM-yy') 
-          };
+        const isAprilIncluded = (() => {
+            if (m === 4 && !paidTxn) {
+                 const admTxn = studentAllTxns.find(t => (t.feeType === 'admission' || t.feeType === 'admissionFees') && t.year === y);
+                 const regTxn = studentAllTxns.find(t => t.feeType === 'registrationFees' && t.year === y);
+                 if ((admIncludesApril && admTxn) || (regIncludesApril && regTxn)) {
+                     return admTxn || regTxn;
+                 }
+            }
+            return null;
+        })();
+
+        if (isAprilIncluded) {
+             feeStatuses[monthHeader] = { 
+                 status: 'paid', // visually looks paid
+                 date: format(new Date(isAprilIncluded.transactionDate || (isAprilIncluded as any).createdAt), 'dd-MM-yy') 
+             };
         } else {
-          feeStatuses[monthHeader] = { status: 'unpaid' };
-          dueMonthsList.push(monthHeader);
+            expectedAmount += monthlyFee;
+            if (paidTxn) {
+              paidAmount += paidTxn.amount;
+              feeStatuses[monthHeader] = { 
+                status: 'paid', 
+                date: format(new Date(paidTxn.transactionDate || (paidTxn as any).createdAt), 'dd-MM-yy') 
+              };
+            } else {
+              feeStatuses[monthHeader] = { status: 'unpaid' };
+              dueMonthsList.push(monthHeader);
+            }
         }
 
         tempIterDate.setMonth(tempIterDate.getMonth() + 1);

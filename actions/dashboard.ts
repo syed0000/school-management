@@ -8,6 +8,7 @@ import ClassFee from "@/models/ClassFee"
 import "@/models/Class"
 import Expense from "@/models/Expense"
 import Attendance from "@/models/Attendance"
+import Setting from "@/models/Setting"
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, eachMonthOfInterval, format, subMonths, subWeeks, subDays } from "date-fns"
 import { Types } from "mongoose"
 import logger from "@/lib/logger"
@@ -121,6 +122,13 @@ interface SaleDocExtended extends SaleDoc {
 }
 
 async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: string) {
+    const [admSetting, regSetting] = await Promise.all([
+        Setting.findOne({ key: "admission_fee_includes_april" }).lean(),
+        Setting.findOne({ key: "registration_fee_includes_april" }).lean()
+    ]);
+    const admIncludesApril = admSetting ? admSetting.value === true : true;
+    const regIncludesApril = regSetting ? regSetting.value === true : true;
+
     // 2. Efficiently Fetch Students and Fees
     const studentQuery: Record<string, unknown> = { isActive: true };
     if (classIdFilter && classIdFilter !== "all") {
@@ -220,9 +228,20 @@ async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: strin
                 const isAfterAdmission = (y > admYear) || (y === admYear && m >= admMonth);
 
                 if (isAfterAdmission) {
+                    let isPaid = hasPaidFeeFast(studentId, 'monthly', m, y);
+                    
+                    if (m === 4 && !isPaid) {
+                        const paidAdm = hasPaidFeeFast(studentId, 'admission', undefined, y) || hasPaidFeeFast(studentId, 'admissionFees', undefined, y);
+                        const paidReg = hasPaidFeeFast(studentId, 'registrationFees', undefined, y);
+                        
+                        if ((admIncludesApril && paidAdm) || (regIncludesApril && paidReg)) {
+                            isPaid = true;
+                        }
+                    }
+
                     totalExpected += monthlyAmount;
 
-                    if (!hasPaidFeeFast(studentId, 'monthly', m, y)) {
+                    if (!isPaid) {
                         studentUnpaidAmount += monthlyAmount;
                         studentUnpaidDetails.push(`${format(monthDate, 'MMM')} ${y}`);
 

@@ -9,6 +9,7 @@ import Student from '@/models/Student';
 import Attendance from '@/models/Attendance';
 import FeeTransaction from '@/models/FeeTransaction';
 import ClassFee from '@/models/ClassFee';
+import Setting from '@/models/Setting';
 import { Types } from 'mongoose';
 import { cookies } from 'next/headers';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, eachMonthOfInterval, isAfter, isBefore } from 'date-fns';
@@ -508,6 +509,13 @@ export async function getStudentFeeOverview(
     async (sId: string, p: string) => {
       await dbConnect();
 
+      const [admSetting, regSetting] = await Promise.all([
+          Setting.findOne({ key: "admission_fee_includes_april" }).lean(),
+          Setting.findOne({ key: "registration_fee_includes_april" }).lean()
+      ]);
+      const admIncludesApril = admSetting ? admSetting.value === true : true;
+      const regIncludesApril = regSetting ? regSetting.value === true : true;
+
       const hasAccess = await validateParentAccess(sId, p);
       if (!hasAccess) return null;
 
@@ -556,6 +564,31 @@ export async function getStudentFeeOverview(
         const y = date.getFullYear();
 
         const paidTxn = allTxns.find((t) => t.feeType === 'monthly' && t.month === m && t.year === y);
+        
+        const isAprilIncluded = (() => {
+            if (m === 4 && !paidTxn) {
+                 const admTxn = allTxns.find((t) => (t.feeType === 'admission' || t.feeType === 'admissionFees') && t.year === y);
+                 const regTxn = allTxns.find((t) => t.feeType === 'registrationFees' && t.year === y);
+                 if ((admIncludesApril && admTxn) || (regIncludesApril && regTxn)) {
+                     return admTxn || regTxn;
+                 }
+            }
+            return null;
+        })();
+
+        if (isAprilIncluded) {
+            return {
+              month: m,
+              year: y,
+              monthName: MONTH_NAMES[m - 1],
+              expected: 0,
+              paid: 0,
+              due: 0,
+              status: 'Included in Admission/Registration',
+              transactionDate: format(new Date(isAprilIncluded.transactionDate || (isAprilIncluded as any).createdAt || new Date()), 'dd-MM-yy'),
+            } as any;
+        }
+
         const paid = paidTxn ? paidTxn.amount : 0;
         
         let expected = 0;
@@ -575,7 +608,7 @@ export async function getStudentFeeOverview(
           status: due <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Due',
           transactionDate: paidTxn ? format(new Date(paidTxn.transactionDate), 'dd-MM-yy') : undefined,
         };
-      }).filter(m => m.expected > 0 || m.paid > 0);
+      }).filter((m: any) => m.expected > 0 || m.paid > 0 || m.status === 'Included in Admission/Registration');
 
       // Other fees: admission, registration, exam
       const otherFeeTypes = ['admissionFees', 'registrationFees', 'admission', 'examination'];

@@ -3,7 +3,8 @@ import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { WhatsAppToggle } from "@/components/admin/school-profile/whatsapp-toggle"
 import { CounterEditor } from "@/components/admin/school-profile/counter-editor"
-import { getWhatsAppReceiptSetting, getCounters } from "@/actions/school-settings"
+import { getWhatsAppReceiptSetting, getCounters, getFeePolicySettings } from "@/actions/school-settings"
+import { FeePolicyEditor } from "@/components/admin/school-profile/fee-policy-editor"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ExternalLink, Settings, MessageSquare, AlertCircle, Hash } from "lucide-react"
@@ -17,9 +18,10 @@ export default async function SchoolProfilePage() {
     redirect("/admin/dashboard")
   }
 
-  const [initialWhatsAppSetting, counters] = await Promise.all([
+  const [initialWhatsAppSetting, counters, feePolicy] = await Promise.all([
     getWhatsAppReceiptSetting(),
     getCounters(),
+    getFeePolicySettings()
   ])
 
   const externalSchoolProfileUrl = `${process.env.NEXT_PUBLIC_FEEEASE_URL || 'https://feeease.com'}/school/profile`
@@ -62,6 +64,25 @@ export default async function SchoolProfilePage() {
                 </p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Fee Policy Configuration */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Settings className="h-5 w-5 text-primary" />
+              <CardTitle>Fee Generation Policy</CardTitle>
+            </div>
+            <CardDescription>
+              Configure how special fees affect monthly dues tracking.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FeePolicyEditor 
+              initialAdmission={feePolicy.admissionFeeIncludesApril} 
+              initialRegistration={feePolicy.registrationFeeIncludesApril} 
+            />
           </CardContent>
         </Card>
 

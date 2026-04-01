@@ -4,6 +4,7 @@ import dbConnect from "@/lib/db"
 import Student from "@/models/Student"
 import ClassFee from "@/models/ClassFee"
 import FeeTransaction from "@/models/FeeTransaction"
+import Setting from "@/models/Setting"
 import { startOfMonth, endOfMonth, eachMonthOfInterval, format } from "date-fns"
 
 interface UnpaidFilter {
@@ -32,6 +33,13 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
     const start = filter.startDate ? new Date(filter.startDate) : startOfMonth(new Date(new Date().getFullYear(), 0, 1))
 
     const monthsToCheck = eachMonthOfInterval({ start, end })
+
+    const [admSetting, regSetting] = await Promise.all([
+        Setting.findOne({ key: "admission_fee_includes_april" }).lean(),
+        Setting.findOne({ key: "registration_fee_includes_april" }).lean()
+    ])
+    const admIncludesApril = admSetting ? admSetting.value === true : true;
+    const regIncludesApril = regSetting ? regSetting.value === true : true;
 
     const studentQuery: Record<string, unknown> = { isActive: true }
     if (filter.classId && filter.classId !== "all") {
@@ -126,7 +134,18 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
                 const isAfterAdmission = (y > admYear) || (y === admYear && m >= admMonth)
 
                 if (isAfterAdmission) {
-                    if (!hasPaidFee(student._id.toString(), 'monthly', m, y)) {
+                    let isPaid = hasPaidFee(student._id.toString(), 'monthly', m, y);
+                    
+                    if (m === 4 && !isPaid) {
+                        const paidAdm = hasPaidFee(student._id.toString(), 'admission', undefined, y) || hasPaidFee(student._id.toString(), 'admissionFees', undefined, y);
+                        const paidReg = hasPaidFee(student._id.toString(), 'registrationFees', undefined, y);
+                        
+                        if ((admIncludesApril && paidAdm) || (regIncludesApril && paidReg)) {
+                            isPaid = true;
+                        }
+                    }
+
+                    if (!isPaid) {
                         studentUnpaidAmount += monthlyAmount
                         studentUnpaidDetails.push(`${format(monthDate, 'MMM')} ${y}`)
                     }

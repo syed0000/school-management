@@ -33,6 +33,48 @@ export async function updateWhatsAppReceiptSetting(enabled: boolean) {
     return { success: true }
 }
 
+// ── Fee Policy Settings ────────────────────────────────────────────────────────
+
+export async function getFeePolicySettings() {
+    await dbConnect()
+    const [admSetting, regSetting] = await Promise.all([
+        Setting.findOne({ key: "admission_fee_includes_april" }).lean(),
+        Setting.findOne({ key: "registration_fee_includes_april" }).lean()
+    ])
+    
+    // Default to true as requested
+    return {
+        admissionFeeIncludesApril: admSetting ? admSetting.value === true : true,
+        registrationFeeIncludesApril: regSetting ? regSetting.value === true : true,
+    }
+}
+
+export async function updateFeePolicySettings(admission: boolean, registration: boolean) {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== "admin") {
+        return { success: false, error: "Unauthorized" }
+    }
+
+    await dbConnect()
+    await Promise.all([
+        Setting.findOneAndUpdate(
+            { key: "admission_fee_includes_april" },
+            { value: admission },
+            { upsert: true, new: true }
+        ),
+        Setting.findOneAndUpdate(
+            { key: "registration_fee_includes_april" },
+            { value: registration },
+            { upsert: true, new: true }
+        )
+    ])
+
+    revalidatePath("/admin/school-profile")
+    revalidatePath("/admin/dashboard")
+    revalidatePath("/admin/reports/fees")
+    return { success: true }
+}
+
 // ── Counter Management ────────────────────────────────────────────────────────
 
 export interface CounterInfo {
