@@ -31,24 +31,15 @@ export default async function WhatsAppPage() {
     <div className="flex-1 space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Notification Center</h2>
-        <Badge variant="outline" className="px-3 py-1 border-primary/20 text-primary bg-primary/5">
-          Admin Portal
-        </Badge>
       </div>
 
       <Tabs defaultValue="in-app" className="space-y-6">
-        <TabsList className="bg-transparent border-b rounded-none w-full justify-start h-auto p-0 gap-8">
-          <TabsTrigger 
-            value="in-app" 
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2 py-4 h-auto font-semibold"
-          >
+        <TabsList>
+          <TabsTrigger value="in-app">
             <Bell className="h-4 w-4 mr-2" />
             In-App Notifications
           </TabsTrigger>
-          <TabsTrigger 
-            value="whatsapp" 
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2 py-4 h-auto font-semibold"
-          >
+          <TabsTrigger value="whatsapp">
             <MessageSquare className="h-4 w-4 mr-2" />
             WhatsApp Integration
           </TabsTrigger>
