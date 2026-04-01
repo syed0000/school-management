@@ -63,7 +63,7 @@ import logger from "@/lib/logger"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 
-export async function verifyFee(transactionId: string, action: 'approve' | 'reject', userId: string) {
+export async function verifyFee(transactionId: string, action: 'approve' | 'reject') {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user.role !== 'admin') throw new Error('Unauthorized');
@@ -75,7 +75,7 @@ export async function verifyFee(transactionId: string, action: 'approve' | 'reje
     const updatedTransaction = await FeeTransaction.findByIdAndUpdate(transactionId, {
       status,
       verifiedAt: new Date(),
-      verifiedBy: userId
+      verifiedBy: session.user.id
     }, { new: true }).populate({
       path: 'studentId',
       populate: { path: 'classId' }

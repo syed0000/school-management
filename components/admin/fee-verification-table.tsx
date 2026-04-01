@@ -39,7 +39,7 @@ export function FeeVerificationTable({ initialTransactions }: FeeVerificationTab
         // Server action
         const { verifyFee } = await import("@/actions/fee");
         
-        const result = await verifyFee(id, action, "admin-action"); 
+        const result = await verifyFee(id, action); 
         
         if (!result.success) {
             toast.error(result.error || "Verification failed");

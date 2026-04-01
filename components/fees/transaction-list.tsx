@@ -69,7 +69,7 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
         toast.error("Cannot select all: The list contains transactions from multiple students. Please filter by a specific student first.")
         return
       }
-      
+
       const allIds = transactions.map(t => t.id)
       onSelectionChange(allIds)
     } else {
@@ -84,9 +84,9 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
         const firstSelectedId = selectedIds[0]
         const firstSelectedTransaction = transactions.find(t => t.id === firstSelectedId)
         const newTransaction = transactions.find(t => t.id === id)
-        
-        if (firstSelectedTransaction && newTransaction && 
-            firstSelectedTransaction.studentRegNo !== newTransaction.studentRegNo) {
+
+        if (firstSelectedTransaction && newTransaction &&
+          firstSelectedTransaction.studentRegNo !== newTransaction.studentRegNo) {
           toast.error("Cannot select transactions from different students. Please clear your selection first.")
           return
         }
@@ -130,17 +130,31 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
   }
 
   const getFeeDescription = (t: Transaction) => {
-    if (t.feeType === 'monthly' && t.month) {
-      const monthName = format(new Date(t.year, t.month - 1), 'MMM')
-      return `Monthly - ${monthName} ${t.year}`
+    const ft = (t.feeType || '').toLowerCase();
+    
+    if (ft === 'monthly') {
+      if (t.month) {
+        const monthName = format(new Date(t.year, t.month - 1), 'MMM')
+        return `Monthly - ${monthName} ${t.year}`
+      }
+      return `Monthly - ${t.year}`
     }
-    if (t.feeType === 'examination') {
+    if (ft === 'examination') {
       return `Exam - ${t.examType || 'Annual'} ${t.year}`
     }
-    if (t.feeType === 'admission') {
+    if (ft === 'admission' || ft === 'admissionfees') {
       return `Admission - ${t.year}`
     }
-    return `Other - ${t.year}`
+    if (ft === 'registrationfees') {
+      return `Registration - ${t.year}`
+    }
+
+    // Default formatting for any other type (e.g., custom or 'other')
+    const displayStr = t.feeType || 'Other';
+    const spaced = displayStr.replace(/([A-Z])/g, ' $1').trim();
+    const capitalized = spaced.charAt(0).toUpperCase() + spaced.slice(1);
+    
+    return `${capitalized} - ${t.year}`;
   }
 
   if (transactions.length === 0) {
@@ -161,7 +175,7 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
           <TableHeader>
             <TableRow>
               <TableHead className="w-[50px]">
-                <Checkbox 
+                <Checkbox
                   checked={transactions.length > 0 && selectedIds.length === transactions.length}
                   onCheckedChange={(checked) => handleSelectAll(!!checked)}
                   aria-label="Select all"
@@ -181,7 +195,7 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
             {transactions.map((t) => (
               <TableRow key={t.id}>
                 <TableCell>
-                  <Checkbox 
+                  <Checkbox
                     checked={selectedIds.includes(t.id)}
                     onCheckedChange={(checked) => handleSelectOne(t.id, !!checked)}
                     aria-label={`Select transaction ${t.receiptNumber}`}
@@ -205,9 +219,9 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
                 <TableCell>{getStatusBadge(t.status)}</TableCell>
                 <TableCell className="text-sm">
                   {format(new Date(t.transactionDate), 'dd MMM yyyy')}
-                  <div className="text-xs text-muted-foreground">
+                  {/* <div className="text-xs text-muted-foreground">
                     {format(new Date(t.transactionDate), 'hh:mm a')}
-                  </div>
+                  </div> */}
                 </TableCell>
                 <TableCell className="text-sm">{t.collectedBy}</TableCell>
                 {isAdmin && (
