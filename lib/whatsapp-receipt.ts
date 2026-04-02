@@ -43,7 +43,7 @@ export async function sendWhatsAppReceipt({ student, totalAmount, receiptNumber,
         });
         await receiptSnapshot.save();
 
-        const receiptUrl = `${whatsappConfig.appUrl}/api/receipt/${receiptSnapshot._id}/image`;
+        const receiptUrl = `${whatsappConfig.appUrl}/api/receipt/${receiptSnapshot._id}/image.png`;
 
         // 3. Track statistics
         const cost = await WhatsAppPricing.getCurrentPrice();
