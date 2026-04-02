@@ -57,7 +57,7 @@ export function FeeOverview({ feeData }: FeeOverviewProps) {
                   className="flex items-center justify-between py-2 border-b last:border-0"
                 >
                   <div className="flex items-center gap-2">
-                    {entry.status === "Paid" ? (
+                    {(entry.status === "Paid" || entry.status === "Included in Admission/Registration") ? (
                       <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
                     ) : entry.status === "Partial" ? (
                       <Clock className="h-4 w-4 text-yellow-500 shrink-0" />
@@ -70,7 +70,7 @@ export function FeeOverview({ feeData }: FeeOverviewProps) {
                       </span>
                       {(entry as any).transactionDate && (
                         <span className="text-[10px] text-muted-foreground italic flex items-center gap-1">
-                          Paid on: {(entry as any).transactionDate}
+                          {entry.status === "Included in Admission/Registration" ? "Part of Admission" : `Paid on: ${(entry as any).transactionDate}`}
                         </span>
                       )}
                     </div>
@@ -88,11 +88,12 @@ export function FeeOverview({ feeData }: FeeOverviewProps) {
                       )}
                     </div>
                     <Badge
-                      variant={entry.status === "Paid" ? "default" : entry.status === "Partial" ? "secondary" : "destructive"}
+                      variant={(entry.status === "Paid" || entry.status === "Included in Admission/Registration") ? "default" : entry.status === "Partial" ? "secondary" : "destructive"}
                       className="text-[10px] px-2"
                     >
-                      {entry.status}
+                      {entry.status === "Included in Admission/Registration" ? "Paid (Admission)" : entry.status}
                     </Badge>
+
                   </div>
                 </div>
               ))}

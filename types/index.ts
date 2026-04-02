@@ -133,7 +133,7 @@ export interface MonthlyFeeStatus {
   expected: number;
   paid: number;
   due: number;
-  status: 'Paid' | 'Due' | 'Partial';
+  status: 'Paid' | 'Due' | 'Partial' | 'Included in Admission/Registration';
   transactionDate?: string;
 }
 

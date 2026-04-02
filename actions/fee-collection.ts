@@ -177,6 +177,38 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
           if (existing) {
             return { success: false, error: `Fee for month ${dbMonth}/${actualYear} already paid/pending.` };
           }
+
+          // Check if it's April and covered by Admission/Registration
+          if (dbMonth === 4) {
+             const [admSetting, regSetting] = await Promise.all([
+               import('@/models/Setting').then(m => m.default.findOne({ key: "admission_fee_includes_april" }).lean()),
+               import('@/models/Setting').then(m => m.default.findOne({ key: "registration_fee_includes_april" }).lean())
+             ]);
+             const admIncludesApril = admSetting ? (admSetting as any).value === true : true;
+             const regIncludesApril = regSetting ? (regSetting as any).value === true : true;
+
+             if (admIncludesApril || regIncludesApril) {
+                const paidAdm = await FeeTransaction.findOne({
+                  studentId: data.studentId,
+                  feeType: { $in: ['admission', 'admissionFees'] },
+                  year: actualYear,
+                  status: { $ne: 'rejected' }
+                });
+                const paidReg = await FeeTransaction.findOne({
+                  studentId: data.studentId,
+                  feeType: 'registrationFees',
+                  year: actualYear,
+                  status: { $ne: 'rejected' }
+                });
+
+                if ((admIncludesApril && paidAdm) || (regIncludesApril && paidReg)) {
+                  return { 
+                    success: false, 
+                    error: `April ${actualYear} fee is already included in ${paidAdm ? 'Admission' : 'Registration'} fee payment.` 
+                  };
+                }
+             }
+          }
         }
 
         // Create transactions per month
