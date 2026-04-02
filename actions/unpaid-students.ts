@@ -177,12 +177,22 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
         )
 
         if (isAdmissionInPeriod) {
-            const admissionFeeConfig = studentFees.find(f => f.type === 'admission')
+            // Check if ANY entrance fee has been paid (Admission or Registration)
+            const hasPaidAdmission = hasPaidFee(student._id.toString(), 'admission', undefined, admYear) || 
+                                    hasPaidFee(student._id.toString(), 'admissionFees', undefined, admYear);
+            const hasPaidRegistration = hasPaidFee(student._id.toString(), 'registrationFees', undefined, admYear);
 
-            if (admissionFeeConfig) {
-                if (!hasPaidFee(student._id.toString(), 'admission', undefined, admYear)) {
-                    studentUnpaidAmount += admissionFeeConfig.amount
-                    studentUnpaidDetails.push(`Admission Fee`)
+            if (!hasPaidAdmission && !hasPaidRegistration) {
+                // Not paid any. See what we should expect.
+                const admissionFeeConfig = studentFees.find(f => f.type === 'admission' || f.type === 'admissionFees');
+                const registrationFeeConfig = studentFees.find(f => f.type === 'registrationFees');
+                
+                // Only expect ONE (prefer Admission if both configured, or whichever exists)
+                const entranceConfig = admissionFeeConfig || registrationFeeConfig;
+
+                if (entranceConfig) {
+                    studentUnpaidAmount += entranceConfig.amount;
+                    studentUnpaidDetails.push(entranceConfig.type === 'registrationFees' ? 'Registration Fee' : 'Admission Fee');
                 }
             }
         }

@@ -285,21 +285,30 @@ async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: strin
         // Admission Fee Logic (simplified)
         const isAdmissionInPeriod = monthsToCheck.some(d =>
             d.getMonth() + 1 === admMonth && d.getFullYear() === admYear
-        );
+        )
 
         if (isAdmissionInPeriod) {
-            const admissionFeeConfig = studentFees.find(f => f.type === 'admission');
+            // Check if ANY entrance fee has been paid (Admission or Registration)
+            const hasPaidAdmission = hasPaidFeeFast(studentId, 'admission', undefined, admYear) || 
+                                    hasPaidFeeFast(studentId, 'admissionFees', undefined, admYear);
+            const hasPaidRegistration = hasPaidFeeFast(studentId, 'registrationFees', undefined, admYear);
 
-            if (admissionFeeConfig) {
-                totalExpected += admissionFeeConfig.amount;
+            if (!hasPaidAdmission && !hasPaidRegistration) {
+                // Not paid any. See what we should expect.
+                const admissionFeeConfig = studentFees.find(f => f.type === 'admission' || f.type === 'admissionFees');
+                const registrationFeeConfig = studentFees.find(f => f.type === 'registrationFees');
+                
+                // Only expect ONE (prefer Admission if both configured, or whichever exists)
+                const entranceConfig = admissionFeeConfig || registrationFeeConfig;
 
-                if (!hasPaidFeeFast(studentId, 'admission', undefined, admYear)) {
-                    studentUnpaidAmount += admissionFeeConfig.amount;
-                    studentUnpaidDetails.push(`Admission Fee`);
+                if (entranceConfig) {
+                    totalExpected += entranceConfig.amount;
+                    studentUnpaidAmount += entranceConfig.amount;
+                    studentUnpaidDetails.push(entranceConfig.type === 'registrationFees' ? 'Registration Fee' : 'Admission Fee');
 
                     const admKey = `${admMonth}-${admYear}`;
                     const current = monthlyUnpaidMap.get(admKey) || 0;
-                    monthlyUnpaidMap.set(admKey, current + admissionFeeConfig.amount);
+                    monthlyUnpaidMap.set(admKey, current + entranceConfig.amount);
                 }
             }
         }
