@@ -29,16 +29,17 @@ export function StudentsListContent({ initialStudents, classes, isAdmin = false 
   const [students, setStudents] = useState(initialStudents)
   const [search, setSearch] = useState("")
   const [classFilter, setClassFilter] = useState("all")
+  const [sortBy, setSortBy] = useState("createdAt_desc")
   const [isPending, startTransition] = useTransition()
 
   const debouncedSearch = useDebounce(search, 500)
 
   useEffect(() => {
     startTransition(async () => {
-      const data = await getStudents(debouncedSearch, classFilter)
+      const data = await getStudents(debouncedSearch, classFilter, sortBy)
       setStudents(data)
     })
-  }, [debouncedSearch, classFilter])
+  }, [debouncedSearch, classFilter, sortBy])
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
@@ -75,6 +76,18 @@ export function StudentsListContent({ initialStudents, classes, isAdmin = false 
             {classes.map((c: any) => (
               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="createdAt_desc">Latest First</SelectItem>
+            <SelectItem value="name_asc">Name (A-Z)</SelectItem>
+            <SelectItem value="name_desc">Name (Z-A)</SelectItem>
+            <SelectItem value="reg_asc">Reg. No (Asc)</SelectItem>
+            <SelectItem value="reg_desc">Reg. No (Desc)</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -432,7 +432,7 @@ interface StudentDoc {
     createdAt?: Date;
 }
 
-export async function getStudents(searchQuery?: string, classId?: string) {
+export async function getStudents(searchQuery?: string, classId?: string, sortBy?: string) {
   await dbConnect();
   
   const query: StudentQuery = { isActive: true };
@@ -452,9 +452,20 @@ export async function getStudents(searchQuery?: string, classId?: string) {
     query.classId = classId;
   }
   
+  let sortConfig: any = { createdAt: -1 };
+  if (sortBy) {
+    switch (sortBy) {
+      case "name_asc": sortConfig = { name: 1 }; break;
+      case "name_desc": sortConfig = { name: -1 }; break;
+      case "reg_asc": sortConfig = { registrationNumber: 1 }; break;
+      case "reg_desc": sortConfig = { registrationNumber: -1 }; break;
+      default: sortConfig = { createdAt: -1 };
+    }
+  }
+
   const students = await Student.find(query)
     .populate('classId', 'name')
-    .sort({ createdAt: -1 })
+    .sort(sortConfig)
     .lean();
     
   return students.map((s: unknown) => {
