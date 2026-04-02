@@ -197,7 +197,7 @@ export async function GET(
             headers: {
                 'Content-Type': 'image/png',
                 'Content-Length': imageBuffer.byteLength.toString(),
-                'Content-Disposition': `inline; filename="receipt-${receiptNumber}.png"`,
+                'Content-Disposition': `attachment; filename="receipt-${receiptNumber}.png"`,
                 'Cache-Control': 'public, max-age=3600',
             }
         });
