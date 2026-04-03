@@ -74,6 +74,7 @@ export function AdmissionForm({ classes }: AdmissionFormProps) {
     const [photoFile, setPhotoFile] = useState<File | null>(null)
     const [documentFiles, setDocumentFiles] = useState<{ index: number, file: File | null }[]>([])
     const [nextRegNo, setNextRegNo] = useState("")
+    const [regNoLoading, setRegNoLoading] = useState(false)
 
     useEffect(() => {
         getNextRegistrationNumber().then(setNextRegNo);
@@ -135,6 +136,19 @@ export function AdmissionForm({ classes }: AdmissionFormProps) {
             form.setValue("registrationNumber", nextRegNo);
         }
     }, [nextRegNo, form]);
+
+    // Re-fetch next registration number whenever the class changes
+    const watchedClassId = form.watch("classId")
+    useEffect(() => {
+        if (!watchedClassId) return;
+        setRegNoLoading(true)
+        getNextRegistrationNumber(watchedClassId).then((reg) => {
+            setNextRegNo(reg)
+            form.setValue("registrationNumber", reg)
+            setRegNoLoading(false)
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [watchedClassId]);
 
     async function onSubmit(values: z.input<typeof formSchema>) {
         setIsLoading(true)
@@ -238,7 +252,12 @@ export function AdmissionForm({ classes }: AdmissionFormProps) {
                                             <FormItem>
                                                 <FormLabel>Registration No (Auto)</FormLabel>
                                                 <FormControl>
-                                                    <Input placeholder={nextRegNo} {...field} />
+                                                    <div className="relative">
+                                                        <Input placeholder={nextRegNo} {...field} />
+                                                        {regNoLoading && (
+                                                            <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                                                        )}
+                                                    </div>
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>

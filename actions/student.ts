@@ -8,6 +8,7 @@ import Counter from "@/models/Counter"
 import ClassFee from "@/models/ClassFee"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+import { findGroupForClass } from "@/actions/school-settings"
 
 export async function getClasses() {
   await dbConnect();
@@ -69,28 +70,40 @@ const registerStudentSchema = z.object({
   tcNumber: z.string().optional(),
 })
 
-export async function getNextRegistrationNumber() {
+export async function getNextRegistrationNumber(classId?: string) {
   await dbConnect();
-  
-  // Try to find existing counter
-  let counter = await Counter.findById('registrationNumber');
-  
-  if (!counter) {
-    // If not exists, initialize with 214 so next is 215
-    counter = await Counter.create({ _id: 'registrationNumber', seq: 214 });
+
+  // Determine which counter to use
+  let counterId = 'registrationNumber';
+  let defaultSeq = 214; // global default starting seq
+
+  if (classId) {
+    const groupInfo = await findGroupForClass(classId);
+    if (groupInfo) {
+      counterId = groupInfo.counterId;
+      // Fetch the group to get its startFrom as the fallback default
+      const { default: ClassGroup } = await import('@/models/ClassGroup');
+      const grp = await ClassGroup.findOne({ _id: groupInfo.groupId }).lean() as { startFrom?: number } | null;
+      defaultSeq = (grp?.startFrom ?? 1) - 1; // seq = startFrom - 1 so next = startFrom
+    }
   }
-  
+
+  // Try to find existing counter
+  let counter = await Counter.findById(counterId);
+
+  if (!counter) {
+    counter = await Counter.create({ _id: counterId, seq: defaultSeq });
+  }
+
   // Return the *next* number (seq + 1) formatted
   let nextSeq = counter.seq + 1;
   let nextRegNo = String(nextSeq).padStart(4, '0');
 
   // Check for collision and auto-heal
-  // If the calculated next number already exists in Students, the counter is stale.
   let attempts = 0;
   while (attempts < 100 && await Student.exists({ registrationNumber: nextRegNo })) {
-      // Update counter to match the existing student's number
       await Counter.findByIdAndUpdate(
-          'registrationNumber',
+          counterId,
           { $set: { seq: nextSeq } },
           { new: true }
       );
@@ -102,15 +115,29 @@ export async function getNextRegistrationNumber() {
   return nextRegNo;
 }
 
-// Function to actually increment and get
-async function incrementRegistrationNumber() {
+// Function to actually increment and get — supports class-group counters
+async function incrementRegistrationNumber(classId?: string) {
   await dbConnect();
+
+  let counterId = 'registrationNumber';
+  let defaultSeq = 214;
+
+  if (classId) {
+    const groupInfo = await findGroupForClass(classId);
+    if (groupInfo) {
+      counterId = groupInfo.counterId;
+      const { default: ClassGroup } = await import('@/models/ClassGroup');
+      const grp = await ClassGroup.findOne({ _id: groupInfo.groupId }).lean() as { startFrom?: number } | null;
+      defaultSeq = (grp?.startFrom ?? 1) - 1;
+    }
+  }
+
   const counter = await Counter.findByIdAndUpdate(
-    'registrationNumber',
+    counterId,
     { $inc: { seq: 1 } },
     { new: true, upsert: true, setDefaultsOnInsert: true }
   );
-  
+
   return String(counter.seq).padStart(4, '0');
 }
 
@@ -187,7 +214,7 @@ export async function registerStudent(formData: FormData) {
     let registrationNumber = rawData.registrationNumber;
     
     if (!registrationNumber) {
-        registrationNumber = await incrementRegistrationNumber();
+        registrationNumber = await incrementRegistrationNumber(rawData.classId);
     } else {
         const existing = await Student.findOne({ registrationNumber });
         if (existing) {

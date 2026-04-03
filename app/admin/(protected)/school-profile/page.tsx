@@ -3,11 +3,13 @@ import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { WhatsAppToggle } from "@/components/admin/school-profile/whatsapp-toggle"
 import { CounterEditor } from "@/components/admin/school-profile/counter-editor"
-import { getWhatsAppReceiptSetting, getCounters, getFeePolicySettings } from "@/actions/school-settings"
+import { ClassGroupManager } from "@/components/admin/school-profile/class-group-manager"
+import { getWhatsAppReceiptSetting, getCounters, getFeePolicySettings, getClassGroups } from "@/actions/school-settings"
+import { getClasses } from "@/actions/class"
 import { FeePolicyEditor } from "@/components/admin/school-profile/fee-policy-editor"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ExternalLink, Settings, MessageSquare, AlertCircle, Hash } from "lucide-react"
+import { ExternalLink, Settings, MessageSquare, AlertCircle, Hash, Layers } from "lucide-react"
 import { whatsappConfig } from "@/lib/whatsapp-config"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
@@ -18,10 +20,12 @@ export default async function SchoolProfilePage() {
     redirect("/admin/dashboard")
   }
 
-  const [initialWhatsAppSetting, counters, feePolicy] = await Promise.all([
+  const [initialWhatsAppSetting, counters, feePolicy, classGroups, allClasses] = await Promise.all([
     getWhatsAppReceiptSetting(),
     getCounters(),
-    getFeePolicySettings()
+    getFeePolicySettings(),
+    getClassGroups(),
+    getClasses(),
   ])
 
   const externalSchoolProfileUrl = `${process.env.NEXT_PUBLIC_FEEEASE_URL || 'https://feeease.com'}/school/profile`
@@ -130,6 +134,24 @@ export default async function SchoolProfilePage() {
           </CardHeader>
           <CardContent>
             <CounterEditor counters={counters} />
+          </CardContent>
+        </Card>
+
+        {/* Class Group Registration Management — full width */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-primary" />
+              <CardTitle>Class Group Registration Numbers</CardTitle>
+            </div>
+            <CardDescription>
+              Create groups of classes that share a <strong>separate</strong> registration number sequence.
+              Useful when you want Primary classes to start from e.g. <em>1001</em> and Secondary from <em>2001</em>.
+              Classes not in any group continue to use the global counter above.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ClassGroupManager groups={classGroups} allClasses={allClasses} />
           </CardContent>
         </Card>
       </div>

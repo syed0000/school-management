@@ -3,6 +3,7 @@
 import dbConnect from "@/lib/db"
 import Setting from "@/models/Setting"
 import Counter from "@/models/Counter"
+import ClassGroup from "@/models/ClassGroup"
 import { revalidatePath } from "next/cache"
 import { whatsappConfig } from "@/lib/whatsapp-config"
 import { getServerSession } from "next-auth"
@@ -117,7 +118,9 @@ export async function updateCounter(id: string, seq: number) {
         return { success: false, error: "Unauthorized" }
     }
 
-    if (!["registrationNumber", "receiptNumber"].includes(id)) {
+    // Allow main counters and class-group-specific counters (prefixed with 'classGroup_')
+    const isGroupCounter = id.startsWith("classGroup_")
+    if (!["registrationNumber", "receiptNumber"].includes(id) && !isGroupCounter) {
         return { success: false, error: "Unknown counter" }
     }
 
@@ -130,4 +133,149 @@ export async function updateCounter(id: string, seq: number) {
 
     revalidatePath("/admin/school-profile")
     return { success: true }
+}
+
+// ── Class Group Management ────────────────────────────────────────────────────────
+
+export interface ClassGroupInfo {
+    id: string
+    name: string
+    classIds: string[]
+    startFrom: number
+    currentSeq: number // live counter seq value
+    nextFormatted: string
+}
+
+export async function getClassGroups(): Promise<ClassGroupInfo[]> {
+    await dbConnect()
+    const groups = await ClassGroup.find({ isActive: true }).lean() as Array<{
+        _id: { toString: () => string }
+        name: string
+        classIds: Array<{ toString: () => string }>
+        startFrom: number
+    }>
+
+    const result: ClassGroupInfo[] = []
+    for (const g of groups) {
+        const counterId = `classGroup_${g._id.toString()}`
+        const counter = await Counter.findById(counterId).lean() as { seq?: number } | null
+        const currentSeq = counter?.seq ?? (g.startFrom - 1)
+        result.push({
+            id: g._id.toString(),
+            name: g.name,
+            classIds: g.classIds.map((c) => c.toString()),
+            startFrom: g.startFrom,
+            currentSeq,
+            nextFormatted: String(currentSeq + 1).padStart(4, "0"),
+        })
+    }
+    return result
+}
+
+export async function createClassGroup(name: string, classIds: string[], startFrom: number) {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== "admin") {
+        return { success: false, error: "Unauthorized" }
+    }
+    if (!name.trim()) return { success: false, error: "Group name is required" }
+    if (!classIds.length) return { success: false, error: "Select at least one class" }
+    if (!Number.isInteger(startFrom) || startFrom < 0) {
+        return { success: false, error: "Start from must be a non-negative integer" }
+    }
+
+    await dbConnect()
+
+    // Verify no class is already in another active group
+    const existing = await ClassGroup.findOne({
+        classIds: { $in: classIds },
+        isActive: true,
+    }).lean()
+    if (existing) {
+        return { success: false, error: "One or more selected classes already belong to another group" }
+    }
+
+    const group = await ClassGroup.create({ name: name.trim(), classIds, startFrom })
+
+    // Initialise the counter so seq = startFrom - 1 (next issued number = startFrom)
+    const counterId = `classGroup_${group._id.toString()}`
+    await Counter.findByIdAndUpdate(
+        counterId,
+        { seq: startFrom - 1 },
+        { upsert: true, new: true }
+    )
+
+    revalidatePath("/admin/school-profile")
+    return { success: true }
+}
+
+export async function updateClassGroup(
+    groupId: string,
+    name: string,
+    classIds: string[],
+    startFrom: number,
+    resetCounter?: boolean
+) {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== "admin") {
+        return { success: false, error: "Unauthorized" }
+    }
+    if (!name.trim()) return { success: false, error: "Group name is required" }
+    if (!classIds.length) return { success: false, error: "Select at least one class" }
+
+    await dbConnect()
+
+    // Verify no class is already in another active group (exclude self)
+    const conflict = await ClassGroup.findOne({
+        classIds: { $in: classIds },
+        isActive: true,
+        _id: { $ne: groupId },
+    }).lean()
+    if (conflict) {
+        return { success: false, error: "One or more selected classes already belong to another group" }
+    }
+
+    await ClassGroup.findByIdAndUpdate(groupId, { name: name.trim(), classIds, startFrom })
+
+    if (resetCounter) {
+        const counterId = `classGroup_${groupId}`
+        await Counter.findByIdAndUpdate(
+            counterId,
+            { seq: startFrom - 1 },
+            { upsert: true, new: true }
+        )
+    }
+
+    revalidatePath("/admin/school-profile")
+    return { success: true }
+}
+
+export async function deleteClassGroup(groupId: string) {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== "admin") {
+        return { success: false, error: "Unauthorized" }
+    }
+
+    await dbConnect()
+    await ClassGroup.findByIdAndUpdate(groupId, { isActive: false })
+
+    revalidatePath("/admin/school-profile")
+    return { success: true }
+}
+
+/**
+ * Given a classId, finds the active group it belongs to and returns its counter key.
+ * Returns null if no group is found (fall back to global counter).
+ */
+export async function findGroupForClass(classId: string): Promise<{ groupId: string; counterId: string } | null> {
+    await dbConnect()
+    const group = await ClassGroup.findOne({
+        classIds: classId,
+        isActive: true,
+    }).lean() as { _id: { toString: () => string } } | null
+
+    if (!group) return null
+    return {
+        groupId: group._id.toString(),
+        counterId: `classGroup_${group._id.toString()}`,
+    }
 }
