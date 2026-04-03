@@ -67,6 +67,7 @@ export function NotificationHistoryList({ notifications }: NotificationHistoryPr
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50 hover:bg-muted/50">
+            <TableHead className="w-12">S.No</TableHead>
             <TableHead className="w-[30%]">Title & Message</TableHead>
             <TableHead>Recipients</TableHead>
             <TableHead>Sent At</TableHead>
@@ -74,8 +75,9 @@ export function NotificationHistoryList({ notifications }: NotificationHistoryPr
           </TableRow>
         </TableHeader>
         <TableBody>
-          {notifications.map((notif) => (
+          {notifications.map((notif, index) => (
             <TableRow key={notif._id} className="group transition-colors hover:bg-muted/30">
+              <TableCell>{index + 1}</TableCell>
               <TableCell className="font-medium">
                 <div className="flex flex-col gap-1">
                    <span className="text-sm font-bold truncate max-w-[200px]">{notif.title}</span>

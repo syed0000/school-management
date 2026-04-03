@@ -388,8 +388,9 @@ export default function FeeReport({ classes }: FeeReportProps) {
           <table className="w-full text-xs border-separate border-spacing-0 print:border-collapse">
             <thead className="sticky top-0 z-20 bg-background shadow-sm">
               <tr className="border-b-2">
-                <th className="p-2 font-bold border-x border-b bg-background text-left sticky left-0 z-10 w-[60px]">Roll</th>
-                <th className="p-2 font-bold border-x border-b bg-background text-left sticky left-[60px] z-10 w-[150px]">Student Name</th>
+                <th className="p-2 font-bold border-x border-b bg-background text-left sticky left-0 z-10 w-[40px]">S.No</th>
+                <th className="p-2 font-bold border-x border-b bg-background text-left sticky left-[40px] z-10 w-[60px]">Roll</th>
+                <th className="p-2 font-bold border-x border-b bg-background text-left sticky left-[100px] z-10 w-[150px]">Student Name</th>
                 {feeHeaders.map((header) => (
                   <th key={header} className="p-2 text-center font-bold px-1 whitespace-nowrap min-w-[70px] border-x border-b bg-background">
                     {header}
@@ -407,10 +408,11 @@ export default function FeeReport({ classes }: FeeReportProps) {
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((student) => (
+                filteredStudents.map((student, idx) => (
                   <tr key={student.id} className="border-b hover:bg-muted/30 transition-colors group">
-                    <td className="p-2 font-medium border-x border-b bg-background sticky left-0 z-5 group-hover:bg-muted/50">{student.rollNumber || '-'}</td>
-                    <td className="p-2 font-semibold border-x border-b bg-background sticky left-[60px] z-5 group-hover:bg-muted/50">{student.name}</td>
+                    <td className="p-2 border-x border-b bg-background sticky left-0 z-5 group-hover:bg-muted/50">{idx + 1}</td>
+                    <td className="p-2 font-medium border-x border-b bg-background sticky left-[40px] z-5 group-hover:bg-muted/50">{student.rollNumber || '-'}</td>
+                    <td className="p-2 font-semibold border-x border-b bg-background sticky left-[100px] z-5 group-hover:bg-muted/50">{student.name}</td>
                     {feeHeaders.map((header) => {
                       const status = student.feeStatuses[header];
                       return (
@@ -424,7 +426,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
                                 <span className="text-[9px] text-muted-foreground font-medium whitespace-nowrap">{status.date}</span>
                               </div>
                             ) : status === 'unpaid' || (status && typeof status === 'object' && status.status === 'unpaid') ? (
-                                <div className="w-5 h-5 border-2 border-slate-300 rounded bg-white/50"></div>
+                              <div className="w-5 h-5 border-2 border-slate-300 rounded bg-white/50"></div>
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}

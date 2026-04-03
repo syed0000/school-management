@@ -257,6 +257,7 @@ export function HolidayManager({ holidays: initialHolidays, classes }: HolidayLi
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">S.No</TableHead>
                 <TableHead>Date(s)</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Affected Classes</TableHead>
@@ -271,13 +272,14 @@ export function HolidayManager({ holidays: initialHolidays, classes }: HolidayLi
                   </TableCell>
                 </TableRow>
               ) : (
-                holidays.map((holiday) => {
+                holidays.map((holiday, index) => {
                   const start = new Date(holiday.startDate);
                   const end = new Date(holiday.endDate);
                   const isSameDay = start.toDateString() === end.toDateString();
                   
                   return (
                     <TableRow key={holiday.id}>
+                      <TableCell>{index + 1}</TableCell>
                       <TableCell>
                         {isSameDay 
                           ? format(start, "PPP") 

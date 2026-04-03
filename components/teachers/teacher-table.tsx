@@ -29,6 +29,7 @@ export function TeacherTable({ teachers, isAdmin }: TeacherTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-12">S.No</TableHead>
             <TableHead className="w-[80px]">Photo</TableHead>
             <TableHead>ID</TableHead>
             <TableHead>Name</TableHead>
@@ -39,8 +40,9 @@ export function TeacherTable({ teachers, isAdmin }: TeacherTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {teachers.map((teacher) => (
+          {teachers.map((teacher, index) => (
             <TableRow key={teacher._id}>
+              <TableCell>{index + 1}</TableCell>
               <TableCell>
                 <Avatar>
                   <AvatarImage src={teacher.photo} alt={teacher.name} />

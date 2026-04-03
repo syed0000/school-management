@@ -7,6 +7,9 @@ import { format } from "date-fns"
 import { ImagePreview } from "@/components/ui/image-preview"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { useState } from "react"
+import { getWhatsAppHistory } from "@/actions/whatsapp-stats"
+import { Loader2 } from "lucide-react"
 
 interface WhatsAppStat {
   _id: string;
@@ -26,15 +29,35 @@ interface WhatsAppStat {
 }
 
 interface WhatsAppHistoryProps {
-  history: WhatsAppStat[];
+  initialHistory: WhatsAppStat[];
   summary: {
     totalCost: number;
     totalPaid: number;
     balance: number;
   };
+  initialTotalPages?: number;
+  initialCurrentPage?: number;
 }
 
-export function WhatsAppHistory({ history, summary }: WhatsAppHistoryProps) {
+export function WhatsAppHistory({ initialHistory, summary, initialTotalPages, initialCurrentPage }: WhatsAppHistoryProps) {
+  const [history, setHistory] = useState(initialHistory);
+  const [currentPage, setCurrentPage] = useState(initialCurrentPage || 1);
+  const [totalPages, setTotalPages] = useState(initialTotalPages || 1);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const onPageChange = async (page: number) => {
+    setIsLoading(true);
+    try {
+      const data = await getWhatsAppHistory(page, 20);
+      setHistory(data.history);
+      setCurrentPage(data.currentPage);
+      setTotalPages(data.totalPages);
+    } catch (error) {
+      console.error("Failed to fetch WhatsApp history:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
@@ -75,6 +98,7 @@ export function WhatsAppHistory({ history, summary }: WhatsAppHistoryProps) {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">S.No</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead className="max-w-[250px]">Description</TableHead>
@@ -86,8 +110,9 @@ export function WhatsAppHistory({ history, summary }: WhatsAppHistoryProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {history.map((item) => (
+              {history.map((item, index) => (
                 <TableRow key={item._id}>
+                  <TableCell>{index + 1 + (currentPage - 1) * 20}</TableCell>
                   <TableCell>{format(new Date(item.createdAt), "dd MMM yyyy, hh:mm a")}</TableCell>
                   <TableCell><Badge variant="secondary">{item.type}</Badge></TableCell>
                   <TableCell className="max-w-[250px] wrap-break-word">{item.description}</TableCell>
@@ -113,6 +138,7 @@ export function WhatsAppHistory({ history, summary }: WhatsAppHistoryProps) {
                             <Table>
                               <TableHeader>
                                 <TableRow>
+                                  <TableHead className="w-12">S.No</TableHead>
                                   <TableHead>Recipient</TableHead>
                                   <TableHead>Phone</TableHead>
                                   <TableHead>Status</TableHead>
@@ -122,6 +148,7 @@ export function WhatsAppHistory({ history, summary }: WhatsAppHistoryProps) {
                               <TableBody>
                                 {item.workerDetails.map((detail, idx) => (
                                   <TableRow key={idx}>
+                                    <TableCell>{idx + 1}</TableCell>
                                     <TableCell>{detail.id || 'Unknown'}</TableCell>
                                     <TableCell>{detail.phone}</TableCell>
                                     <TableCell><Badge variant={detail.status === 'success' ? 'default' : 'destructive'}>{detail.status}</Badge></TableCell>
@@ -149,6 +176,32 @@ export function WhatsAppHistory({ history, summary }: WhatsAppHistoryProps) {
               ))}
             </TableBody>
           </Table>
+
+          {totalPages && totalPages > 1 && (
+            <div className="flex items-center justify-end space-x-2 py-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage <= 1 || isLoading}
+              >
+                {isLoading && currentPage > 1 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Previous
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage >= totalPages || isLoading}
+              >
+                Next
+                {isLoading && currentPage < totalPages ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : null}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

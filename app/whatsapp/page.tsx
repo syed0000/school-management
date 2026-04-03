@@ -19,13 +19,15 @@ export default async function WhatsAppPage() {
   const session = await getServerSession(authOptions)
   if (!session) redirect("/login")
 
-  const [classes, teachers, history, summary, appNotifications] = await Promise.all([
+  const [classes, teachers, historyData, summary, appNotifications] = await Promise.all([
     getClasses(),
     getTeachers(),
-    getWhatsAppHistory(),
+    getWhatsAppHistory(1, 20),
     getWhatsAppSummary(),
     getNotificationHistory(),
   ]);
+
+  const { history, totalPages, currentPage, totalCount } = historyData;
 
   return (
     <div className="flex-1 space-y-6">
@@ -74,7 +76,12 @@ export default async function WhatsAppPage() {
               <WhatsAppNotificationForm classes={classes} />
             </TabsContent>
             <TabsContent value="history">
-              <WhatsAppHistory history={history} summary={summary} />
+              <WhatsAppHistory 
+                initialHistory={history} 
+                summary={summary} 
+                initialTotalPages={totalPages} 
+                initialCurrentPage={currentPage} 
+              />
             </TabsContent>
           </Tabs>
         </TabsContent>

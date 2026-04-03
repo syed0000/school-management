@@ -37,6 +37,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead className="w-12">S.No</TableHead>
           <TableHead>Student Name</TableHead>
           <TableHead className="hidden sm:table-cell">Type (Monthly/ Examination)</TableHead>
           <TableHead className="hidden sm:table-cell">Month/ Exam</TableHead>
@@ -45,7 +46,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {payments.map((payment) => {
+        {payments.map((payment, index) => {
           const monthName = payment.month 
             ? new Date(0, payment.month - 1).toLocaleString('default', { month: 'long' }) 
             : null;
@@ -56,6 +57,7 @@ export function PaymentsTable({ payments }: PaymentsTableProps) {
 
           return (
             <TableRow key={payment.id}>
+              <TableCell>{index + 1}</TableCell>
               <TableCell>
                 <div className="font-medium">{payment.studentName}</div>
                 <div className="hidden text-sm text-muted-foreground md:inline">

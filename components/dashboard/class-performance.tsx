@@ -23,6 +23,7 @@ export function ClassPerformance({ data }: ClassPerformanceProps) {
         <Table>
             <TableHeader>
                 <TableRow>
+                    <TableHead className="w-12">S.No</TableHead>
                     <TableHead>Class Name</TableHead>
                     <TableHead className="text-right">Collected</TableHead>
                     <TableHead className="text-right">Pending</TableHead>
@@ -30,8 +31,9 @@ export function ClassPerformance({ data }: ClassPerformanceProps) {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {data.map((item) => (
+                {data.map((item, index) => (
                     <TableRow key={item.name}>
+                        <TableCell>{index + 1}</TableCell>
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell className="text-right text-green-600 font-medium">₹{item.collected.toLocaleString()}</TableCell>
                         <TableCell className="text-right text-yellow-600 font-medium">₹{item.pending.toLocaleString()}</TableCell>

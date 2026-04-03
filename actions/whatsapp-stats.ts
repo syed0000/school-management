@@ -4,11 +4,22 @@ import dbConnect from "@/lib/db";
 import WhatsAppStat from "@/models/WhatsAppStat";
 import WhatsAppPayment from "@/models/WhatsAppPayment";
 
-export async function getWhatsAppHistory() {
+export async function getWhatsAppHistory(page: number = 1, limit: number = 20) {
   await dbConnect();
-  const historyDoc = await WhatsAppStat.find({}).sort({ createdAt: -1 }).lean();
+  const skip = (page - 1) * limit;
+  
+  const [historyDoc, totalCount] = await Promise.all([
+    WhatsAppStat.find({}).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    WhatsAppStat.countDocuments({})
+  ]);
+
   const history = JSON.parse(JSON.stringify(historyDoc));
-  return history;
+  return {
+    history,
+    totalCount,
+    totalPages: Math.ceil(totalCount / limit),
+    currentPage: page
+  };
 }
 
 export async function getWhatsAppSummary() {

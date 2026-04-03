@@ -430,6 +430,7 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
                 <table className="w-full text-sm border-separate border-spacing-0">
                   <thead className="sticky top-0 z-20 bg-background shadow-sm">
                     <tr className="border-b">
+                      <th className="p-2 border-x border-b bg-background text-left w-12">S.No</th>
                       <th className="p-2 border-x border-b bg-background text-left w-[80px]">Roll No</th>
                       <th className="p-2 border-x border-b bg-background text-left z-20">Student Name</th>
                       <th className="p-2 border-x border-b bg-background text-right">Present</th>
@@ -438,8 +439,9 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
                     </tr>
                   </thead>
                   <tbody className="bg-card">
-                    {students.map((student) => (
+                    {students.map((student, idx) => (
                       <tr key={student.id} className="border-b hover:bg-muted/30 transition-colors">
+                        <td className="p-2 border-x border-b">{idx + 1}</td>
                         <td className="p-2 border-x border-b">{student.rollNumber || '-'}</td>
                         <td className="p-2 font-medium border-x border-b z-20">{student.name}</td>
                         <td className="p-2 text-right text-green-600 font-medium border-x border-b">{student.present}</td>

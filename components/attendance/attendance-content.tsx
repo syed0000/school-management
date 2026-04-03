@@ -81,6 +81,7 @@ export function AttendanceContent({
             <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">S.No</TableHead>
                 <TableHead className="whitespace-nowrap">Date</TableHead>
                 <TableHead>Class</TableHead>
                 <TableHead>Section</TableHead>
@@ -101,7 +102,7 @@ export function AttendanceContent({
                 </TableRow>
               ) : (
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                history.map((record: any) => {
+                history.map((record: any, index: number) => {
                   const recordDate = new Date(record.date);
                   const today = new Date();
                   const isToday = recordDate.toDateString() === today.toDateString();
@@ -109,6 +110,7 @@ export function AttendanceContent({
 
                   return (
                     <TableRow key={record.id}>
+                      <TableCell>{index + 1}</TableCell>
                       <TableCell className="whitespace-nowrap">{format(recordDate, "PPP")}</TableCell>
                       <TableCell>{record.className}</TableCell>
                       <TableCell>{record.section}</TableCell>

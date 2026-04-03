@@ -182,7 +182,8 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
                   aria-label="Select all"
                 />
               </TableHead>
-              <TableHead>Student</TableHead>
+                <TableHead className="w-12">S.No</TableHead>
+                <TableHead>Student</TableHead>
               <TableHead>Receipt No</TableHead>
               <TableHead>Fee Type</TableHead>
               <TableHead>Amount</TableHead>
@@ -193,7 +194,7 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transactions.map((t) => (
+            {transactions.map((t, index) => (
               <TableRow key={t.id}>
                 <TableCell>
                   <Checkbox
@@ -202,6 +203,7 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
                     aria-label={`Select transaction ${t.receiptNumber}`}
                   />
                 </TableCell>
+                <TableCell>{index + 1 + (pagination.currentPage - 1) * 20}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar className="h-8 w-8">

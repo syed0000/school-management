@@ -107,6 +107,7 @@ export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">S.No</TableHead>
               {isWhatsAppEnabled && (
                 <TableHead className="w-[40px]">
                     <Checkbox 
@@ -124,8 +125,9 @@ export function UnpaidStudentList({ students }: UnpaidStudentListProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {students.map((student) => (
+          {students.map((student, index) => (
             <TableRow key={student.id}>
+                <TableCell>{index + 1}</TableCell>
               {isWhatsAppEnabled && (
                 <TableCell>
                     <Checkbox 

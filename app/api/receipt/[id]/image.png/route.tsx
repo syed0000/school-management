@@ -192,11 +192,12 @@ export async function GET(
         );
 
         const imageBuffer = await imageResponse.arrayBuffer();
+        const uint8Array = new Uint8Array(imageBuffer);
 
-        return new Response(imageBuffer, {
+        return new Response(uint8Array, {
             headers: {
                 'Content-Type': 'image/png',
-                'Content-Length': imageBuffer.byteLength.toString(),
+                'Content-Length': uint8Array.length.toString(),
                 'Content-Disposition': `attachment; filename="receipt-${receiptNumber}.png"`,
                 'Cache-Control': 'public, max-age=3600',
             }
