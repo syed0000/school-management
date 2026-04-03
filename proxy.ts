@@ -71,7 +71,7 @@ export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Skip public paths
-  if (PUBLIC_PATHS.some(path => pathname.startsWith(path))) {
+  if (PUBLIC_PATHS.some(path => pathname.startsWith(path)) || pathname.startsWith("/api/receipt")) {
     return NextResponse.next();
   }
 
