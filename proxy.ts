@@ -25,7 +25,8 @@ const PUBLIC_PATHS = [
   "/static",
   "/images",
   "/public",
-  "/api/whatsapp"
+  "/api/whatsapp",
+  "/api/public-receipt"
 ];
 
 const LICENSE_COOKIE_SECRET = new TextEncoder().encode(process.env.LICENSE_COOKIE_SECRET);
@@ -71,7 +72,7 @@ export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Skip public paths
-  if (PUBLIC_PATHS.some(path => pathname.startsWith(path)) || pathname.startsWith("/api/receipt")) {
+  if (PUBLIC_PATHS.some(path => pathname.startsWith(path))) {
     return NextResponse.next();
   }
 

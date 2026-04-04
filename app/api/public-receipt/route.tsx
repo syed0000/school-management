@@ -2,29 +2,26 @@ import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 import { format } from 'date-fns';
 import { schoolConfig } from '@/lib/config';
-import dbConnect from '@/lib/db';
-import WhatsAppReceipt from '@/models/WhatsAppReceipt';
-
-// Removed edge runtime to allow for database connection and standard Node.js response behavior
-// export const runtime = 'edge';
 
 const FONT_URL = 'https://cdn.jsdelivr.net/npm/notosans-fontface@1.3.0/fonts/NotoSans-Regular.ttf';
 
-export async function GET(
-    request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest) {
     try {
-        const { id } = await params;
-        await dbConnect();
-
-        const receipt = await WhatsAppReceipt.findById(id).lean();
-
-        if (!receipt) {
-            return new Response('Receipt not found', { status: 404 });
-        }
-
-        const receiptNumber = receipt.receiptNumber || 'N/A';
+        const searchParams = request.nextUrl.searchParams;
+        const receiptNumber = searchParams.get('receiptNumber') || 'N/A';
+        const studentName = searchParams.get('studentName') || 'Unknown';
+        const studentRegNo = searchParams.get('studentRegNo') || 'N/A';
+        const rollNumber = searchParams.get('rollNumber') || 'N/A';
+        const className = searchParams.get('className') || 'N/A';
+        const section = searchParams.get('section') || 'A';
+        const amountStr = searchParams.get('amount') || '0';
+        const amount = parseFloat(amountStr) || 0;
+        const dateStr = searchParams.get('date');
+        const date = dateStr ? new Date(dateStr) : new Date();
+        const feeType = searchParams.get('feeType') || 'Fee Payment';
+        const monthsParam = searchParams.get('months');
+        const year = searchParams.get('year') || date.getFullYear().toString();
+        const remarks = searchParams.get('remarks') || '';
 
         // Load Font from stable CDN
         let fontData: ArrayBuffer | null = null;
@@ -44,17 +41,6 @@ export async function GET(
             return new Response('Error: Font loading failed.', { status: 500 });
         }
 
-        const studentName = receipt.studentName || 'Unknown';
-        const studentRegNo = receipt.studentRegNo || 'N/A';
-        const rollNumber = receipt.rollNumber || 'N/A';
-        const className = receipt.className || 'N/A';
-        const section = receipt.section || 'A';
-        const amount = receipt.amount || 0;
-        const date = receipt.date ? new Date(receipt.date) : new Date();
-        const feeType = receipt.feeType || 'Fee Payment';
-        const monthsParam = receipt.months;
-        const year = receipt.year || date.getFullYear().toString();
-
         // Format fee description
         let feeDescription = 'Fee Payment';
         if (monthsParam) {
@@ -64,8 +50,6 @@ export async function GET(
         } else if (feeType !== 'Multiple Fees' && feeType !== 'Fee Payment') {
             feeDescription = feeType.charAt(0).toUpperCase() + feeType.slice(1) + ` (${year})`;
         }
-
-        const remarks = receipt.remarks || '';
 
         const imageResponse = new ImageResponse(
             (
