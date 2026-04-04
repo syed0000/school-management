@@ -139,7 +139,8 @@ export function TransactionFilters({ classes, onFilter, isLoading }: Transaction
               <SelectItem value="all">All Types</SelectItem>
               <SelectItem value="monthly">Monthly</SelectItem>
               <SelectItem value="examination">Examination</SelectItem>
-              <SelectItem value="admission">Admission</SelectItem>
+              <SelectItem value="admissionFees">Admission</SelectItem>
+              <SelectItem value="registrationFees">Registration Fees</SelectItem>
               <SelectItem value="other">Other</SelectItem>
             </SelectContent>
           </Select>

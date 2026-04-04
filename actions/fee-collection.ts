@@ -307,12 +307,15 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
             ...otherTypes
             ].join(", ") || "Current";
 
+          const remarksStr = data.fees.map(f => f.remarks).filter(Boolean).join(" | ");
+
           await sendWhatsAppReceipt({
             student,
             totalAmount,
             receiptNumber: baseReceiptNumber,
               monthsStr,
-              transactionDate: submissionDate
+              transactionDate: submissionDate,
+              remarks: remarksStr
             });
         }
     } catch (error) {

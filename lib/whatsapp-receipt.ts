@@ -12,9 +12,10 @@ interface SendReceiptParams {
     receiptNumber: string;
     monthsStr: string;
     transactionDate?: Date;
+    remarks?: string;
 }
 
-export async function sendWhatsAppReceipt({ student, totalAmount, receiptNumber, monthsStr, transactionDate }: SendReceiptParams) {
+export async function sendWhatsAppReceipt({ student, totalAmount, receiptNumber, monthsStr, transactionDate, remarks }: SendReceiptParams) {
     try {
         await dbConnect();
         // 1. Check if alerts are enabled globally in Settings
@@ -40,6 +41,7 @@ export async function sendWhatsAppReceipt({ student, totalAmount, receiptNumber,
             feeType: 'Multiple Fees',
             months: monthsStr,
             year: (transactionDate || new Date()).getFullYear().toString(),
+            remarks: remarks,
         });
         await receiptSnapshot.save();
 
@@ -77,7 +79,7 @@ export async function sendWhatsAppReceipt({ student, totalAmount, receiptNumber,
             licenseKey: license.key,
             mode: 'single',
             phone: mobile,
-            parentName: student.name,
+            parentName: student.parents?.father?.name || student.parents?.mother?.name || 'Parent/Guardian',
             studentName: student.name,
             amount: totalAmount.toString(),
             receiptNumber: receiptNumber,

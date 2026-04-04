@@ -12,6 +12,7 @@ const WhatsAppReceiptSchema = new mongoose.Schema({
   feeType: { type: String },
   months: { type: String },
   year: { type: String },
+  remarks: { type: String },
   createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 * 30 } // Expire after 30 days
 });
 

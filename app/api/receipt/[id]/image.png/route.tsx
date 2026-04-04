@@ -65,6 +65,8 @@ export async function GET(
             feeDescription = feeType.charAt(0).toUpperCase() + feeType.slice(1) + ` (${year})`;
         }
 
+        const remarks = receipt.remarks || '';
+
         const imageResponse = new ImageResponse(
             (
                 <div
@@ -128,9 +130,16 @@ export async function GET(
                             <span style={{ fontWeight: 'bold' }}>Description</span>
                             <span style={{ fontWeight: 'bold' }}>Amount</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                            <span style={{ fontSize: '16px', maxWidth: '75%', overflow: 'hidden' }}>{feeDescription}</span>
-                            <span>₹{amount.toLocaleString()}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', marginTop: '6px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: '16px', maxWidth: '75%', overflow: 'hidden' }}>{feeDescription}</span>
+                                <span>₹{amount.toLocaleString()}</span>
+                            </div>
+                            {remarks && (
+                                <span style={{ fontSize: '14px', color: '#555', fontStyle: 'italic', marginTop: '4px', borderLeft: '2px solid #ccc', paddingLeft: '6px' }}>
+                                    "{remarks}"
+                                </span>
+                            )}
                         </div>
                     </div>
 

@@ -152,9 +152,14 @@ export function ThermalReceipt({ receiptData }: ReceiptProps) {
             {/* Fee Items */}
             <div className="space-y-1 text-[11px] min-h-[40px]">
                 {receiptData.items.map((item, index) => (
-                    <div key={index} className="flex justify-between items-start">
-                        <span className="pr-2">{getFeeDescription(item)}</span>
-                        <span className="whitespace-nowrap">₹{formatNumber(item.amount)}</span>
+                    <div key={index} className="flex flex-col">
+                        <div className="flex justify-between items-start">
+                            <span className="pr-2 font-medium">{getFeeDescription(item)}</span>
+                            <span className="whitespace-nowrap">₹{formatNumber(item.amount)}</span>
+                        </div>
+                        {item.remarks && (
+                            <span className="text-[10px] text-gray-700 italic border-l block pl-1 ml-1 mt-0.5 border-gray-400">"{item.remarks}"</span>
+                        )}
                     </div>
                 ))}
             </div>

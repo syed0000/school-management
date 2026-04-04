@@ -190,6 +190,7 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
               <TableHead>Status</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Collected By</TableHead>
+              <TableHead>Remarks</TableHead>
               {isAdmin && <TableHead className="text-right">Actions</TableHead>}
             </TableRow>
           </TableHeader>
@@ -229,6 +230,7 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
                   </div> */}
                 </TableCell>
                 <TableCell className="text-sm">{t.collectedBy}</TableCell>
+                <TableCell className="text-sm">{t.remarks || '-'}</TableCell>
                 {isAdmin && (
                   <TableCell className="text-right">
                     <Button
