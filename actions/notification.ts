@@ -11,6 +11,7 @@ export interface CreateNotificationPayload {
   title: string;
   body: string;
   targetClassIds?: string[];
+  targetStudentIds?: string[];
   targetTeacherIds?: string[];
   targetAllTeachers?: boolean;
 }
@@ -23,9 +24,10 @@ export async function sendAppNotification(payload: CreateNotificationPayload) {
     const newNotification = new Notification({
       title: payload.title,
       body: payload.body,
-      type: payload.targetClassIds?.length ? 'class' : (payload.targetTeacherIds?.length || payload.targetAllTeachers ? 'teacher' : 'broadcast'),
+      type: payload.targetClassIds?.length ? 'class' : (payload.targetStudentIds?.length ? 'individual' : (payload.targetTeacherIds?.length || payload.targetAllTeachers ? 'teacher' : 'broadcast')),
       targetClasses: payload.targetClassIds,
       targetTeachers: payload.targetTeacherIds,
+      targetStudents: payload.targetStudentIds,
     });
     await newNotification.save();
 
@@ -59,6 +61,18 @@ export async function sendAppNotification(payload: CreateNotificationPayload) {
        }).select('pushTokens').lean();
        teachers.forEach(t => {
          if (t.pushTokens) tokens = tokens.concat(t.pushTokens);
+       });
+    }
+
+    // Add specific student tokens
+    if (payload.targetStudentIds?.length) {
+       const students = await Student.find({ 
+         _id: { $in: payload.targetStudentIds },
+         isActive: true,
+         "notificationSettings.pushEnabled": true
+       }).select('pushTokens').lean();
+       students.forEach(s => {
+         if (s.pushTokens) tokens = tokens.concat(s.pushTokens);
        });
     }
 

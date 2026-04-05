@@ -7,6 +7,7 @@ import "@/models/Student"
 import "@/models/Class"
 import { revalidatePath } from "next/cache"
 import { sendWhatsAppReceipt } from "@/lib/whatsapp-receipt"
+import { sendAppNotification } from "./notification"
 
 export async function getPendingFees() {
   await dbConnect();
@@ -100,7 +101,14 @@ export async function verifyFee(transactionId: string, action: 'approve' | 'reje
         receiptNumber: updatedTransaction.receiptNumber,
         monthsStr: monthsStr,
         transactionDate: updatedTransaction.transactionDate
-        });
+      });
+        
+      // Trigger in-app push notification upon approval
+      await sendAppNotification({
+        title: "Fee Payment Approved",
+        body: `A payment of ₹${updatedTransaction.amount} (Receipt: #${updatedTransaction.receiptNumber}) for ${updatedTransaction.studentId.name} has been verified & approved.`,
+        targetStudentIds: [updatedTransaction.studentId._id.toString()]
+      });
     }
     
     revalidatePath("/admin/fees/verify");

@@ -11,6 +11,7 @@ import { z } from "zod"
 import { getYearForMonth } from "@/lib/utils"
 import User from "@/models/User"
 import { sendWhatsAppReceipt } from "@/lib/whatsapp-receipt"
+import { sendAppNotification } from "./notification"
 
 const feeItemSchema = z.object({
   feeType: z.string().min(1, "Fee type is required"),
@@ -180,34 +181,34 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
 
           // Check if it's April and covered by Admission/Registration
           if (dbMonth === 4) {
-             const [admSetting, regSetting] = await Promise.all([
-               import('@/models/Setting').then(m => m.default.findOne({ key: "admission_fee_includes_april" }).lean()),
-               import('@/models/Setting').then(m => m.default.findOne({ key: "registration_fee_includes_april" }).lean())
-             ]);
-             const admIncludesApril = admSetting ? (admSetting as any).value === true : true;
-             const regIncludesApril = regSetting ? (regSetting as any).value === true : true;
+            const [admSetting, regSetting] = await Promise.all([
+              import('@/models/Setting').then(m => m.default.findOne({ key: "admission_fee_includes_april" }).lean()),
+              import('@/models/Setting').then(m => m.default.findOne({ key: "registration_fee_includes_april" }).lean())
+            ]);
+            const admIncludesApril = admSetting ? (admSetting as any).value === true : true;
+            const regIncludesApril = regSetting ? (regSetting as any).value === true : true;
 
-             if (admIncludesApril || regIncludesApril) {
-                const paidAdm = await FeeTransaction.findOne({
-                  studentId: data.studentId,
-                  feeType: { $in: ['admission', 'admissionFees'] },
-                  year: actualYear,
-                  status: { $ne: 'rejected' }
-                });
-                const paidReg = await FeeTransaction.findOne({
-                  studentId: data.studentId,
-                  feeType: 'registrationFees',
-                  year: actualYear,
-                  status: { $ne: 'rejected' }
-                });
+            if (admIncludesApril || regIncludesApril) {
+              const paidAdm = await FeeTransaction.findOne({
+                studentId: data.studentId,
+                feeType: { $in: ['admission', 'admissionFees'] },
+                year: actualYear,
+                status: { $ne: 'rejected' }
+              });
+              const paidReg = await FeeTransaction.findOne({
+                studentId: data.studentId,
+                feeType: 'registrationFees',
+                year: actualYear,
+                status: { $ne: 'rejected' }
+              });
 
-                if ((admIncludesApril && paidAdm) || (regIncludesApril && paidReg)) {
-                  return { 
-                    success: false, 
-                    error: `April ${actualYear} fee is already included in ${paidAdm ? 'Admission' : 'Registration'} fee payment.` 
-                  };
-                }
-             }
+              if ((admIncludesApril && paidAdm) || (regIncludesApril && paidReg)) {
+                return {
+                  success: false,
+                  error: `April ${actualYear} fee is already included in ${paidAdm ? 'Admission' : 'Registration'} fee payment.`
+                };
+              }
+            }
           }
         }
 
@@ -290,34 +291,69 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
             .flatMap(f => f.months!)
         )).sort((a, b) => getSessionRank(a) - getSessionRank(b));
 
-          const otherTypes = Array.from(new Set(
-            data.fees
-              .filter(f => f.feeType !== 'monthly')
-              .map(f => {
-                      if (f.feeType === 'examination' && f.examType) return `${f.examType} Exam`;
-                      if (f.feeType === 'admission' || f.feeType === 'admissionFees') return "Admission";
-                      if (f.feeType === 'registration' || f.feeType === 'registrationFees') return "Registration";
-                      if (f.feeType === 'annual' || f.feeType === 'annualFees') return "Annual";
-                      return f.feeType.charAt(0).toUpperCase() + f.feeType.slice(1);
-                    })
-            ));
+        const otherTypes = Array.from(new Set(
+          data.fees
+            .filter(f => f.feeType !== 'monthly')
+            .map(f => {
+              if (f.feeType === 'examination' && f.examType) return `${f.examType} Exam`;
+              if (f.feeType === 'admission' || f.feeType === 'admissionFees') return "Admission";
+              if (f.feeType === 'registration' || f.feeType === 'registrationFees') return "Registration";
+              if (f.feeType === 'annual' || f.feeType === 'annualFees') return "Annual";
+              return f.feeType.charAt(0).toUpperCase() + f.feeType.slice(1);
+            })
+        ));
 
-          const monthsStr = [
-            ...uniqueMonths.map(m => monthNames[m]),
-            ...otherTypes
-            ].join(", ") || "Current";
+        const monthsStr = [
+          ...uniqueMonths.map(m => monthNames[m]),
+          ...otherTypes
+        ].join(", ") || "Current";
 
-          const remarksStr = data.fees.map(f => f.remarks).filter(Boolean).join(" | ");
+        const remarksStr = data.fees.map(f => f.remarks).filter(Boolean).join(" | ");
 
-          await sendWhatsAppReceipt({
-            student,
-            totalAmount,
-            receiptNumber: baseReceiptNumber,
-              monthsStr,
-              transactionDate: submissionDate,
-              remarks: remarksStr
-            });
-        }
+        await sendWhatsAppReceipt({
+          student,
+          totalAmount,
+          receiptNumber: baseReceiptNumber,
+          monthsStr,
+          transactionDate: submissionDate,
+          remarks: remarksStr
+        });
+      }
+
+      // Always trigger in-app push notification if verified, independent of WhatsApp setting
+      if (initialStatus === 'verified') {
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const getSessionRank = (m: number) => (m - 3 + 12) % 12;
+
+        const uniqueMonths = Array.from(new Set(
+          data.fees
+            .filter(f => f.feeType === 'monthly' && f.months)
+            .flatMap(f => f.months!)
+        )).sort((a, b) => getSessionRank(a) - getSessionRank(b));
+
+        const otherTypes = Array.from(new Set(
+          data.fees
+            .filter(f => f.feeType !== 'monthly')
+            .map(f => {
+              if (f.feeType === 'examination' && f.examType) return `${f.examType} Exam`;
+              if (f.feeType === 'admission' || f.feeType === 'admissionFees') return "Admission";
+              if (f.feeType === 'registration' || f.feeType === 'registrationFees') return "Registration";
+              if (f.feeType === 'annual' || f.feeType === 'annualFees') return "Annual";
+              return f.feeType.charAt(0).toUpperCase() + f.feeType.slice(1);
+            })
+        ));
+
+        const monthsStr = [
+          ...uniqueMonths.map(m => monthNames[m]),
+          ...otherTypes
+        ].join(", ") || "Current";
+
+        await sendAppNotification({
+          title: "Fee Payment Received",
+          body: `A payment of ₹${totalAmount} (Receipt: #${baseReceiptNumber}) has been successful for ${student.name}. Fees for: ${monthsStr}`,
+          targetStudentIds: [data.studentId]
+        });
+      }
     } catch (error) {
       console.error("Failed to trigger WhatsApp receipt helper:", error);
     }
