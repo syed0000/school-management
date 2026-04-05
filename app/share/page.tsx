@@ -21,7 +21,7 @@ export default function SharePage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "School Management System",
+          title: "Institute Management System",
           text: "Check out our school management system!",
           url: `${origin}/login/otp`,
         })

@@ -7,7 +7,8 @@ import FeeTransaction from '@/models/FeeTransaction';
 import ClassFee from '@/models/ClassFee';
 import Setting from '@/models/Setting';
 import Holiday from '@/models/Holiday';
-import { startOfDay, endOfDay, format, eachDayOfInterval, isBefore, isAfter, startOfMonth, endOfMonth } from 'date-fns';
+import { format, eachDayOfInterval, isBefore, isAfter, startOfMonth, endOfMonth } from 'date-fns';
+import { getSchoolDateBoundaries } from '@/lib/tz-utils';
 import logger from "@/lib/logger";
 import { Types } from "mongoose";
 
@@ -97,12 +98,14 @@ export async function getAttendanceReport({
   await dbConnect();
 
   try {
-    // Build Query for Attendance Records
+    const { startUtc: startOfStartDate } = await getSchoolDateBoundaries(startDate);
+    const { endUtc: endOfEndDate } = await getSchoolDateBoundaries(endDate);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {
       date: {
-        $gte: startOfDay(startDate),
-        $lte: endOfDay(endDate),
+        $gte: startOfStartDate,
+        $lte: endOfEndDate,
       },
     };
 
@@ -154,9 +157,9 @@ export async function getAttendanceReport({
     // 2. Get holidays from DB
     const dbHolidays = await Holiday.find({
       $or: [
-        { startDate: { $gte: startOfDay(startDate), $lte: endOfDay(endDate) } },
-        { endDate: { $gte: startOfDay(startDate), $lte: endOfDay(endDate) } },
-        { startDate: { $lte: startOfDay(startDate) }, endDate: { $gte: endOfDay(endDate) } }
+        { startDate: { $gte: startOfStartDate, $lte: endOfEndDate } },
+        { endDate: { $gte: startOfStartDate, $lte: endOfEndDate } },
+        { startDate: { $lte: startOfStartDate }, endDate: { $gte: endOfEndDate } }
       ]
     }).lean();
 
@@ -175,9 +178,11 @@ export async function getAttendanceReport({
       const isWorkingDate = (d: Date) => {
         if (d.getDay() === 0) return false;
         return !relevantHolidays.some((h: any) => {
-          const hStart = startOfDay(new Date(h.startDate));
-          const hEnd = endOfDay(new Date(h.endDate));
-          return d >= hStart && d <= hEnd;
+          // These are timezone dependent too ideally, but interval logic using Date comparison requires careful thought.
+          // Since it's iterating day by day (UTC 00:00 locally), we need to check if the day is in the holiday range
+          const hStart = new Date(h.startDate).getTime();
+          const hEnd = new Date(h.endDate).getTime();
+          return d.getTime() >= hStart && d.getTime() <= hEnd;
         });
       };
 
@@ -320,13 +325,18 @@ export async function getFeeReport({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const studentIds = students.map((s: any) => s._id);
 
+    const { startUtc: startOfStartDate, endUtc: endOfEndDate } = await Promise.all([
+      getSchoolDateBoundaries(startDate).then(res => ({ startUtc: res.startUtc })),
+      getSchoolDateBoundaries(endDate).then(res => ({ endUtc: res.endUtc }))
+    ]).then(res => ({ ...res[0], ...res[1] }));
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const transactionQuery: any = {
       studentId: { $in: studentIds },
       status: 'verified',
       transactionDate: {
-        $gte: startOfDay(startDate),
-        $lte: endOfDay(endDate),
+        $gte: startOfStartDate,
+        $lte: endOfEndDate,
       },
     };
 
@@ -426,7 +436,7 @@ export async function getFeeReport({
       }
 
       // 2. Admission / Registration Fee in Period
-      if (isAfter(admissionDate, startOfDay(startDate)) && isBefore(admissionDate, endOfDay(endDate))) {
+      if (isAfter(admissionDate, startOfStartDate) && isBefore(admissionDate, endOfEndDate)) {
         // Check if they paid EITHER admission OR registration (anywhere in studentAllTxns)
         const admissionTxn = studentAllTxns.find(t =>
           t.feeType === 'admission' ||

@@ -22,7 +22,7 @@ export function AppLogo({ href }: AppLogoProps) {
       </div>
       <X className="h-4 w-4 md:h-5 md:w-5 text-foreground hidden sm:block" strokeWidth={3} />
       <div className="font-bold text-base md:text-lg tracking-tight hidden sm:block text-foreground truncate max-w-[150px] md:max-w-xs">
-        {schoolConfig.name || "School Name"}
+        {schoolConfig.name || "Institute Name"}
       </div>
     </div>
   );

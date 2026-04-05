@@ -6,12 +6,12 @@ import { ServiceWorkerRegister } from "@/components/sw-register";
 import { InstallPrompt } from "@/components/install-prompt";
 
 export const metadata: Metadata = {
-  title: "School Management",
+  title: "Institute Management",
   description: "Efficient nursery school management system",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "School Management",
+    title: "Institute Management",
   },
   icons: {
     icon: "/favicon.ico",

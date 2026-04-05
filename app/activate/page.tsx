@@ -65,7 +65,7 @@ export default function ActivatePage() {
           <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-2">
             <Key className="w-6 h-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">Activate Your School</CardTitle>
+          <CardTitle className="text-2xl font-bold">Activate Your Institute</CardTitle>
           <CardDescription>
             Enter the license key provided in your Fee Ease dashboard or by the FeeEase team to activate your product.
           </CardDescription>

@@ -2,7 +2,7 @@
 
 import dbConnect from "@/lib/db"
 import Attendance from "@/models/Attendance"
-import { startOfDay, endOfDay } from "date-fns"
+import { getSchoolDateBoundaries } from "@/lib/tz-utils"
 import logger from "@/lib/logger"
 
 interface AttendanceReportFilter {
@@ -57,14 +57,17 @@ export async function getAttendanceReport(filter: AttendanceReportFilter): Promi
     const query: Record<string, unknown> = {};
     
     if (filter.startDate && filter.endDate) {
+      const { startUtc } = await getSchoolDateBoundaries(filter.startDate);
+      const { endUtc } = await getSchoolDateBoundaries(filter.endDate);
       query.date = {
-        $gte: startOfDay(filter.startDate),
-        $lte: endOfDay(filter.endDate)
+        $gte: startUtc,
+        $lte: endUtc
       };
     } else if (filter.startDate) {
+        const { startUtc, endUtc } = await getSchoolDateBoundaries(filter.startDate);
         query.date = {
-            $gte: startOfDay(filter.startDate),
-            $lte: endOfDay(filter.startDate)
+            $gte: startUtc,
+            $lte: endUtc
         };
     }
     

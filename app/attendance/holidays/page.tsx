@@ -26,7 +26,7 @@ export default async function HolidaysPage() {
       
       <Card>
         <CardHeader>
-          <CardTitle>Manage School Holidays</CardTitle>
+          <CardTitle>Manage Institute Holidays</CardTitle>
         </CardHeader>
         <CardContent>
           <HolidayManager holidays={holidays} classes={classes} />

@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!license.schoolId) {
-         return NextResponse.json({ success: false, error: "Local license record missing School ID" });
+         return NextResponse.json({ success: false, error: "Local license record missing Institute ID" });
     }
 
     const response = await fetch(`${FEEEASE_URL}/api/license/latest/${license.schoolId}`, {

@@ -3,7 +3,7 @@
 import dbConnect from "@/lib/db"
 import FeeTransaction from "@/models/FeeTransaction"
 import Student from "@/models/Student"
-import { startOfDay, endOfDay } from "date-fns"
+import { getSchoolDateBoundaries } from "@/lib/tz-utils"
 
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth"
@@ -28,9 +28,11 @@ export async function getFeeTransactions(filter: TransactionFilter, page: number
   const query: Record<string, unknown> = {}
 
   if (filter.startDate && filter.endDate) {
+    const { startUtc, endUtc } = await getSchoolDateBoundaries(filter.startDate)
+    const { endUtc: finalEndUtc } = await getSchoolDateBoundaries(filter.endDate)
     query.transactionDate = {
-      $gte: startOfDay(filter.startDate),
-      $lte: endOfDay(filter.endDate)
+      $gte: startUtc,
+      $lte: finalEndUtc
     }
   }
 
@@ -177,9 +179,11 @@ export async function getTransactionStats(filter: TransactionFilter) {
   const query: Record<string, unknown> = {}
 
   if (filter.startDate && filter.endDate) {
+    const { startUtc, endUtc } = await getSchoolDateBoundaries(filter.startDate)
+    const { endUtc: finalEndUtc } = await getSchoolDateBoundaries(filter.endDate)
     query.transactionDate = {
-      $gte: startOfDay(filter.startDate),
-      $lte: endOfDay(filter.endDate)
+      $gte: startUtc,
+      $lte: finalEndUtc
     }
   }
 

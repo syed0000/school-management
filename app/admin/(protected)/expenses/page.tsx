@@ -7,7 +7,7 @@ import { getTeachers } from "@/actions/teacher"
 import { ExpenseContent } from "@/components/admin/expenses/expense-content"
 
 export const metadata: Metadata = {
-  title: "Expenses | School Management",
+  title: "Expenses | Institute Management",
   description: "Manage expenses and salaries",
 }
 

@@ -566,7 +566,7 @@ export function AdmissionForm({ classes }: AdmissionFormProps) {
 
                             {/* Section 5: Previous Institution (Optional) */}
                             <div className="space-y-4">
-                                <h3 className="text-lg font-medium">Previous School Details (Optional)</h3>
+                                <h3 className="text-lg font-medium">Previous Institute Details (Optional)</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField
                                         control={form.control}
@@ -575,7 +575,7 @@ export function AdmissionForm({ classes }: AdmissionFormProps) {
                                             <FormItem>
                                                 <FormLabel>Last Institution Name</FormLabel>
                                                 <FormControl>
-                                                    <Input placeholder="Previous School Name" {...field} />
+                                                    <Input placeholder="Previous Institute Name" {...field} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>

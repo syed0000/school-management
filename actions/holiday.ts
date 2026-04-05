@@ -3,6 +3,7 @@
 import dbConnect from "@/lib/db"
 import Holiday from "@/models/Holiday"
 import { revalidatePath } from "next/cache"
+import { getSchoolDateBoundaries } from "@/lib/tz-utils"
 import { z } from "zod"
 
 const holidaySchema = z.object({
@@ -24,11 +25,8 @@ export async function addHoliday(data: z.infer<typeof holidaySchema>) {
     const validatedData = holidaySchema.parse(data);
     await dbConnect();
     
-    const startDate = new Date(validatedData.startDate);
-    startDate.setHours(0, 0, 0, 0);
-    
-    const endDate = new Date(validatedData.endDate);
-    endDate.setHours(23, 59, 59, 999);
+    const { startUtc: startDate } = await getSchoolDateBoundaries(new Date(validatedData.startDate));
+    const { endUtc: endDate } = await getSchoolDateBoundaries(new Date(validatedData.endDate));
 
     // Check for overlap
     // Overlap exists if (StartA <= EndB) and (EndA >= StartB)
@@ -120,13 +118,12 @@ export async function checkIsHoliday(dateStr: string, classId?: string) {
       return { isHoliday: true, reason: "Sunday" };
   }
 
-  const startOfDay = (d: Date) => { const n = new Date(d); n.setHours(0,0,0,0); return n; };
-  const endOfDay = (d: Date) => { const n = new Date(d); n.setHours(23,59,59,999); return n; };
+  const { startUtc, endUtc } = await getSchoolDateBoundaries(new Date(dateStr));
 
   const query: any = {
     $or: [
-      { startDate: { $lte: endOfDay(new Date(dateStr)) }, endDate: { $gte: startOfDay(new Date(dateStr)) } },
-      { date: { $gte: startOfDay(new Date(dateStr)), $lte: endOfDay(new Date(dateStr)) } }
+      { startDate: { $lte: endUtc }, endDate: { $gte: startUtc } },
+      { date: { $gte: startUtc, $lte: endUtc } }
     ]
   };
 

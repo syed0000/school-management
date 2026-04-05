@@ -12,7 +12,8 @@ import ClassFee from '@/models/ClassFee';
 import Setting from '@/models/Setting';
 import { Types } from 'mongoose';
 import { cookies } from 'next/headers';
-import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, eachMonthOfInterval, isAfter, isBefore } from 'date-fns';
+import { format, eachMonthOfInterval, isAfter, isBefore, startOfMonth, endOfMonth } from 'date-fns';
+import { getSchoolDateBoundaries } from '@/lib/tz-utils';
 import logger from '@/lib/logger';
 import { saveFile } from '@/lib/upload';
 import type {
@@ -385,18 +386,21 @@ export async function getStudentAttendanceCalendar(
       const from = startOfMonth(new Date(y, m - 1, 1));
       const to = endOfMonth(from);
 
+      const { startUtc, endUtc } = await getSchoolDateBoundaries(from); // if 'to' is same as 'from', this is buggy. 'to' should be endUtc of 'to'.
+      const { endUtc: finalEndUtc } = await getSchoolDateBoundaries(to);
+
       const records = await Attendance.find({
         classId: student.classId,
         section: student.section,
-        date: { $gte: startOfDay(from), $lte: endOfDay(to) },
+        date: { $gte: startUtc, $lte: finalEndUtc },
       }).lean() as unknown as AttendanceDoc[];
 
       // Also get all holidays in this range
       const holidaysDoc = await import('@/models/Holiday').then(m => m.default);
       const globalHolidays = await holidaysDoc.find({
         $or: [
-          { startDate: { $lte: endOfDay(to) }, endDate: { $gte: startOfDay(from) } },
-          { date: { $gte: startOfDay(from), $lte: endOfDay(to) } } // old schema support
+          { startDate: { $lte: finalEndUtc }, endDate: { $gte: startUtc } },
+          { date: { $gte: startUtc, $lte: finalEndUtc } } // old schema support
         ]
       }).lean();
 
@@ -423,9 +427,10 @@ export async function getStudentAttendanceCalendar(
         const isGlobalHoliday = globalHolidays.find((h: any) => {
            const hStart = h.startDate || h.date;
            const hEnd = h.endDate || h.date;
-           const hStartDay = startOfDay(new Date(hStart));
-           const hEndDay = endOfDay(new Date(hEnd));
-           return day >= hStartDay && day <= hEndDay;
+           const hStartDay = new Date(hStart).getTime();
+           const hEndDay = new Date(hEnd).getTime();
+           const checkTime = day.getTime();
+           return checkTime >= hStartDay && checkTime <= hEndDay;
         });
 
         if (isGlobalHoliday) {

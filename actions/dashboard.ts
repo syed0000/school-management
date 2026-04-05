@@ -14,6 +14,7 @@ import { Types } from "mongoose"
 import logger from "@/lib/logger"
 import { unstable_cache } from "next/cache"
 import { getCurrentSessionRange } from "@/lib/utils"
+import { getSchoolDateBoundaries } from "@/lib/tz-utils"
 
 interface DashboardFilter {
     startDate?: Date;
@@ -355,9 +356,13 @@ export const getDashboardStats = unstable_cache(
         const query: FeeQuery = {};
 
         if (filter.startDate && filter.endDate) {
+            // Adjust to timezone boundaries for UTC servers
+            const { startUtc, endUtc } = await getSchoolDateBoundaries(filter.startDate);
+            const { endUtc: finalEndUtc } = await getSchoolDateBoundaries(filter.endDate);
+            
             query.transactionDate = {
-                $gte: startOfDay(filter.startDate),
-                $lte: endOfDay(filter.endDate)
+                $gte: startUtc,
+                $lte: finalEndUtc
             };
         }
 
@@ -510,9 +515,12 @@ export const getDashboardStats = unstable_cache(
         // Calculate Expenses
         const expenseQuery: Record<string, unknown> = { status: 'active' };
         if (filter.startDate && filter.endDate) {
+            const { startUtc, endUtc } = await getSchoolDateBoundaries(filter.startDate);
+            const { endUtc: finalEndUtc } = await getSchoolDateBoundaries(filter.endDate);
+            
             expenseQuery.expenseDate = {
-                $gte: startOfDay(filter.startDate),
-                $lte: endOfDay(filter.endDate)
+                $gte: startUtc,
+                $lte: finalEndUtc
             };
         }
 
@@ -729,10 +737,9 @@ export const getAttendanceStats = unstable_cache(async () => {
 export const getStaffDashboardStats = unstable_cache(async (userId: string) => {
     await dbConnect();
 
-    const todayStart = startOfDay(new Date());
-    const todayEnd = endOfDay(new Date());
-    const monthStart = startOfMonth(new Date());
-    const monthEnd = endOfMonth(new Date());
+    const { startUtc: todayStart, endUtc: todayEnd } = await getSchoolDateBoundaries(new Date());
+    const { startUtc: monthStart } = await getSchoolDateBoundaries(startOfMonth(new Date()));
+    const { endUtc: monthEnd } = await getSchoolDateBoundaries(endOfMonth(new Date()));
 
     // 1. My Collection Today
     const collectionTodayResult = await FeeTransaction.aggregate([
@@ -824,8 +831,7 @@ export const getStaffDashboardStats = unstable_cache(async (userId: string) => {
     ]);
     const myCollectionLastMonth = collectionLastMonthResult[0]?.total || 0;
 
-    const yesterdayStart = startOfDay(subDays(new Date(), 1));
-    const yesterdayEnd = endOfDay(subDays(new Date(), 1));
+    const { startUtc: yesterdayStart, endUtc: yesterdayEnd } = await getSchoolDateBoundaries(subDays(new Date(), 1));
     const collectionYesterdayResult = await FeeTransaction.aggregate([
         { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: yesterdayStart, $lte: yesterdayEnd }, status: 'verified' } },
         { $group: { _id: null, total: { $sum: "$amount" } } }

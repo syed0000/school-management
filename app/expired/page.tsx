@@ -42,7 +42,7 @@ export default function ExpiredPage() {
           </div>
           <CardTitle className="text-2xl font-bold">License Expired</CardTitle>
           <CardDescription>
-            Your school&apos;s license has expired. Please contact FeeEase support to renew your subscription.
+            your institute&apos;s license has expired. Please contact FeeEase support to renew your subscription.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -4,7 +4,8 @@ import { redirect } from "next/navigation"
 import { WhatsAppToggle } from "@/components/admin/school-profile/whatsapp-toggle"
 import { CounterEditor } from "@/components/admin/school-profile/counter-editor"
 import { ClassGroupManager } from "@/components/admin/school-profile/class-group-manager"
-import { getWhatsAppReceiptSetting, getCounters, getFeePolicySettings, getClassGroups } from "@/actions/school-settings"
+import { TimezoneEditor } from "@/components/admin/school-profile/timezone-picker"
+import { getWhatsAppReceiptSetting, getCounters, getFeePolicySettings, getClassGroups, getTimezoneSetting } from "@/actions/school-settings"
 import { getClasses } from "@/actions/class"
 import { FeePolicyEditor } from "@/components/admin/school-profile/fee-policy-editor"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,12 +21,13 @@ export default async function SchoolProfilePage() {
     redirect("/admin/dashboard")
   }
 
-  const [initialWhatsAppSetting, counters, feePolicy, classGroups, allClasses] = await Promise.all([
+  const [initialWhatsAppSetting, counters, feePolicy, classGroups, allClasses, initialTimezone] = await Promise.all([
     getWhatsAppReceiptSetting(),
     getCounters(),
     getFeePolicySettings(),
     getClassGroups(),
     getClasses(),
+    getTimezoneSetting(),
   ])
 
   const externalSchoolProfileUrl = `${process.env.NEXT_PUBLIC_FEEEASE_URL || 'https://feeease.com'}/school/profile`
@@ -34,7 +36,7 @@ export default async function SchoolProfilePage() {
   return (
     <div className="flex-1 space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">School Profile Settings</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Institute Profile Settings</h2>
       </div>
 
       {isWhatsAppGloballyDisabled && (
@@ -95,27 +97,31 @@ export default async function SchoolProfilePage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Settings className="h-5 w-5 text-primary" />
-              <CardTitle>Global School Settings</CardTitle>
+              <CardTitle>Global Institute Settings</CardTitle>
             </div>
             <CardDescription>
-              Manage your school's global identity and core billing settings.
+              Manage your institute's global identity, timezone, and core settings.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Click the button below to manage your global school profile on FeeEase, including branding, payment methods, and account details.
-              </p>
-              <Button asChild variant="outline" className="w-full">
-                <a
-                  href={externalSchoolProfileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2"
-                >
-                  Manage Global Profile <ExternalLink className="h-4 w-4" />
-                </a>
-              </Button>
+            <div className="space-y-6">
+              <TimezoneEditor initialTimezone={initialTimezone} />
+              
+              <div className="space-y-4 pt-4 border-t">
+                <p className="text-sm text-muted-foreground">
+                  Click the button below to manage your global school profile on FeeEase, including branding, payment methods, and account details.
+                </p>
+                <Button asChild variant="outline" className="w-full">
+                  <a
+                    href={externalSchoolProfileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2"
+                  >
+                    Manage Global Profile <ExternalLink className="h-4 w-4" />
+                  </a>
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

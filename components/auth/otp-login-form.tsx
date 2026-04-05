@@ -118,7 +118,7 @@ export function OtpLoginForm() {
         
         {!enableParentLogin && !enableTeacherLogin && (
           <div className="text-center py-6 text-destructive font-medium">
-             WhatsApp OTP login is currently disabled for this school.
+             WhatsApp OTP login is currently disabled for this institute.
           </div>
         )}
 

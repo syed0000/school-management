@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { getSchoolDateBoundaries } from "@/lib/tz-utils"
 import { Types } from "mongoose"
 
 // Zod schema for validation
@@ -350,8 +351,14 @@ export async function getExpenses({
 
   if (startDate || endDate) {
     query.expenseDate = {};
-    if (startDate) query.expenseDate.$gte = new Date(startDate);
-    if (endDate) query.expenseDate.$lte = new Date(endDate);
+    if (startDate) {
+        const { startUtc } = await getSchoolDateBoundaries(new Date(startDate));
+        query.expenseDate.$gte = startUtc;
+    }
+    if (endDate) {
+        const { endUtc } = await getSchoolDateBoundaries(new Date(endDate));
+        query.expenseDate.$lte = endUtc;
+    }
   }
 
   if (category && category !== 'all') {
@@ -412,8 +419,14 @@ export async function getAllExpensesForExport({
 
   if (startDate || endDate) {
     query.expenseDate = {};
-    if (startDate) query.expenseDate.$gte = new Date(startDate);
-    if (endDate) query.expenseDate.$lte = new Date(endDate);
+    if (startDate) {
+        const { startUtc } = await getSchoolDateBoundaries(new Date(startDate));
+        query.expenseDate.$gte = startUtc;
+    }
+    if (endDate) {
+        const { endUtc } = await getSchoolDateBoundaries(new Date(endDate));
+        query.expenseDate.$lte = endUtc;
+    }
   }
 
   if (category && category !== 'all') {
@@ -444,8 +457,14 @@ export async function getExpenseStats(startDate?: string, endDate?: string) {
     
     if (startDate || endDate) {
         query.expenseDate = {};
-        if (startDate) query.expenseDate.$gte = new Date(startDate);
-        if (endDate) query.expenseDate.$lte = new Date(endDate);
+        if (startDate) {
+            const { startUtc } = await getSchoolDateBoundaries(new Date(startDate));
+            query.expenseDate.$gte = startUtc;
+        }
+        if (endDate) {
+            const { endUtc } = await getSchoolDateBoundaries(new Date(endDate));
+            query.expenseDate.$lte = endUtc;
+        }
     }
 
     const result = await Expense.aggregate([

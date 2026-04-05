@@ -5,7 +5,7 @@ import Attendance from "@/models/Attendance"
 import Student from "@/models/Student"
 import Class from "@/models/Class"
 import { revalidatePath } from "next/cache"
-import { startOfDay, endOfDay } from "date-fns"
+import { getSchoolDateBoundaries } from "@/lib/tz-utils"
 import { Types } from "mongoose"
 import logger from "@/lib/logger"
 import { checkIsHoliday } from "@/actions/holiday"
@@ -68,8 +68,7 @@ export async function getStudentsForAttendance(classId: string, section: string,
     }
 
     const searchDate = new Date(date)
-    const start = startOfDay(searchDate)
-    const end = endOfDay(searchDate)
+    const { startUtc: start, endUtc: end } = await getSchoolDateBoundaries(searchDate)
 
     // Parallel fetch: Students and Existing Attendance
     const [students, existingAttendance, holidayCheck] = await Promise.all([
@@ -152,8 +151,7 @@ export async function saveAttendance({
     await dbConnect()
 
     const attendanceDate = new Date(date)
-    const start = startOfDay(attendanceDate)
-    const end = endOfDay(attendanceDate)
+    const { startUtc: start, endUtc: end } = await getSchoolDateBoundaries(attendanceDate)
 
     const updateData = {
       date: attendanceDate,

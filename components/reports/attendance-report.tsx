@@ -286,7 +286,7 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">{reportData.summary.totalWorkingDays}</div>
-                <p className="text-xs text-muted-foreground">Actual School Days</p>
+                <p className="text-xs text-muted-foreground">Actual Institute Days</p>
               </CardContent>
             </Card>
             <Card>

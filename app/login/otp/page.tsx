@@ -3,7 +3,7 @@ import { schoolConfig } from "@/lib/config"
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "OTP Login | School Management",
+  title: "OTP Login | Institute Management",
   description: "Login using WhatsApp OTP",
 }
 

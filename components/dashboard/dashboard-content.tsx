@@ -125,7 +125,7 @@ export function DashboardContent({
     <div className="flex-1 p-4 md:p-8 bg-background">
       {/* Header Controls */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 mb-6">
-        <h2 className="text-2xl font-bold tracking-tight">Dashboard Overview</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Overview</h2>
 
         <div className="flex flex-wrap items-center gap-2">
           <DashboardFilter

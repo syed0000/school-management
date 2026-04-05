@@ -3,7 +3,7 @@ import ReportsView from '@/components/reports/reports-view';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Reports & Analytics | School Management',
+  title: 'Reports & Analytics | Institute Management',
   description: 'Comprehensive reports for attendance and fees.',
 };
 

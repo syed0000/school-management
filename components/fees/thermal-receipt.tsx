@@ -80,17 +80,17 @@ export function ThermalReceipt({ receiptData }: ReceiptProps) {
 
     return (
         <div className="thermal-receipt bg-white text-black p-6 max-w-[80mm] mx-auto font-mono text-sm">
-            {/* School Logo/Emblem */}
+            {/* Institute Logo/Emblem */}
             <div className="flex justify-center mb-4 relative h-[120px]">
                 {/* // eslint-disable-next-line @next/next/no-img-element, @next/next/no-img-element */}
                 <img
                     src="/dark-logo.jpeg"
-                    alt="School Logo"
+                    alt="Institute Logo"
                     className="object-contain"
                 />
             </div>
 
-            {/* School Name */}
+            {/* Institute Name */}
             <div className="text-center mb-4">
                 <h1 className="text-lg font-bold leading-tight">{schoolConfig.name}</h1>
                 <p className="text-[10px] mt-1">Fee Receipt</p>

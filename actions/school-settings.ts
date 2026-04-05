@@ -34,6 +34,32 @@ export async function updateWhatsAppReceiptSetting(enabled: boolean) {
     return { success: true }
 }
 
+// ── Timezone Setting ────────────────────────────────────────────────────────
+
+export async function getTimezoneSetting() {
+    await dbConnect()
+    const setting = await Setting.findOne({ key: "school_timezone" }).lean()
+    return setting ? setting.value as string : "Asia/Kolkata"
+}
+
+export async function updateTimezoneSetting(timezone: string) {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== "admin") {
+        return { success: false, error: "Unauthorized" }
+    }
+
+    if (!timezone) return { success: false, error: "Timezone required" }
+
+    await dbConnect()
+    await Setting.findOneAndUpdate(
+        { key: "school_timezone" },
+        { value: timezone },
+        { upsert: true, new: true }
+    )
+    revalidatePath("/", "layout")
+    return { success: true }
+}
+
 // ── Fee Policy Settings ────────────────────────────────────────────────────────
 
 export async function getFeePolicySettings() {
