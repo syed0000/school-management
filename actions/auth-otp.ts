@@ -11,6 +11,8 @@ import { whatsappConfig } from "@/lib/whatsapp-config";
 import crypto from "crypto";
 import { addMinutes } from "date-fns";
 
+const OTP_RATE_LIMIT_SECONDS = 5 * 60; // 5 minutes between OTPs
+
 export async function requestOtp(phone: string, role: 'teacher' | 'parent') {
   try {
     await dbConnect();
@@ -18,6 +20,20 @@ export async function requestOtp(phone: string, role: 'teacher' | 'parent') {
     // 1. Validate phone number format (simple check)
     if (!/^\d{10,12}$/.test(phone)) {
         return { success: false, error: "Invalid phone number format" };
+    }
+
+    // 2. Rate limit check — only 1 OTP per 5 minutes
+    const existingOtp = await Otp.findOne({ phone, role }).sort({ sentAt: -1 }).lean() as { sentAt?: Date } | null;
+    if (existingOtp?.sentAt) {
+      const secondsSinceLast = (Date.now() - new Date(existingOtp.sentAt).getTime()) / 1000;
+      const retryAfterSeconds = Math.ceil(OTP_RATE_LIMIT_SECONDS - secondsSinceLast);
+      if (retryAfterSeconds > 0) {
+        return {
+          success: false,
+          error: `Please wait before requesting a new OTP.`,
+          retryAfterSeconds,
+        };
+      }
     }
 
     let userEntity = null;
@@ -37,11 +53,12 @@ export async function requestOtp(phone: string, role: 'teacher' | 'parent') {
         refId = userEntity._id;
     }
 
-    // 2. Generate 6-digit OTP
+    // 3. Generate 6-digit OTP
     const otpCode = crypto.randomInt(100000, 999999).toString();
     const expiresAt = addMinutes(new Date(), 5);
+    const sentAt = new Date();
 
-    // 3. Save to DB (upsert/new)
+    // 4. Save to DB (upsert/new)
     await Otp.findOneAndUpdate(
         { phone, role },
         { 
@@ -49,17 +66,18 @@ export async function requestOtp(phone: string, role: 'teacher' | 'parent') {
             refId, 
             expiresAt, 
             isUsed: false,
-            createdAt: new Date()
+            sentAt,
+            createdAt: sentAt
         },
         { upsert: true }
     );
 
-    // 4. Send via Worker
+    // 5. Send via Worker
     if (whatsappConfig.enabled) {
         const license = await License.findOne().sort({ createdAt: -1 }).lean();
         if (!license) return { success: false, error: "System configuration error (No license found)" };
 
-        // 5. Build Stat Payload
+        // Build Stat Payload
         const cost = await WhatsAppPricing.getCurrentPrice();
         const stat = new WhatsAppStat({
             type: 'otp',

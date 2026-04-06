@@ -7,6 +7,7 @@ const OtpSchema = new mongoose.Schema({
   refId: { type: mongoose.Schema.Types.ObjectId, required: true }, // StudentId for parent, TeacherId for teacher
   expiresAt: { type: Date, required: true },
   isUsed: { type: Boolean, default: false },
+  sentAt: { type: Date, default: Date.now }, // Track when OTP was sent (for rate limiting)
   createdAt: { type: Date, default: Date.now },
 });
 
