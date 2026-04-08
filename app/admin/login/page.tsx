@@ -1,4 +1,5 @@
 import { LoginForm } from "@/components/auth/login-form"
+import { AuthBranding } from "@/components/auth/auth-branding"
 import { Suspense } from "react"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
@@ -20,9 +21,12 @@ export default async function AdminLoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/50 p-4">
-      <Suspense fallback={<div>Loading...</div>}>
-        <LoginForm type="admin" allowDemo={demoConfig.adminInstitute} />
-      </Suspense>
+      <div className="w-full max-w-md space-y-6">
+        <AuthBranding subtitle="Admin Portal" />
+        <Suspense fallback={<div>Loading...</div>}>
+          <LoginForm type="admin" allowDemo={demoConfig.adminInstitute} />
+        </Suspense>
+      </div>
     </div>
   )
 }
