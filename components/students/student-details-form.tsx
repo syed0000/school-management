@@ -3,7 +3,7 @@
 import { useForm, useFieldArray, Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,47 +19,344 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, Plus, Trash, Save, Printer } from "lucide-react"
 import { updateStudent } from "@/actions/student"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { FileUploader } from "@/components/ui/file-uploader"
 import { AdmissionPrintDocument, type AdmissionPrintDocumentData } from "@/components/students/admission-print-document"
+import { defaultLocale, hasLocale } from "@/lib/i18n"
 
-const formSchema = z.object({
-  registrationNumber: z.string().min(1, "Registration Number is required"),
-  name: z.string().min(1, "Name is required"),
-  classId: z.string().min(1, "Class is required"),
-  section: z.enum(["A", "B", "C", "D"]).default("A"),
-  rollNumber: z.string().optional(),
-  dateOfBirth: z.string().min(1, "Date of Birth is required"),
-  dateOfAdmission: z.string().optional(),
-  gender: z.enum(["Male", "Female", "Other"]).optional(),
-  aadhaar: z.string().regex(/^\d{12}$/, "Aadhaar number must be 12 digits").optional().or(z.literal("")),
-  
-  // Parents
-  parents: z.object({
-    father: z.object({
-      name: z.string().optional(),
-      aadhaarNumber: z.string().regex(/^\d{12}$/, "Aadhaar number must be 12 digits").optional().or(z.literal("")),
+type Copy = {
+  toast: {
+    updated: string
+    updateFailedPrefix: string
+    somethingWentWrong: string
+  }
+  validation: {
+    registrationRequired: string
+    nameRequired: string
+    classRequired: string
+    dobRequired: string
+    aadhaarDigits: string
+    addressRequired: string
+    invalidEmail: string
+    mobileValidRequired: string
+    mobileAtLeastOne: string
+    docTypeRequired: string
+    docImageRequired: string
+  }
+  title: string
+  sections: {
+    basic: string
+    classDetails: string
+    parents: string
+    contact: string
+    previous: string
+    uploads: string
+  }
+  fields: Record<string, string>
+  actions: {
+    printAdmission: string
+    save: string
+  }
+}
+
+const copy: Record<"en" | "hi" | "ur", Copy> = {
+  en: {
+    toast: {
+      updated: "Student details updated successfully",
+      updateFailedPrefix: "Failed to update student:",
+      somethingWentWrong: "Something went wrong",
+    },
+    validation: {
+      registrationRequired: "Registration Number is required",
+      nameRequired: "Name is required",
+      classRequired: "Class is required",
+      dobRequired: "Date of Birth is required",
+      aadhaarDigits: "Aadhaar number must be 12 digits",
+      addressRequired: "Address is required",
+      invalidEmail: "Invalid email",
+      mobileValidRequired: "Valid mobile number is required",
+      mobileAtLeastOne: "At least one mobile number is required",
+      docTypeRequired: "Document Type is required",
+      docImageRequired: "Document Image is required",
+    },
+    title: "Edit Student Details",
+    sections: {
+      basic: "Basic Information",
+      classDetails: "Class Details",
+      parents: "Parent Information",
+      contact: "Contact Information",
+      previous: "Previous Institute Details (Optional)",
+      uploads: "Documents & Photo",
+    },
+    fields: {
+      registrationNo: "Registration No",
+      admissionDate: "Date of Admission",
+      penOptional: "PEN (Optional)",
+      penPlaceholder: "Permanent Education Number",
+      studentName: "Student Name",
+      namePlaceholder: "John Doe",
+      gender: "Gender",
+      selectGender: "Select Gender",
+      male: "Male",
+      female: "Female",
+      other: "Other",
+      dob: "Date of Birth",
+      studentAadhaarOptional: "Student Aadhaar (Optional)",
+      aadhaarPlaceholder: "12-digit Aadhaar",
+      class: "Class",
+      selectClass: "Select Class",
+      section: "Section",
+      selectSection: "Select Section",
+      rollNumber: "Roll Number",
+      rollPlaceholder: "e.g. 01",
+      fatherDetails: "Father's Details",
+      fatherName: "Father's Name",
+      fatherNamePlaceholder: "Father Name",
+      fatherAadhaar: "Father's Aadhaar",
+      motherDetails: "Mother's Details",
+      motherName: "Mother's Name",
+      motherNamePlaceholder: "Mother Name",
+      motherAadhaar: "Mother's Aadhaar",
+      address: "Address",
+      addressPlaceholder: "123 Main St",
+      mobileNumbers: "Mobile Numbers",
+      mobilePlaceholder: "1234567890",
+      addMobile: "Add Mobile",
+      emailsOptional: "Emails (Optional)",
+      emailPlaceholder: "email@example.com",
+      addEmail: "Add Email",
+      previousInstituteName: "Last Institution Name",
+      previousInstitutePlaceholder: "Previous Institute Name",
+      tcNumber: "TC Number",
+      tcPlaceholder: "Transfer Certificate No.",
+      studentPhoto: "Student Photo",
+      uploadPhoto: "Upload Photo",
+      documents: "Documents",
+      addDocument: "Add Document",
+      documentType: "Document Type",
+      documentTypePlaceholder: "e.g. Birth Cert",
+      documentNumberOptional: "Document Number (Optional)",
+      documentNumberPlaceholder: "Doc No.",
+      documentImage: "Document Image",
+    },
+    actions: {
+      printAdmission: "Print Admission Form",
+      save: "Save Changes",
+    },
+  },
+  hi: {
+    toast: {
+      updated: "छात्र विवरण सफलतापूर्वक अपडेट हुआ",
+      updateFailedPrefix: "छात्र अपडेट करने में असफल:",
+      somethingWentWrong: "कुछ गलत हो गया",
+    },
+    validation: {
+      registrationRequired: "रजिस्ट्रेशन नंबर आवश्यक है",
+      nameRequired: "नाम आवश्यक है",
+      classRequired: "कक्षा आवश्यक है",
+      dobRequired: "जन्म तिथि आवश्यक है",
+      aadhaarDigits: "आधार नंबर 12 अंकों का होना चाहिए",
+      addressRequired: "पता आवश्यक है",
+      invalidEmail: "अमान्य ईमेल",
+      mobileValidRequired: "मान्य मोबाइल नंबर आवश्यक है",
+      mobileAtLeastOne: "कम से कम एक मोबाइल नंबर आवश्यक है",
+      docTypeRequired: "दस्तावेज़ प्रकार आवश्यक है",
+      docImageRequired: "दस्तावेज़ इमेज आवश्यक है",
+    },
+    title: "छात्र विवरण संपादित करें",
+    sections: {
+      basic: "मूल जानकारी",
+      classDetails: "कक्षा विवरण",
+      parents: "अभिभावक जानकारी",
+      contact: "संपर्क जानकारी",
+      previous: "पिछले संस्थान का विवरण (वैकल्पिक)",
+      uploads: "दस्तावेज़ और फोटो",
+    },
+    fields: {
+      registrationNo: "रजिस्ट्रेशन नंबर",
+      admissionDate: "प्रवेश तिथि",
+      penOptional: "PEN (वैकल्पिक)",
+      penPlaceholder: "स्थायी शिक्षा नंबर",
+      studentName: "छात्र का नाम",
+      namePlaceholder: "जैसे: John Doe",
+      gender: "लिंग",
+      selectGender: "लिंग चुनें",
+      male: "पुरुष",
+      female: "महिला",
+      other: "अन्य",
+      dob: "जन्म तिथि",
+      studentAadhaarOptional: "छात्र आधार (वैकल्पिक)",
+      aadhaarPlaceholder: "12-अंकों का आधार",
+      class: "कक्षा",
+      selectClass: "कक्षा चुनें",
+      section: "सेक्शन",
+      selectSection: "सेक्शन चुनें",
+      rollNumber: "रोल नंबर",
+      rollPlaceholder: "जैसे: 01",
+      fatherDetails: "पिता का विवरण",
+      fatherName: "पिता का नाम",
+      fatherNamePlaceholder: "पिता का नाम",
+      fatherAadhaar: "पिता का आधार",
+      motherDetails: "माता का विवरण",
+      motherName: "माता का नाम",
+      motherNamePlaceholder: "माता का नाम",
+      motherAadhaar: "माता का आधार",
+      address: "पता",
+      addressPlaceholder: "जैसे: 123 Main St",
+      mobileNumbers: "मोबाइल नंबर",
+      mobilePlaceholder: "1234567890",
+      addMobile: "मोबाइल जोड़ें",
+      emailsOptional: "ईमेल (वैकल्पिक)",
+      emailPlaceholder: "email@example.com",
+      addEmail: "ईमेल जोड़ें",
+      previousInstituteName: "पिछले संस्थान का नाम",
+      previousInstitutePlaceholder: "पिछले संस्थान का नाम",
+      tcNumber: "TC नंबर",
+      tcPlaceholder: "ट्रांसफर सर्टिफिकेट नंबर",
+      studentPhoto: "छात्र फोटो",
+      uploadPhoto: "फोटो अपलोड करें",
+      documents: "दस्तावेज़",
+      addDocument: "दस्तावेज़ जोड़ें",
+      documentType: "दस्तावेज़ प्रकार",
+      documentTypePlaceholder: "जैसे: जन्म प्रमाणपत्र",
+      documentNumberOptional: "दस्तावेज़ नंबर (वैकल्पिक)",
+      documentNumberPlaceholder: "Doc No.",
+      documentImage: "दस्तावेज़ इमेज",
+    },
+    actions: {
+      printAdmission: "प्रवेश फॉर्म प्रिंट करें",
+      save: "परिवर्तन सहेजें",
+    },
+  },
+  ur: {
+    toast: {
+      updated: "طالب علم کی تفصیلات کامیابی سے اپڈیٹ ہوگئیں",
+      updateFailedPrefix: "طالب علم اپڈیٹ کرنے میں ناکامی:",
+      somethingWentWrong: "کچھ غلط ہوگیا",
+    },
+    validation: {
+      registrationRequired: "رجسٹریشن نمبر ضروری ہے",
+      nameRequired: "نام ضروری ہے",
+      classRequired: "کلاس ضروری ہے",
+      dobRequired: "تاریخِ پیدائش ضروری ہے",
+      aadhaarDigits: "آدھار نمبر 12 ہندسوں کا ہونا چاہیے",
+      addressRequired: "پتہ ضروری ہے",
+      invalidEmail: "غلط ای میل",
+      mobileValidRequired: "درست موبائل نمبر ضروری ہے",
+      mobileAtLeastOne: "کم از کم ایک موبائل نمبر ضروری ہے",
+      docTypeRequired: "دستاویز کی قسم ضروری ہے",
+      docImageRequired: "دستاویز کی تصویر ضروری ہے",
+    },
+    title: "طالب علم کی تفصیلات میں ترمیم کریں",
+    sections: {
+      basic: "بنیادی معلومات",
+      classDetails: "کلاس کی تفصیلات",
+      parents: "والدین کی معلومات",
+      contact: "رابطہ معلومات",
+      previous: "پچھلے ادارے کی تفصیلات (اختیاری)",
+      uploads: "دستاویزات اور تصویر",
+    },
+    fields: {
+      registrationNo: "رجسٹریشن نمبر",
+      admissionDate: "داخلہ کی تاریخ",
+      penOptional: "PEN (اختیاری)",
+      penPlaceholder: "مستقل تعلیمی نمبر",
+      studentName: "طالب علم کا نام",
+      namePlaceholder: "مثلاً: John Doe",
+      gender: "جنس",
+      selectGender: "جنس منتخب کریں",
+      male: "مرد",
+      female: "عورت",
+      other: "دیگر",
+      dob: "تاریخِ پیدائش",
+      studentAadhaarOptional: "طالب علم آدھار (اختیاری)",
+      aadhaarPlaceholder: "12 ہندسوں کا آدھار",
+      class: "کلاس",
+      selectClass: "کلاس منتخب کریں",
+      section: "سیکشن",
+      selectSection: "سیکشن منتخب کریں",
+      rollNumber: "رول نمبر",
+      rollPlaceholder: "مثلاً: 01",
+      fatherDetails: "والد کی تفصیلات",
+      fatherName: "والد کا نام",
+      fatherNamePlaceholder: "والد کا نام",
+      fatherAadhaar: "والد کا آدھار",
+      motherDetails: "والدہ کی تفصیلات",
+      motherName: "والدہ کا نام",
+      motherNamePlaceholder: "والدہ کا نام",
+      motherAadhaar: "والدہ کا آدھار",
+      address: "پتہ",
+      addressPlaceholder: "مثلاً: 123 Main St",
+      mobileNumbers: "موبائل نمبرز",
+      mobilePlaceholder: "1234567890",
+      addMobile: "موبائل شامل کریں",
+      emailsOptional: "ای میلز (اختیاری)",
+      emailPlaceholder: "email@example.com",
+      addEmail: "ای میل شامل کریں",
+      previousInstituteName: "پچھلے ادارے کا نام",
+      previousInstitutePlaceholder: "پچھلے ادارے کا نام",
+      tcNumber: "TC نمبر",
+      tcPlaceholder: "ٹرانسفر سرٹیفکیٹ نمبر",
+      studentPhoto: "طالب علم کی تصویر",
+      uploadPhoto: "تصویر اپلوڈ کریں",
+      documents: "دستاویزات",
+      addDocument: "دستاویز شامل کریں",
+      documentType: "دستاویز کی قسم",
+      documentTypePlaceholder: "مثلاً: برتھ سرٹیفکیٹ",
+      documentNumberOptional: "دستاویز نمبر (اختیاری)",
+      documentNumberPlaceholder: "Doc No.",
+      documentImage: "دستاویز کی تصویر",
+    },
+    actions: {
+      printAdmission: "داخلہ فارم پرنٹ کریں",
+      save: "تبدیلیاں محفوظ کریں",
+    },
+  },
+}
+
+type CopyLocale = keyof typeof copy
+
+const createSchema = (c: Copy) =>
+  z.object({
+    registrationNumber: z.string().min(1, c.validation.registrationRequired),
+    name: z.string().min(1, c.validation.nameRequired),
+    classId: z.string().min(1, c.validation.classRequired),
+    section: z.enum(["A", "B", "C", "D"]).default("A"),
+    rollNumber: z.string().optional(),
+    dateOfBirth: z.string().min(1, c.validation.dobRequired),
+    dateOfAdmission: z.string().optional(),
+    gender: z.enum(["Male", "Female", "Other"]).optional(),
+    aadhaar: z.string().regex(/^\d{12}$/, c.validation.aadhaarDigits).optional().or(z.literal("")),
+    parents: z.object({
+      father: z.object({
+        name: z.string().optional(),
+        aadhaarNumber: z.string().regex(/^\d{12}$/, c.validation.aadhaarDigits).optional().or(z.literal("")),
+      }),
+      mother: z.object({
+        name: z.string().optional(),
+        aadhaarNumber: z.string().regex(/^\d{12}$/, c.validation.aadhaarDigits).optional().or(z.literal("")),
+      }),
     }),
-    mother: z.object({
-      name: z.string().optional(),
-      aadhaarNumber: z.string().regex(/^\d{12}$/, "Aadhaar number must be 12 digits").optional().or(z.literal("")),
-    })
-  }),
+    address: z.string().min(1, c.validation.addressRequired),
+    email: z.array(z.object({ value: z.string().email(c.validation.invalidEmail) })).optional(),
+    mobile: z
+      .array(z.object({ value: z.string().min(10, c.validation.mobileValidRequired) }))
+      .min(1, c.validation.mobileAtLeastOne),
+    pen: z.string().optional(),
+    lastInstitution: z.string().optional(),
+    tcNumber: z.string().optional(),
+    documents: z
+      .array(
+        z.object({
+          type: z.string().min(1, c.validation.docTypeRequired),
+          image: z.string().min(1, c.validation.docImageRequired),
+          documentNumber: z.string().optional(),
+        })
+      )
+      .optional(),
+  })
 
-  address: z.string().min(1, "Address is required"),
-  email: z.array(z.object({ value: z.string().email("Invalid email") })).optional(),
-  mobile: z.array(z.object({ value: z.string().min(10, "Valid mobile number is required") })).min(1, "At least one mobile number is required"),
-  
-  pen: z.string().optional(),
-  lastInstitution: z.string().optional(),
-  tcNumber: z.string().optional(),
-
-  documents: z.array(z.object({
-    type: z.string().min(1, "Document Type is required"),
-    image: z.string().min(1, "Document Image is required"),
-    documentNumber: z.string().optional(),
-  })).optional(),
-})
+type FormValues = z.infer<ReturnType<typeof createSchema>>
 
 interface StudentData {
   id: string;
@@ -98,14 +395,17 @@ interface StudentDetailsFormProps {
 }
 
 export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps) {
+  const params = useParams<{ lang?: string }>()
+  const lang = hasLocale(params.lang ?? "") ? (params.lang as CopyLocale) : defaultLocale
+  const c = copy[lang] ?? copy.en
+  const schema = useMemo(() => createSchema(c), [c])
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [photo, setPhoto] = useState<string | null>(student.photo || null)
   const [printData, setPrintData] = useState<AdmissionPrintDocumentData | null>(null)
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    
-    resolver: zodResolver(formSchema) as Resolver<z.infer<typeof formSchema>>,
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: {
       registrationNumber: student.registrationNumber || "",
       name: student.name || "",
@@ -158,7 +458,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
     name: "documents"
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: FormValues) {
     setIsLoading(true)
     try {
       const payload = {
@@ -172,13 +472,13 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
       const result = await updateStudent(student._id || student.id, payload)
       
       if (result.success) {
-        toast.success("Student details updated successfully")
+        toast.success(c.toast.updated)
         router.refresh()
       } else {
-        toast.error(`Failed to update student: ${result.error}`)
+        toast.error(`${c.toast.updateFailedPrefix} ${result.error}`)
       }
     } catch {
-      toast.error("Something went wrong")
+      toast.error(c.toast.somethingWentWrong)
     } finally {
       setIsLoading(false)
     }
@@ -231,7 +531,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Edit Student Details</CardTitle>
+        <CardTitle>{c.title}</CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -239,14 +539,14 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
             
             {/* Section 1: Basic Information */}
             <div className="space-y-4">
-               <h3 className="text-lg font-medium">Basic Information</h3>
+               <h3 className="text-lg font-medium">{c.sections.basic}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <FormField
                         control={form.control}
                         name="registrationNumber"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Registration No</FormLabel>
+                            <FormLabel>{c.fields.registrationNo}</FormLabel>
                             <FormControl>
                             <Input {...field} />
                             </FormControl>
@@ -260,7 +560,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                         name="dateOfAdmission"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Date of Admission</FormLabel>
+                            <FormLabel>{c.fields.admissionDate}</FormLabel>
                             <FormControl>
                             <Input type="date" {...field} />
                             </FormControl>
@@ -274,9 +574,9 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                         name="pen"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>PEN (Optional)</FormLabel>
+                            <FormLabel>{c.fields.penOptional}</FormLabel>
                             <FormControl>
-                            <Input placeholder="Permanent Education Number" {...field} />
+                            <Input placeholder={c.fields.penPlaceholder} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -288,9 +588,9 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                         name="name"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Student Name</FormLabel>
+                            <FormLabel>{c.fields.studentName}</FormLabel>
                             <FormControl>
-                            <Input placeholder="John Doe" {...field} />
+                            <Input placeholder={c.fields.namePlaceholder} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -302,17 +602,17 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                         name="gender"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Gender</FormLabel>
+                            <FormLabel>{c.fields.gender}</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                                 <SelectTrigger>
-                                <SelectValue placeholder="Select Gender" />
+                                <SelectValue placeholder={c.fields.selectGender} />
                                 </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                                <SelectItem value="Male">Male</SelectItem>
-                                <SelectItem value="Female">Female</SelectItem>
-                                <SelectItem value="Other">Other</SelectItem>
+                                <SelectItem value="Male">{c.fields.male}</SelectItem>
+                                <SelectItem value="Female">{c.fields.female}</SelectItem>
+                                <SelectItem value="Other">{c.fields.other}</SelectItem>
                             </SelectContent>
                             </Select>
                             <FormMessage />
@@ -325,7 +625,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                         name="dateOfBirth"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Date of Birth</FormLabel>
+                            <FormLabel>{c.fields.dob}</FormLabel>
                             <FormControl>
                             <Input type="date" {...field} />
                             </FormControl>
@@ -339,9 +639,9 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                         name="aadhaar"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Student Aadhaar (Optional)</FormLabel>
+                            <FormLabel>{c.fields.studentAadhaarOptional}</FormLabel>
                             <FormControl>
-                            <Input placeholder="12-digit Aadhaar" maxLength={12} {...field} />
+                            <Input placeholder={c.fields.aadhaarPlaceholder} maxLength={12} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -352,18 +652,18 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
 
             {/* Section 2: Class Details */}
             <div className="space-y-4">
-                <h3 className="text-lg font-medium">Class Details</h3>
+                <h3 className="text-lg font-medium">{c.sections.classDetails}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <FormField
                         control={form.control}
                         name="classId"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Class</FormLabel>
+                            <FormLabel>{c.fields.class}</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                                 <SelectTrigger>
-                                <SelectValue placeholder="Select Class" />
+                                <SelectValue placeholder={c.fields.selectClass} />
                                 </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -382,11 +682,11 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                         name="section"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Section</FormLabel>
+                            <FormLabel>{c.fields.section}</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                                 <SelectTrigger>
-                                <SelectValue placeholder="Select Section" />
+                                <SelectValue placeholder={c.fields.selectSection} />
                                 </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -406,9 +706,9 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                         name="rollNumber"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Roll Number</FormLabel>
+                            <FormLabel>{c.fields.rollNumber}</FormLabel>
                             <FormControl>
-                            <Input placeholder="e.g. 01" {...field} />
+                            <Input placeholder={c.fields.rollPlaceholder} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -419,18 +719,18 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
 
             {/* Section 3: Parent Information */}
             <div className="space-y-4">
-                <h3 className="text-lg font-medium">Parent Information</h3>
+                <h3 className="text-lg font-medium">{c.sections.parents}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border p-4 rounded-md">
                     <div className="space-y-4">
-                        <h4 className="font-medium text-sm text-muted-foreground">Father&apos;s Details</h4>
+                        <h4 className="font-medium text-sm text-muted-foreground">{c.fields.fatherDetails}</h4>
                         <FormField
                             control={form.control}
                             name="parents.father.name"
                             render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Father&apos;s Name</FormLabel>
+                                <FormLabel>{c.fields.fatherName}</FormLabel>
                                 <FormControl>
-                                <Input placeholder="Father Name" {...field} />
+                                <Input placeholder={c.fields.fatherNamePlaceholder} {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -441,9 +741,9 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                             name="parents.father.aadhaarNumber"
                             render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Father&apos;s Aadhaar</FormLabel>
+                                <FormLabel>{c.fields.fatherAadhaar}</FormLabel>
                                 <FormControl>
-                                <Input placeholder="12-digit Aadhaar" maxLength={12} {...field} />
+                                <Input placeholder={c.fields.aadhaarPlaceholder} maxLength={12} {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -452,15 +752,15 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                     </div>
 
                     <div className="space-y-4">
-                        <h4 className="font-medium text-sm text-muted-foreground">Mother&apos;s Details</h4>
+                        <h4 className="font-medium text-sm text-muted-foreground">{c.fields.motherDetails}</h4>
                         <FormField
                             control={form.control}
                             name="parents.mother.name"
                             render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Mother&apos;s Name</FormLabel>
+                                <FormLabel>{c.fields.motherName}</FormLabel>
                                 <FormControl>
-                                <Input placeholder="Mother Name" {...field} />
+                                <Input placeholder={c.fields.motherNamePlaceholder} {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -471,9 +771,9 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                             name="parents.mother.aadhaarNumber"
                             render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Mother&apos;s Aadhaar</FormLabel>
+                                <FormLabel>{c.fields.motherAadhaar}</FormLabel>
                                 <FormControl>
-                                <Input placeholder="12-digit Aadhaar" maxLength={12} {...field} />
+                                <Input placeholder={c.fields.aadhaarPlaceholder} maxLength={12} {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -485,15 +785,15 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
 
             {/* Section 4: Contact Information */}
             <div className="space-y-4">
-                <h3 className="text-lg font-medium">Contact Information</h3>
+                <h3 className="text-lg font-medium">{c.sections.contact}</h3>
                 <FormField
                     control={form.control}
                     name="address"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Address</FormLabel>
+                        <FormLabel>{c.fields.address}</FormLabel>
                         <FormControl>
-                        <Input placeholder="123 Main St" {...field} />
+                        <Input placeholder={c.fields.addressPlaceholder} {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -502,7 +802,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <FormLabel>Mobile Numbers</FormLabel>
+                        <FormLabel>{c.fields.mobileNumbers}</FormLabel>
                         {mobileFields.map((field, index) => (
                             <div key={field.id} className="flex items-center gap-2">
                                 <FormField
@@ -511,7 +811,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                                     render={({ field }) => (
                                         <FormItem className="flex-1">
                                             <FormControl>
-                                                <Input placeholder="1234567890" {...field} />
+                                                <Input placeholder={c.fields.mobilePlaceholder} {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -523,12 +823,12 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                             </div>
                         ))}
                         <Button type="button" variant="outline" size="sm" onClick={() => appendMobile({ value: "" })}>
-                            <Plus className="mr-2 h-4 w-4" /> Add Mobile
+                            <Plus className="mr-2 h-4 w-4" /> {c.fields.addMobile}
                         </Button>
                     </div>
 
                     <div className="space-y-2">
-                        <FormLabel>Emails (Optional)</FormLabel>
+                        <FormLabel>{c.fields.emailsOptional}</FormLabel>
                         {emailFields.map((field, index) => (
                             <div key={field.id} className="flex items-center gap-2">
                                 <FormField
@@ -537,7 +837,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                                     render={({ field }) => (
                                         <FormItem className="flex-1">
                                             <FormControl>
-                                                <Input placeholder="email@example.com" {...field} />
+                                                <Input placeholder={c.fields.emailPlaceholder} {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -549,7 +849,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                             </div>
                         ))}
                         <Button type="button" variant="outline" size="sm" onClick={() => appendEmail({ value: "" })}>
-                            <Plus className="mr-2 h-4 w-4" /> Add Email
+                            <Plus className="mr-2 h-4 w-4" /> {c.fields.addEmail}
                         </Button>
                     </div>
                 </div>
@@ -557,16 +857,16 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
 
             {/* Section 5: Previous Institution (Optional) */}
             <div className="space-y-4">
-                <h3 className="text-lg font-medium">Previous Institute Details (Optional)</h3>
+                <h3 className="text-lg font-medium">{c.sections.previous}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <FormField
                         control={form.control}
                         name="lastInstitution"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Last Institution Name</FormLabel>
+                            <FormLabel>{c.fields.previousInstituteName}</FormLabel>
                             <FormControl>
-                            <Input placeholder="Previous Institute Name" {...field} />
+                            <Input placeholder={c.fields.previousInstitutePlaceholder} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -577,9 +877,9 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                         name="tcNumber"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>TC Number</FormLabel>
+                            <FormLabel>{c.fields.tcNumber}</FormLabel>
                             <FormControl>
-                            <Input placeholder="Transfer Certificate No." {...field} />
+                            <Input placeholder={c.fields.tcPlaceholder} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -590,23 +890,23 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
 
             {/* Section 6: Uploads */}
             <div className="space-y-4">
-                <h3 className="text-lg font-medium">Documents & Photo</h3>
+                <h3 className="text-lg font-medium">{c.sections.uploads}</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-2">
-                        <FormLabel>Student Photo</FormLabel>
+                        <FormLabel>{c.fields.studentPhoto}</FormLabel>
                         <FileUploader 
                             value={photo} 
                             onChange={setPhoto} 
-                            label="Upload Photo" 
+                            label={c.fields.uploadPhoto} 
                         />
                     </div>
 
                     <div className="space-y-2 col-span-1 md:col-span-2">
                         <div className="flex items-center justify-between">
-                            <FormLabel>Documents</FormLabel>
+                            <FormLabel>{c.fields.documents}</FormLabel>
                             <Button type="button" variant="outline" size="sm" onClick={() => appendDocument({ type: "", image: "", documentNumber: "" })}>
-                                <Plus className="mr-2 h-4 w-4" /> Add Document
+                                <Plus className="mr-2 h-4 w-4" /> {c.fields.addDocument}
                             </Button>
                         </div>
                         
@@ -628,9 +928,9 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                                             name={`documents.${index}.type`}
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className="text-xs">Document Type</FormLabel>
+                                                    <FormLabel className="text-xs">{c.fields.documentType}</FormLabel>
                                                     <FormControl>
-                                                        <Input placeholder="e.g. Birth Cert" {...field} />
+                                                        <Input placeholder={c.fields.documentTypePlaceholder} {...field} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -641,9 +941,9 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                                             name={`documents.${index}.documentNumber`}
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className="text-xs">Document Number (Optional)</FormLabel>
+                                                    <FormLabel className="text-xs">{c.fields.documentNumberOptional}</FormLabel>
                                                     <FormControl>
-                                                        <Input placeholder="Doc No." {...field} />
+                                                        <Input placeholder={c.fields.documentNumberPlaceholder} {...field} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -654,7 +954,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                                             name={`documents.${index}.image`}
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className="text-xs">Document Image</FormLabel>
+                                                    <FormLabel className="text-xs">{c.fields.documentImage}</FormLabel>
                                                     <FormControl>
                                                         <FileUploader 
                                                         value={field.value || null} 
@@ -680,12 +980,12 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
             <div className="flex flex-col sm:flex-row gap-3 print:hidden">
               <Button type="button" variant="secondary" onClick={handlePrint} disabled={isLoading}>
                 <Printer className="mr-2 h-4 w-4" />
-                Print Admission Form
+                {c.actions.printAdmission}
               </Button>
               <Button type="submit" className="sm:ml-auto" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 <Save className="mr-2 h-4 w-4" />
-                Save Changes
+                {c.actions.save}
               </Button>
             </div>
           </form>

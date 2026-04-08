@@ -1,4 +1,3 @@
-import Image from "next/image"
 import { schoolConfig } from "@/lib/config"
 
 export function AuthBranding({
@@ -11,12 +10,10 @@ export function AuthBranding({
   return (
     <div className="flex flex-col items-center text-center">
       <div className="relative h-20 w-20">
-        <Image
+        <img
           src="/logo.jpeg"
           alt={name}
-          fill
-          className="object-contain"
-          priority
+          className="object-contain rounded-full"
         />
       </div>
       <div className="mt-3 text-2xl font-bold tracking-tight text-foreground">

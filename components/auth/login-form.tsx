@@ -4,8 +4,8 @@ import { useForm, Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { signIn, getSession } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { useState } from "react"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,16 +22,9 @@ import { Loader2, Eye, EyeOff } from "lucide-react"
 
 import Link from "next/link"
 import { whatsappConfig } from "@/lib/whatsapp-config"
-
-const adminSchema = z.object({
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
-})
-
-const staffSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
-})
+import { defaultLocale, hasLocale } from "@/lib/i18n"
+import { withLocale } from "@/lib/locale-path"
+import { useI18n } from "@/components/i18n-provider"
 
 interface LoginFormProps {
   type: "admin" | "staff"
@@ -39,11 +32,32 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
+  const { t } = useI18n()
+  const params = useParams<{ lang?: string }>()
+  const lang = hasLocale(params.lang ?? "") ? (params.lang as string) : defaultLocale
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [demoEmail, setDemoEmail] = useState("")
+
+  const adminSchema = useMemo(
+    () =>
+      z.object({
+        username: z.string().min(1, t("auth.usernameRequired", "Username is required")),
+        password: z.string().min(1, t("auth.passwordRequired", "Password is required")),
+      }),
+    [t]
+  )
+
+  const staffSchema = useMemo(
+    () =>
+      z.object({
+        email: z.string().email(t("auth.invalidEmailAddress", "Invalid email address")),
+        password: z.string().min(1, t("auth.passwordRequired", "Password is required")),
+      }),
+    [t]
+  )
 
   const schema = type === "admin" ? adminSchema : staffSchema
   
@@ -74,9 +88,9 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
       })
 
       if (result?.error) {
-        toast.error("Invalid credentials")
+        toast.error(t("auth.invalidCredentials", "Invalid credentials"))
       } else {
-        toast.success("Logged in successfully")
+        toast.success(t("auth.loginSuccess", "Logged in successfully"))
         
         // Fetch current session to determine role
         const session = await getSession()
@@ -94,12 +108,16 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
             redirectUrl = "/dashboard"
           }
         }
+
+        if (redirectUrl.startsWith("/")) {
+          redirectUrl = withLocale(lang, redirectUrl)
+        }
         
         router.push(redirectUrl)
         router.refresh()
       }
     } catch {
-      toast.error("Something went wrong")
+      toast.error(t("auth.somethingWentWrong", "Something went wrong"))
     } finally {
       setIsLoading(false)
     }
@@ -111,7 +129,7 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
       const email =
         type === "staff" ? (form.getValues("email") || "").trim() : demoEmail.trim()
       if (!email) {
-        toast.error("Enter demo email")
+        toast.error(t("auth.enterDemoEmail", "Enter demo email"))
         return
       }
       const result = await signIn("credentials", {
@@ -121,13 +139,13 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
       })
 
       if (result?.error) {
-        toast.error("Invalid demo email")
+        toast.error(t("auth.invalidDemoEmail", "Invalid demo email"))
       } else {
-        router.push("/demo/access-as")
+        router.push(withLocale(lang, "/demo/access-as"))
         router.refresh()
       }
     } catch {
-      toast.error("Something went wrong")
+      toast.error(t("auth.somethingWentWrong", "Something went wrong"))
     } finally {
       setIsLoading(false)
     }
@@ -136,9 +154,11 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>{type === "admin" ? "Admin Login" : "Staff Login"}</CardTitle>
+        <CardTitle>{type === "admin" ? t("auth.adminLogin", "Admin Login") : t("auth.staffLogin", "Staff Login")}</CardTitle>
         <CardDescription>
-          Enter your credentials to access the {type === "admin" ? "admin panel" : "dashboard"}
+          {type === "admin"
+            ? t("auth.enterCredentialsAdmin", "Enter your credentials to access the admin panel")
+            : t("auth.enterCredentialsStaff", "Enter your credentials to access the dashboard")}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -150,9 +170,9 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel>{t("auth.username", "Username")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Admin" {...field} />
+                      <Input placeholder={t("auth.usernamePlaceholder", "Admin")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -164,9 +184,9 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("auth.email", "Email")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="staff@example.com" {...field} />
+                      <Input placeholder={t("auth.emailPlaceholder", "staff@example.com")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -178,10 +198,14 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>{t("auth.password", "Password")}</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Input type={showPassword ? "text" : "password"} placeholder="••••••••" {...field} />
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        placeholder={t("auth.passwordPlaceholder", "••••••••")}
+                        {...field}
+                      />
                       <Button
                         type="button"
                         variant="ghost"
@@ -195,8 +219,8 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
                   </FormControl>
                   <FormMessage />
                   <div className="text-right">
-                    <Link href="/forgot-password" title="Forgot Password" className="text-sm text-primary hover:underline">
-                      Forgot Password?
+                    <Link href={withLocale(lang, "/forgot-password")} className="text-sm text-primary hover:underline">
+                      {t("auth.forgotPassword", "Forgot Password?")}
                     </Link>
                   </div>
                 </FormItem>
@@ -204,15 +228,15 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
             />
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sign In
+              {t("auth.signIn", "Sign In")}
             </Button>
             {allowDemo && (
               <>
                 {type === "admin" && (
                   <div className="space-y-2">
-                    <FormLabel>Demo Email</FormLabel>
+                    <FormLabel>{t("auth.demoEmail", "Demo Email")}</FormLabel>
                     <Input
-                      placeholder="demo@example.com"
+                      placeholder={t("auth.demoEmailPlaceholder", "demo@example.com")}
                       value={demoEmail}
                       onChange={(e) => setDemoEmail(e.target.value)}
                       disabled={isLoading}
@@ -221,18 +245,18 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
                 )}
                 <Button type="button" variant="outline" className="w-full" disabled={isLoading} onClick={onDemoLogin}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Demo Login
+                  {t("auth.demoLogin", "Demo Login")}
                 </Button>
               </>
             )}
             <div className="text-center text-sm">
               {type === "admin" ? (
-                <Link href="/login" className="underline underline-offset-4 hover:text-primary">
-                  Staff Login
+                <Link href={withLocale(lang, "/login")} className="underline underline-offset-4 hover:text-primary">
+                  {t("auth.switchToStaff", "Staff Login")}
                 </Link>
               ) : (
-                <Link href="/admin/login" className="underline underline-offset-4 hover:text-primary">
-                  Admin Login
+                <Link href={withLocale(lang, "/admin/login")} className="underline underline-offset-4 hover:text-primary">
+                  {t("auth.switchToAdmin", "Admin Login")}
                 </Link>
               )}
             </div>
@@ -259,10 +283,10 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
           return (
             <div className="mt-4 pt-4 border-t border-border flex flex-col items-center gap-2">
               <p className="text-xs text-muted-foreground text-center">
-                Parent or Teacher?
+                {t("auth.parentOrTeacher", "Parent or Teacher?")}
               </p>
               <Button variant="outline" className="w-full" asChild>
-                <Link href="/login/otp">Login with WhatsApp OTP</Link>
+                <Link href={withLocale(lang, "/login/otp")}>{t("auth.loginWithWhatsappOtp", "Login with WhatsApp OTP")}</Link>
               </Button>
             </div>
           );

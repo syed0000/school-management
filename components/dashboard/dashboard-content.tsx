@@ -13,6 +13,7 @@ import { getDashboardStats } from "@/actions/dashboard"
 import { UnpaidStudentsTable, UnpaidStudent } from "@/components/dashboard/unpaid-students-table"
 import { DateRange } from "react-day-picker"
 import { formatNumber, getCurrentSessionRange } from "@/lib/utils"
+import { useI18n } from "@/components/i18n-provider"
 interface DashboardStats {
   collected: number
   pending: number
@@ -77,6 +78,7 @@ export function DashboardContent({
   initialStats,
   classes,
 }: DashboardContentProps) {
+  const { t } = useI18n()
   const [stats, setStats] = useState<DashboardStats>(initialStats)
   const [isPending, startTransition] = useTransition()
 
@@ -103,17 +105,17 @@ export function DashboardContent({
   }))
 
   const profitData = [
-    { name: 'Income', value: stats.collected, color: '#22c55e' },
-    { name: 'Expense', value: stats.totalExpenses, color: '#ef4444' }
+    { name: t("dashboard.income", "Income"), value: stats.collected, color: "#22c55e" },
+    { name: t("dashboard.expense", "Expense"), value: stats.totalExpenses, color: "#ef4444" },
   ]
 
   // Approximation for Total Collection vs Should be Collected
   // We don't have exact "Should be Collected" per month in the overview data structure easily accessible for a line chart without backend changes,
   // but we can show the aggregate status.
   const collectionStatusData = [
-    { name: 'Collected', value: stats.collected, color: '#22c55e' },
-    { name: 'Pending', value: stats.pending, color: '#eab308' },
-    { name: 'Unpaid (Deficit)', value: stats.unpaid, color: '#ef4444' }
+    { name: t("dashboard.collected", "Collected"), value: stats.collected, color: "#22c55e" },
+    { name: t("dashboard.pending", "Pending"), value: stats.pending, color: "#eab308" },
+    { name: t("dashboard.unpaidDeficit", "Unpaid (Deficit)"), value: stats.unpaid, color: "#ef4444" },
   ]
 
   // const revenueChange = stats.revenueChange
@@ -124,7 +126,7 @@ export function DashboardContent({
     <div className="flex-1 p-4 md:p-8 bg-background">
       {/* Header Controls */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 mb-6">
-        <h2 className="text-2xl font-bold tracking-tight">Overview</h2>
+        <h2 className="text-2xl font-bold tracking-tight">{t("dashboard.overview", "Overview")}</h2>
 
         <div className="flex flex-wrap items-center gap-2">
           <DashboardFilter
@@ -144,7 +146,7 @@ export function DashboardContent({
         {/* Total Amount Collected Chart - Large Card - Full width on mobile */}
         <Card className="col-span-1 md:col-span-2 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-bold">Financial Overview</CardTitle>
+            <CardTitle className="text-base font-bold">{t("dashboard.financialOverview", "Financial Overview")}</CardTitle>
           </CardHeader>
           <CardContent className="pl-0">
             <Overview data={stats.overview} />
@@ -156,7 +158,7 @@ export function DashboardContent({
           {/* Total Revenue */}
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-              <CardTitle className="text-xs font-medium">Total Revenue</CardTitle>
+              <CardTitle className="text-xs font-medium">{t("dashboard.totalRevenue", "Total Revenue")}</CardTitle>
               <IndianRupee className="h-3 w-3 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-4 pt-0">
@@ -167,7 +169,7 @@ export function DashboardContent({
           {/* Total Expenses */}
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-              <CardTitle className="text-xs font-medium">Total Expenses</CardTitle>
+              <CardTitle className="text-xs font-medium">{t("dashboard.totalExpenses", "Total Expenses")}</CardTitle>
               <IndianRupee className="h-3 w-3 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-4 pt-0">
@@ -178,12 +180,12 @@ export function DashboardContent({
           {/* Net Profit */}
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-              <CardTitle className="text-xs font-bold">Net Profit</CardTitle>
+              <CardTitle className="text-xs font-bold">{t("dashboard.netProfit", "Net Profit")}</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <div className="text-xl md:text-3xl font-bold">₹{formatNumber(stats.netProfit)}</div>
               <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
-                Income - Expense
+                {t("dashboard.incomeMinusExpense", "Income - Expense")}
               </p>
             </CardContent>
           </Card>
@@ -191,12 +193,12 @@ export function DashboardContent({
           {/* Reminders (Unpaid) */}
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-              <CardTitle className="text-xs font-bold">Reminders</CardTitle>
+              <CardTitle className="text-xs font-bold">{t("dashboard.reminders", "Reminders")}</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <div className="text-xl md:text-3xl font-bold">₹{formatNumber(stats.unpaid)}</div>
               <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
-                Total Unpaid / Deficit
+                {t("dashboard.totalUnpaidDeficit", "Total Unpaid / Deficit")}
               </p>
               <Progress value={pendingChange} className="mt-2 h-1.5" />
             </CardContent>
@@ -207,10 +209,10 @@ export function DashboardContent({
         {/* Pending Fees Chart - Large Card */}
         <Card className="col-span-1 md:col-span-2 lg:col-span-3 row-span-1 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-bold">Pending Fees</CardTitle>
+            <CardTitle className="text-base font-bold">{t("dashboard.pendingFees", "Pending Fees")}</CardTitle>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
-              Unpaid Fees (Deficit)
+              {t("dashboard.unpaidFeesDeficit", "Unpaid Fees (Deficit)")}
             </div>
           </CardHeader>
           <CardContent className="pl-0">

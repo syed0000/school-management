@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useForm, Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -18,21 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { updateProfile } from "@/actions/profile"
 import { Loader2, Eye, EyeOff } from "lucide-react"
-
-const profileFormSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().min(10, "Phone number must be at least 10 digits").max(12, "Invalid phone number"),
-})
-
-const passwordFormSchema = z.object({
-  currentPassword: z.string().min(1, "Current password is required"),
-  newPassword: z.string().min(6, "Password must be at least 6 characters"),
-  confirmPassword: z.string().min(6, "Password must be at least 6 characters"),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-})
+import { useI18n } from "@/components/i18n-provider"
 
 interface ProfileFormProps {
   user: {
@@ -44,10 +30,39 @@ interface ProfileFormProps {
 }
 
 export function ProfileForm({ user }: ProfileFormProps) {
+  const { t } = useI18n()
   const [isLoading, setIsLoading] = useState(false)
   const [showCurrent, setShowCurrent] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+
+  const profileFormSchema = useMemo(
+    () =>
+      z.object({
+        name: z.string().min(2, t("profile.validationNameMin", "Name must be at least 2 characters")),
+        email: z.string().email(t("profile.validationEmailInvalid", "Invalid email address")),
+        phone: z
+          .string()
+          .min(10, t("profile.validationPhoneMin", "Phone number must be at least 10 digits"))
+          .max(12, t("profile.validationPhoneInvalid", "Invalid phone number")),
+      }),
+    [t]
+  )
+
+  const passwordFormSchema = useMemo(
+    () =>
+      z
+        .object({
+          currentPassword: z.string().min(1, t("profile.validationCurrentPasswordRequired", "Current password is required")),
+          newPassword: z.string().min(6, t("profile.validationPasswordMin", "Password must be at least 6 characters")),
+          confirmPassword: z.string().min(6, t("profile.validationPasswordMin", "Password must be at least 6 characters")),
+        })
+        .refine((data) => data.newPassword === data.confirmPassword, {
+          message: t("profile.validationPasswordsMismatch", "Passwords do not match"),
+          path: ["confirmPassword"],
+        }),
+    [t]
+  )
 
   const profileForm = useForm<z.infer<typeof profileFormSchema>>({
     
@@ -79,13 +94,13 @@ export function ProfileForm({ user }: ProfileFormProps) {
       })
 
       if (result.success) {
-        toast.success("Profile updated successfully")
+        toast.success(t("profile.toastProfileUpdated", "Profile updated successfully"))
       } else {
         toast.error(result.error)
       }
     } catch (error) {
-      toast.error("Failed to update profile", {
-        description: error instanceof Error ? error.message : "Unknown error",
+      toast.error(t("profile.toastProfileUpdateFailed", "Failed to update profile"), {
+        description: error instanceof Error ? error.message : t("profile.unknownError", "Unknown error"),
       })
     } finally {
       setIsLoading(false)
@@ -105,14 +120,14 @@ export function ProfileForm({ user }: ProfileFormProps) {
       })
 
       if (result.success) {
-        toast.success("Password updated successfully")
+        toast.success(t("profile.toastPasswordUpdated", "Password updated successfully"))
         passwordForm.reset()
       } else {
         toast.error(result.error)
       }
     } catch (error) {
-      toast.error("Failed to update password", {
-        description: error instanceof Error ? error.message : "Unknown error",
+      toast.error(t("profile.toastPasswordUpdateFailed", "Failed to update password"), {
+        description: error instanceof Error ? error.message : t("profile.unknownError", "Unknown error"),
       })
     } finally {
       setIsLoading(false)
@@ -123,8 +138,8 @@ export function ProfileForm({ user }: ProfileFormProps) {
     <div className="grid gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Profile Details</CardTitle>
-          <CardDescription>Update your personal information.</CardDescription>
+          <CardTitle>{t("profile.detailsTitle", "Profile Details")}</CardTitle>
+          <CardDescription>{t("profile.detailsSubtitle", "Update your personal information.")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...profileForm}>
@@ -134,9 +149,9 @@ export function ProfileForm({ user }: ProfileFormProps) {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>{t("profile.nameLabel", "Name")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Your name" {...field} />
+                      <Input placeholder={t("profile.namePlaceholder", "Your name")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -147,9 +162,9 @@ export function ProfileForm({ user }: ProfileFormProps) {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("profile.emailLabel", "Email")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="email@example.com" {...field} />
+                      <Input placeholder={t("profile.emailPlaceholder", "email@example.com")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -160,9 +175,9 @@ export function ProfileForm({ user }: ProfileFormProps) {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>WhatsApp Number</FormLabel>
+                    <FormLabel>{t("profile.whatsappLabel", "WhatsApp Number")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="10-digit number" {...field} />
+                      <Input placeholder={t("profile.whatsappPlaceholder", "10-digit number")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -170,7 +185,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
               />
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Changes
+                {t("profile.saveChanges", "Save Changes")}
               </Button>
             </form>
           </Form>
@@ -180,8 +195,8 @@ export function ProfileForm({ user }: ProfileFormProps) {
       {!['teacher', 'parent'].includes(user.role || '') && (
         <Card>
         <CardHeader>
-          <CardTitle>Change Password</CardTitle>
-          <CardDescription>Update your password to keep your account secure.</CardDescription>
+          <CardTitle>{t("profile.changePasswordTitle", "Change Password")}</CardTitle>
+          <CardDescription>{t("profile.changePasswordSubtitle", "Update your password to keep your account secure.")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...passwordForm}>
@@ -191,10 +206,10 @@ export function ProfileForm({ user }: ProfileFormProps) {
                 name="currentPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Current Password</FormLabel>
+                    <FormLabel>{t("profile.currentPassword", "Current Password")}</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Input type={showCurrent ? "text" : "password"} placeholder="********" {...field} />
+                        <Input type={showCurrent ? "text" : "password"} placeholder={t("profile.passwordPlaceholder", "********")} {...field} />
                         <Button
                             type="button"
                             variant="ghost"
@@ -215,10 +230,10 @@ export function ProfileForm({ user }: ProfileFormProps) {
                 name="newPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>New Password</FormLabel>
+                    <FormLabel>{t("profile.newPassword", "New Password")}</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Input type={showNew ? "text" : "password"} placeholder="********" {...field} />
+                        <Input type={showNew ? "text" : "password"} placeholder={t("profile.passwordPlaceholder", "********")} {...field} />
                         <Button
                             type="button"
                             variant="ghost"
@@ -239,10 +254,10 @@ export function ProfileForm({ user }: ProfileFormProps) {
                 name="confirmPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
+                    <FormLabel>{t("profile.confirmPassword", "Confirm Password")}</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Input type={showConfirm ? "text" : "password"} placeholder="********" {...field} />
+                        <Input type={showConfirm ? "text" : "password"} placeholder={t("profile.passwordPlaceholder", "********")} {...field} />
                         <Button
                             type="button"
                             variant="ghost"
@@ -260,7 +275,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
               />
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Update Password
+                {t("profile.updatePassword", "Update Password")}
               </Button>
             </form>
           </Form>

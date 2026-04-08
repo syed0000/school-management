@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: schoolConfig.name,
     short_name: schoolConfig.shortName,
-    description: 'Efficient school management system',
+    description: 'Efficient educational institute management system',
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Download } from 'lucide-react'
+import { useI18n } from '@/components/i18n-provider'
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void> | void
@@ -12,6 +13,7 @@ type BeforeInstallPromptEvent = Event & {
 export function InstallPrompt() {
   const [isIOSDismissed, setIsIOSDismissed] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const { t } = useI18n()
 
   const isIOS =
     !isIOSDismissed &&
@@ -55,9 +57,9 @@ export function InstallPrompt() {
     return (
       <div className="fixed bottom-16 left-4 right-4 z-50 rounded-lg border bg-background p-4 md:left-auto md:right-4 md:w-96 cursor-pointer">
         <div className="flex flex-col gap-2">
-          <h3 className="font-semibold">Install App</h3>
+          <h3 className="font-semibold">{t("pwa.installTitle", "Install App")}</h3>
           <p className="text-sm text-muted-foreground">
-            To install this app on your iOS device, tap the share button
+            {t("pwa.iosStepA", "To install this app on your iOS device, tap the share button")}
             <span className="mx-1 inline-block">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -75,7 +77,7 @@ export function InstallPrompt() {
                 <line x1="12" y1="2" x2="12" y2="15" />
               </svg>
             </span>
-            and then {`"Add to Home Screen"`}
+            {t("pwa.iosStepB", 'and then "Add to Home Screen"')}
             <span className="mx-1 inline-block">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -96,7 +98,7 @@ export function InstallPrompt() {
             .
           </p>
           <Button variant="outline" size="sm" onClick={() => setIsIOSDismissed(true)}>
-            Close
+            {t("pwa.close", "Close")}
           </Button>
         </div>
       </div>
@@ -112,7 +114,7 @@ export function InstallPrompt() {
       <div className="pointer-events-auto">
           <Button onClick={handleInstallClick} className="gap-2 rounded-full" size="sm">
             <Download className="h-4 w-4" />
-            Install App
+            {t("pwa.installTitle", "Install App")}
           </Button>
       </div>
     </div>

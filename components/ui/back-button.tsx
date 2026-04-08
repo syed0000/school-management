@@ -3,9 +3,11 @@
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useI18n } from "@/components/i18n-provider"
 
 export function BackButton() {
   const router = useRouter()
+  const { t } = useI18n()
 
   return (
     <Button
@@ -15,7 +17,7 @@ export function BackButton() {
       onClick={() => router.back()}
     >
       <ArrowLeft className="h-4 w-4" />
-      Back
+      {t("common.back", "Back")}
     </Button>
   )
 }

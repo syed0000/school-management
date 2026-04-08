@@ -18,7 +18,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { signOut } from "next-auth/react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { useParams, usePathname } from "next/navigation"
+import { defaultLocale, hasLocale, type Locale } from "@/lib/i18n"
+import { withLocale } from "@/lib/locale-path"
+import { useI18n } from "@/components/i18n-provider"
 
 interface UserNavProps {
   user: {
@@ -30,9 +33,15 @@ interface UserNavProps {
 }
 
 export function UserNav({ user }: UserNavProps) {
+  const { t } = useI18n()
   const pathname = usePathname()
-  const isAttendance = pathname.startsWith('/attendance')
-  const isStaff = !pathname.startsWith('/admin') && !isAttendance
+  const params = useParams<{ lang?: string }>()
+  const lang = hasLocale(params.lang ?? "") ? (params.lang as Locale) : defaultLocale
+  const base = `/${lang}`
+  const normalizedPathname = pathname?.startsWith(`${base}/`) ? pathname.slice(base.length) : pathname
+
+  const isAttendance = normalizedPathname.startsWith('/attendance')
+  const isStaff = !normalizedPathname.startsWith('/admin') && !isAttendance
 
   const profileLink = isAttendance 
     ? "/attendance/profile" 
@@ -63,22 +72,22 @@ export function UserNav({ user }: UserNavProps) {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href={profileLink}>
-              Profile
+            <Link href={withLocale(lang, profileLink)}>
+              {t("common.profile", "Profile")}
               <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
             </Link>
           </DropdownMenuItem>
           {user.role === 'admin' && (
             <DropdownMenuItem asChild>
-              <Link href="/admin/school-profile">
-                School Profile
+              <Link href={withLocale(lang, "/admin/school-profile")}>
+                {t("nav.schoolProfile", "School Profile")}
               </Link>
             </DropdownMenuItem>
           )}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => signOut()}>
-          Log out
+        <DropdownMenuItem onClick={() => signOut({ callbackUrl: withLocale(lang, "/login") })}>
+          {t("common.logout", "Log out")}
           <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuContent>

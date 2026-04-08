@@ -20,8 +20,10 @@ import {
 } from "@/components/ui/alert-dialog"
 import { deleteFeeTransaction } from '@/actions/fee-transactions'
 import { toast } from 'sonner'
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { BackButton } from "@/components/ui/back-button"
+import { useI18n } from "@/components/i18n-provider"
+import { defaultLocale, hasLocale } from "@/lib/i18n"
 
 interface Transaction {
   id: string
@@ -61,13 +63,24 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
+  const { t } = useI18n()
+  const params = useParams<{ lang?: string }>()
+  const lang = hasLocale(params.lang ?? "") ? (params.lang as string) : defaultLocale
+
+  const fmtMonthShort = (year: number, month1Based: number) => {
+    try {
+      return new Intl.DateTimeFormat(lang, { month: "short" }).format(new Date(year, month1Based - 1, 1))
+    } catch {
+      return format(new Date(year, month1Based - 1, 1), "MMM")
+    }
+  }
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       // Validation: Ensure all visible transactions belong to the same student
       const uniqueStudents = new Set(transactions.map(t => t.studentRegNo))
       if (uniqueStudents.size > 1) {
-        toast.error("Cannot select all: The list contains transactions from multiple students. Please filter by a specific student first.")
+        toast.error(t("transactions.toastSelectAllMultiStudent", "Cannot select all: The list contains transactions from multiple students. Please filter by a specific student first."))
         return
       }
 
@@ -88,7 +101,7 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
 
         if (firstSelectedTransaction && newTransaction &&
           firstSelectedTransaction.studentRegNo !== newTransaction.studentRegNo) {
-          toast.error("Cannot select transactions from different students. Please clear your selection first.")
+          toast.error(t("transactions.toastSelectDifferentStudents", "Cannot select transactions from different students. Please clear your selection first."))
           return
         }
       }
@@ -104,13 +117,13 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
     try {
       const result = await deleteFeeTransaction(deleteId)
       if (result.success) {
-        toast.success("Transaction deleted successfully")
+        toast.success(t("transactions.toastDeleted", "Transaction deleted successfully"))
         router.refresh()
       } else {
-        toast.error(result.error || "Failed to delete transaction")
+        toast.error(result.error || t("transactions.toastDeleteFailed", "Failed to delete transaction"))
       }
     } catch {
-      toast.error("An error occurred")
+      toast.error(t("transactions.toastGenericError", "An error occurred"))
     } finally {
       setIsDeleting(false)
       setDeleteId(null)
@@ -120,50 +133,50 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'verified':
-        return <Badge className="bg-green-600">Verified</Badge>
+        return <Badge className="bg-green-600">{t("transactions.statusVerified", "Verified")}</Badge>
       case 'pending':
-        return <Badge className="bg-yellow-600">Pending</Badge>
+        return <Badge className="bg-yellow-600">{t("transactions.statusPending", "Pending")}</Badge>
       case 'rejected':
-        return <Badge variant="destructive">Rejected</Badge>
+        return <Badge variant="destructive">{t("transactions.statusRejected", "Rejected")}</Badge>
       default:
         return <Badge variant="secondary">{status}</Badge>
     }
   }
 
-  const getFeeDescription = (t: Transaction) => {
-    const ft = (t.feeType || '').toLowerCase();
+  const getFeeDescription = (tx: Transaction) => {
+    const ft = (tx.feeType || '').toLowerCase();
     
     if (ft === 'monthly') {
-      if (t.month) {
-        const monthName = format(new Date(t.year, t.month - 1), 'MMM')
-        return `Monthly - ${monthName} ${t.year}`
+      if (tx.month) {
+        const monthName = fmtMonthShort(tx.year, tx.month)
+        return `${t("transactions.feeMonthly", "Monthly")} - ${monthName} ${tx.year}`
       }
-      return `Monthly - ${t.year}`
+      return `${t("transactions.feeMonthly", "Monthly")} - ${tx.year}`
     }
     if (ft === 'examination') {
-      return `Exam - ${t.examType || 'Annual'} ${t.year}`
+      return `${t("transactions.feeExam", "Exam")} - ${tx.examType || t("transactions.examAnnual", "Annual")} ${tx.year}`
     }
     if (ft === 'admission' || ft === 'admissionfees') {
-      return `Admission - ${t.year}`
+      return `${t("transactions.feeAdmission", "Admission")} - ${tx.year}`
     }
     if (ft === 'registrationfees') {
-      return `Registration - ${t.year}`
+      return `${t("transactions.feeRegistration", "Registration")} - ${tx.year}`
     }
 
     // Default formatting for any other type (e.g., custom or 'other')
-    const displayStr = t.feeType || 'Other';
+    const displayStr = tx.feeType || t("transactions.feeOther", "Other");
     const spaced = displayStr.replace(/([A-Z])/g, ' $1').trim();
     const capitalized = spaced.charAt(0).toUpperCase() + spaced.slice(1);
     
-    return `${capitalized} - ${t.year}`;
+    return `${capitalized} - ${tx.year}`;
   }
 
   if (transactions.length === 0) {
     return (
       <div className="text-center py-12">
         <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-        <h3 className="mt-4 text-lg font-semibold">No transactions found</h3>
-        <p className="text-muted-foreground">Try adjusting your filters</p>
+        <h3 className="mt-4 text-lg font-semibold">{t("transactions.emptyTitle", "No transactions found")}</h3>
+        <p className="text-muted-foreground">{t("transactions.emptySubtitle", "Try adjusting your filters")}</p>
       </div>
     )
   }
@@ -179,19 +192,19 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
                 <Checkbox
                   checked={transactions.length > 0 && selectedIds.length === transactions.length}
                   onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                  aria-label="Select all"
+                  aria-label={t("transactions.selectAll", "Select all")}
                 />
               </TableHead>
-                <TableHead className="w-12">S.No</TableHead>
-                <TableHead>Student</TableHead>
-              <TableHead>Receipt No</TableHead>
-              <TableHead>Fee Type</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Collected By</TableHead>
-              <TableHead>Remarks</TableHead>
-              {isAdmin && <TableHead className="text-right">Actions</TableHead>}
+              <TableHead className="w-12">{t("transactions.sNo", "S.No")}</TableHead>
+              <TableHead>{t("transactions.student", "Student")}</TableHead>
+              <TableHead>{t("transactions.receiptNo", "Receipt No")}</TableHead>
+              <TableHead>{t("transactions.feeType", "Fee Type")}</TableHead>
+              <TableHead>{t("transactions.amount", "Amount")}</TableHead>
+              <TableHead>{t("transactions.status", "Status")}</TableHead>
+              <TableHead>{t("transactions.date", "Date")}</TableHead>
+              <TableHead>{t("transactions.collectedBy", "Collected By")}</TableHead>
+              <TableHead>{t("transactions.remarks", "Remarks")}</TableHead>
+              {isAdmin && <TableHead className="text-right">{t("transactions.actions", "Actions")}</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>

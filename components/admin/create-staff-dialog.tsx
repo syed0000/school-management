@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation"
 import { useForm, SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Plus, Loader2 } from "lucide-react"
 import { createDemoUser, createStaff } from "@/actions/admin"
+import { useI18n } from "@/components/i18n-provider"
 
 import {
   Select,
@@ -36,29 +37,41 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-const staffSchema = z.object({
-  userType: z.literal("staff"),
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email"),
-  phone: z.string().min(10, "Phone number must be at least 10 digits").max(12, "Invalid phone number"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["staff", "attendance_staff"]),
-})
-
-const demoSchema = z.object({
-  userType: z.literal("demo"),
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email"),
-})
-
-const formSchema = z.union([staffSchema, demoSchema])
-
-type StaffFormValues = z.infer<typeof formSchema>
-
 export function CreateStaffDialog({ allowDemo = false }: { allowDemo?: boolean }) {
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const { t } = useI18n()
+
+  const staffSchema = useMemo(
+    () =>
+      z.object({
+        userType: z.literal("staff"),
+        name: z.string().min(1, t("adminStaff.validationNameRequired", "Name is required")),
+        email: z.string().email(t("adminStaff.validationEmailInvalid", "Invalid email")),
+        phone: z
+          .string()
+          .min(10, t("adminStaff.validationPhoneMin", "Phone number must be at least 10 digits"))
+          .max(12, t("adminStaff.validationPhoneInvalid", "Invalid phone number")),
+        password: z.string().min(6, t("adminStaff.validationPasswordMin", "Password must be at least 6 characters")),
+        role: z.enum(["staff", "attendance_staff"]),
+      }),
+    [t]
+  )
+
+  const demoSchema = useMemo(
+    () =>
+      z.object({
+        userType: z.literal("demo"),
+        name: z.string().min(1, t("adminStaff.validationNameRequired", "Name is required")),
+        email: z.string().email(t("adminStaff.validationEmailInvalid", "Invalid email")),
+      }),
+    [t]
+  )
+
+  const formSchema = useMemo(() => z.union([staffSchema, demoSchema]), [staffSchema, demoSchema])
+
+  type StaffFormValues = z.infer<typeof formSchema>
 
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(formSchema),
@@ -80,15 +93,19 @@ export function CreateStaffDialog({ allowDemo = false }: { allowDemo?: boolean }
           ? await createDemoUser({ name: values.name, email: values.email })
           : await createStaff(values)
       if (result.success) {
-        toast.success(values.userType === "demo" ? "Demo user created" : "Staff member created successfully")
+        toast.success(
+          values.userType === "demo"
+            ? t("adminStaff.toastDemoCreated", "Demo user created")
+            : t("adminStaff.toastStaffCreated", "Staff member created successfully")
+        )
         setOpen(false)
         form.reset()
         router.refresh()
       } else {
-        toast.error(result.error || "Failed")
+        toast.error(result.error || t("adminStaff.toastFailed", "Failed"))
       }
     } catch {
-      toast.error("Something went wrong")
+      toast.error(t("adminStaff.toastSomethingWentWrong", "Something went wrong"))
     } finally {
       setIsLoading(false)
     }
@@ -101,16 +118,21 @@ export function CreateStaffDialog({ allowDemo = false }: { allowDemo?: boolean }
       <DialogTrigger asChild>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
-          Add Staff
+          {t("adminStaff.addStaff", "Add Staff")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{userType === "demo" ? "Add Demo User" : "Add Staff Member"}</DialogTitle>
+          <DialogTitle>
+            {userType === "demo" ? t("adminStaff.addDemoUser", "Add Demo User") : t("adminStaff.addStaffMember", "Add Staff Member")}
+          </DialogTitle>
           <DialogDescription>
             {userType === "demo"
-              ? "Demo users can log in without credentials and can access all areas in view-only mode."
-              : "Create a new staff account. They can login with email and password."}
+              ? t(
+                  "adminStaff.demoDescription",
+                  "Demo users can log in without credentials and can access all areas in view-only mode."
+                )
+              : t("adminStaff.staffDescription", "Create a new staff account. They can login with email and password.")}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -121,16 +143,16 @@ export function CreateStaffDialog({ allowDemo = false }: { allowDemo?: boolean }
                 name="userType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>User Type</FormLabel>
+                    <FormLabel>{t("adminStaff.userTypeLabel", "User Type")}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select user type" />
+                          <SelectValue placeholder={t("adminStaff.userTypePlaceholder", "Select user type")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="staff">Staff</SelectItem>
-                        <SelectItem value="demo">Demo User</SelectItem>
+                        <SelectItem value="staff">{t("adminStaff.userTypeStaff", "Staff")}</SelectItem>
+                        <SelectItem value="demo">{t("adminStaff.userTypeDemo", "Demo User")}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -143,9 +165,9 @@ export function CreateStaffDialog({ allowDemo = false }: { allowDemo?: boolean }
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
+                  <FormLabel>{t("adminStaff.nameLabel", "Name")}</FormLabel>
                   <FormControl>
-                    <Input placeholder="John Doe" {...field} />
+                    <Input placeholder={t("adminStaff.namePlaceholder", "John Doe")} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -156,9 +178,9 @@ export function CreateStaffDialog({ allowDemo = false }: { allowDemo?: boolean }
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>{t("adminStaff.emailLabel", "Email")}</FormLabel>
                   <FormControl>
-                    <Input placeholder="staff@example.com" {...field} />
+                    <Input placeholder={t("adminStaff.emailPlaceholder", "staff@example.com")} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -172,16 +194,16 @@ export function CreateStaffDialog({ allowDemo = false }: { allowDemo?: boolean }
                   name="role"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Role</FormLabel>
+                      <FormLabel>{t("adminStaff.roleLabel", "Role")}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a role" />
+                            <SelectValue placeholder={t("adminStaff.rolePlaceholder", "Select a role")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="staff">Staff</SelectItem>
-                          <SelectItem value="attendance_staff">Attendance Staff</SelectItem>
+                          <SelectItem value="staff">{t("adminStaff.roleStaff", "Staff")}</SelectItem>
+                          <SelectItem value="attendance_staff">{t("adminStaff.roleAttendance", "Attendance Staff")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -193,9 +215,9 @@ export function CreateStaffDialog({ allowDemo = false }: { allowDemo?: boolean }
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>WhatsApp Number</FormLabel>
+                      <FormLabel>{t("adminStaff.whatsappLabel", "WhatsApp Number")}</FormLabel>
                       <FormControl>
-                        <Input placeholder="10-digit number" {...field} />
+                        <Input placeholder={t("adminStaff.whatsappPlaceholder", "10-digit number")} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -206,9 +228,9 @@ export function CreateStaffDialog({ allowDemo = false }: { allowDemo?: boolean }
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel>{t("adminStaff.passwordLabel", "Password")}</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="••••••" {...field} />
+                        <Input type="password" placeholder={t("adminStaff.passwordPlaceholder", "••••••")} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -219,7 +241,9 @@ export function CreateStaffDialog({ allowDemo = false }: { allowDemo?: boolean }
             <DialogFooter>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {userType === "demo" ? "Create Demo User" : "Create Account"}
+                {userType === "demo"
+                  ? t("adminStaff.createDemoUser", "Create Demo User")
+                  : t("adminStaff.createAccount", "Create Account")}
               </Button>
             </DialogFooter>
           </form>

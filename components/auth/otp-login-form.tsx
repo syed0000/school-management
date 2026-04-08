@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -16,23 +16,18 @@ import {
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { signIn } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { requestOtp } from "@/actions/auth-otp"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, Smartphone, KeyRound, RefreshCw, Clock } from "lucide-react"
 import { whatsappConfig } from "@/lib/whatsapp-config"
+import { defaultLocale, hasLocale } from "@/lib/i18n"
+import { withLocale } from "@/lib/locale-path"
+import { useI18n } from "@/components/i18n-provider"
 
 const FIRST_RESEND_DELAY = 60        // 1 minute before first resend
 const SUBSEQUENT_RESEND_DELAY = 300  // 5 minutes for subsequent resends
-
-const phoneSchema = z.object({
-  phone: z.string().min(10, "Phone number must be at least 10 digits").max(12, "Invalid phone number"),
-})
-
-const otpSchema = z.object({
-  otp: z.string().length(6, "OTP must be 6 digits"),
-})
 
 function formatCountdown(seconds: number) {
   if (seconds <= 0) return ""
@@ -43,6 +38,9 @@ function formatCountdown(seconds: number) {
 }
 
 export function OtpLoginForm() {
+  const { t } = useI18n()
+  const params = useParams<{ lang?: string }>()
+  const lang = hasLocale(params.lang ?? "") ? (params.lang as string) : defaultLocale
   const { enableParentLogin, enableTeacherLogin } = whatsappConfig
 
   const defaultRole = enableParentLogin ? "parent" : "teacher"
@@ -53,7 +51,10 @@ export function OtpLoginForm() {
   const [role, setRole] = useState<"teacher" | "parent">(defaultRole)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") || (defaultRole === 'teacher' ? '/teacher/dashboard' : '/parent/dashboard')
+  const callbackUrlRaw =
+    searchParams.get("callbackUrl") ||
+    (defaultRole === "teacher" ? "/teacher/dashboard" : "/parent/dashboard")
+  const callbackUrl = callbackUrlRaw.startsWith("/") ? withLocale(lang, callbackUrlRaw) : callbackUrlRaw
 
   // Resend cooldown state
   // countdown = seconds remaining before resend is allowed
@@ -85,6 +86,25 @@ export function OtpLoginForm() {
   // Clean up on unmount
   useEffect(() => () => clearCountdown(), [clearCountdown])
 
+  const phoneSchema = useMemo(
+    () =>
+      z.object({
+        phone: z
+          .string()
+          .min(10, t("authOtp.validationPhoneMin", "Phone number must be at least 10 digits"))
+          .max(12, t("authOtp.validationPhoneInvalid", "Invalid phone number")),
+      }),
+    [t]
+  )
+
+  const otpSchema = useMemo(
+    () =>
+      z.object({
+        otp: z.string().length(6, t("authOtp.validationOtpLength", "OTP must be 6 digits")),
+      }),
+    [t]
+  )
+
   const phoneForm = useForm<z.infer<typeof phoneSchema>>({
     resolver: zodResolver(phoneSchema),
     defaultValues: { phone: "" },
@@ -112,7 +132,7 @@ export function OtpLoginForm() {
         return false
       }
     } catch {
-      toast.error("Failed to send OTP")
+      toast.error(t("authOtp.toastSendFailed", "Failed to send OTP"))
       return false
     } finally {
       setLoading(false)
@@ -126,7 +146,7 @@ export function OtpLoginForm() {
       // First resend available after 1 minute; subsequent ones after 5 minutes
       startCountdown(FIRST_RESEND_DELAY)
       setStep("otp")
-      toast.success("OTP sent to your WhatsApp")
+      toast.success(t("authOtp.toastOtpSent", "OTP sent to your WhatsApp"))
     }
   }
 
@@ -134,7 +154,7 @@ export function OtpLoginForm() {
     if (countdown > 0 || loading) return
     const ok = await sendOtp(phone)
     if (ok) {
-      toast.success("OTP resent successfully")
+      toast.success(t("authOtp.toastOtpResent", "OTP resent successfully"))
       otpForm.reset()
     }
   }
@@ -153,12 +173,12 @@ export function OtpLoginForm() {
       if (result?.error) {
         toast.error(result.error)
       } else {
-        toast.success("Logged in successfully")
-        router.push(role === 'teacher' ? '/teacher/dashboard' : '/parent/dashboard')
+        toast.success(t("authOtp.toastLoginSuccess", "Logged in successfully"))
+        router.push(withLocale(lang, role === "teacher" ? "/teacher/dashboard" : "/parent/dashboard"))
         router.refresh()
       }
     } catch {
-      toast.error("Login failed")
+      toast.error(t("authOtp.toastLoginFailed", "Login failed"))
     } finally {
       setLoading(false)
     }
@@ -169,24 +189,24 @@ export function OtpLoginForm() {
   return (
     <Card className="w-full max-w-md mx-auto shadow-xl border-t-4 border-t-primary">
       <CardHeader className="space-y-1 text-center">
-        <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
+        <CardTitle className="text-2xl font-bold">{t("authOtp.cardTitle", "Welcome Back")}</CardTitle>
         <CardDescription>
-          Login to your account using WhatsApp OTP
+          {t("authOtp.cardSubtitle", "Login to your account using WhatsApp OTP")}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {enableParentLogin && enableTeacherLogin && (
           <Tabs value={role} onValueChange={(v) => setRole(v as "parent" | "teacher")} className="mb-6">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="parent">Parent</TabsTrigger>
-              <TabsTrigger value="teacher">Teacher</TabsTrigger>
+              <TabsTrigger value="parent">{t("authOtp.parentTab", "Parent")}</TabsTrigger>
+              <TabsTrigger value="teacher">{t("authOtp.teacherTab", "Teacher")}</TabsTrigger>
             </TabsList>
           </Tabs>
         )}
 
         {!enableParentLogin && !enableTeacherLogin && (
           <div className="text-center py-6 text-destructive font-medium">
-            WhatsApp OTP login is currently disabled for this institute.
+            {t("authOtp.disabledMessage", "WhatsApp OTP login is currently disabled for this institute.")}
           </div>
         )}
 
@@ -200,11 +220,11 @@ export function OtpLoginForm() {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>WhatsApp Number</FormLabel>
+                        <FormLabel>{t("authOtp.whatsappNumberLabel", "WhatsApp Number")}</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <Smartphone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Enter 10-digit number" {...field} className="pl-9" />
+                            <Input placeholder={t("authOtp.whatsappNumberPlaceholder", "Enter 10-digit number")} {...field} className="pl-9" />
                           </div>
                         </FormControl>
                         <FormMessage />
@@ -213,7 +233,7 @@ export function OtpLoginForm() {
                   />
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Send OTP
+                    {t("authOtp.sendOtp", "Send OTP")}
                   </Button>
                 </form>
               </Form>
@@ -222,7 +242,10 @@ export function OtpLoginForm() {
                 <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-4">
                   {/* Header info */}
                   <div className="text-center mb-2 space-y-1">
-                    <p className="text-sm text-muted-foreground">OTP sent to <span className="font-semibold text-foreground">{phone}</span></p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("authOtp.otpSentToPrefix", "OTP sent to")}{" "}
+                      <span className="font-semibold text-foreground">{phone}</span>
+                    </p>
                     <Button
                       type="button"
                       variant="link"
@@ -230,7 +253,7 @@ export function OtpLoginForm() {
                       onClick={() => { setStep("phone"); clearCountdown(); setCountdown(0) }}
                       className="h-auto p-0 text-xs"
                     >
-                      Change number
+                      {t("authOtp.changeNumber", "Change number")}
                     </Button>
                   </div>
 
@@ -239,12 +262,12 @@ export function OtpLoginForm() {
                     name="otp"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>6-Digit OTP</FormLabel>
+                        <FormLabel>{t("authOtp.otpLabel", "6-Digit OTP")}</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <KeyRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                             <Input
-                              placeholder="000000"
+                              placeholder={t("authOtp.otpPlaceholder", "000000")}
                               {...field}
                               className="pl-9 tracking-[0.5em] text-center font-bold text-lg"
                               maxLength={6}
@@ -259,7 +282,7 @@ export function OtpLoginForm() {
 
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Verify &amp; Login
+                    {t("authOtp.verifyLogin", "Verify & Login")}
                   </Button>
 
                   {/* Resend OTP */}
@@ -267,7 +290,7 @@ export function OtpLoginForm() {
                     {countdown > 0 ? (
                       <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <Clock className="h-3.5 w-3.5" />
-                        Resend available in{" "}
+                        {t("authOtp.resendAvailableIn", "Resend available in")}{" "}
                         <span className="font-semibold tabular-nums text-foreground">
                           {formatCountdown(countdown)}
                         </span>
@@ -282,7 +305,7 @@ export function OtpLoginForm() {
                         disabled={!canResend}
                       >
                         <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-                        Resend OTP
+                        {t("authOtp.resendOtp", "Resend OTP")}
                       </Button>
                     )}
                   </div>

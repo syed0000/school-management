@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { useState, useEffect } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, Check, ChevronsUpDown, Plus, Trash2 } from "lucide-react"
 import { collectFees, getStudentFeeDetails } from "@/actions/fee-collection"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import {
   Command,
   CommandEmpty,
@@ -37,10 +37,13 @@ import {
 } from "@/components/ui/popover"
 import { cn, getCurrentSessionStartYear } from "@/lib/utils"
 import { BackButton } from "../ui/back-button"
+import { useI18n } from "@/components/i18n-provider"
+import { defaultLocale, hasLocale } from "@/lib/i18n"
+import { withLocale } from "@/lib/locale-path"
 
 // Schema for a single fee item input
 const feeItemInputSchema = z.object({
-  feeType: z.string().min(1, "Fee type is required"),
+  feeType: z.string().min(1),
   amount: z.string(), // Input as string for easier handling
   months: z.array(z.number()).optional(),
   year: z.string(),
@@ -50,11 +53,10 @@ const feeItemInputSchema = z.object({
 })
 
 // Schema for the overall form (mainly for student selection)
-const formSchema = z.object({
+const formSchemaBase = z.object({
   classId: z.string().optional(),
-  studentId: z.string().min(1, "Student is required"),
-  transactionDate: z.string().min(1, "Collection date is required"),
-  // Current fee item fields
+  studentId: z.string().min(1),
+  transactionDate: z.string().min(1),
   ...feeItemInputSchema.shape,
 })
 
@@ -76,7 +78,10 @@ interface FeeItem {
 }
 
 export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFormProps) {
+  const { t } = useI18n()
   const router = useRouter()
+  const params = useParams<{ lang?: string }>()
+  const lang = hasLocale(params.lang ?? "") ? (params.lang as string) : defaultLocale
   const [isLoading, setIsLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const [feeDetails, setFeeDetails] = useState<{
@@ -87,6 +92,16 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
 
   // List of added fees
   const [feeItems, setFeeItems] = useState<FeeItem[]>([])
+
+  const formSchema = useMemo(
+    () =>
+      formSchemaBase.extend({
+        feeType: z.string().min(1, t("fees.validationFeeTypeRequired", "Fee type is required")),
+        studentId: z.string().min(1, t("fees.validationStudentRequired", "Student is required")),
+        transactionDate: z.string().min(1, t("fees.validationCollectionDateRequired", "Collection date is required")),
+      }),
+    [t]
+  )
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -200,17 +215,17 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
     const amount = Number(values.amount);
 
     if (amount <= 0) {
-      form.setError("amount", { message: "Amount must be positive" });
+      form.setError("amount", { message: t("fees.validationAmountPositive", "Amount must be positive") });
       return;
     }
 
     if (values.feeType === 'monthly' && (!values.months || values.months.length === 0)) {
-      form.setError("months", { message: "Select at least one month" });
+      form.setError("months", { message: t("fees.validationSelectMonth", "Select at least one month") });
       return;
     }
 
     if (values.feeType === 'other' && !values.title) {
-      form.setError("title", { message: "Title is required for Other fee" });
+      form.setError("title", { message: t("fees.validationOtherTitleRequired", "Title is required for Other fee") });
       return;
     }
 
@@ -242,7 +257,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
       form.setValue("amount", "0");
     }
 
-    toast.success("Fee item added");
+    toast.success(t("fees.toastItemAdded", "Fee item added"));
   };
 
   const handleRemoveFee = (id: string) => {
@@ -279,13 +294,13 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
           remarks: values.remarks,
         });
       } else {
-        toast.error("Please add at least one fee item with valid amount");
+        toast.error(t("fees.toastAddAtLeastOne", "Please add at least one fee item with valid amount"));
         return;
       }
     }
 
     if (!selectedStudentId) {
-      form.setError("studentId", { message: "Student is required" });
+      form.setError("studentId", { message: t("fees.validationStudentRequired", "Student is required") });
       return;
     }
 
@@ -307,32 +322,42 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
           } catch {
           }
         }
-        toast.success(`Fee collected successfully!`)
-        router.push(`/fees/receipt?receiptNumber=${result?.receiptNumber}`)
+        toast.success(t("fees.toastCollected", "Fee collected successfully!"))
+        router.push(withLocale(lang, `/fees/receipt?receiptNumber=${result?.receiptNumber}`))
       } else {
         const error = 'error' in result ? result.error : 'Failed to collect fee'
-        toast.error(`Failed: ${error}`)
+        toast.error(`${t("fees.toastFailedPrefix", "Failed:")} ${error}`)
       }
     } catch {
-      toast.error("Something went wrong")
+      toast.error(t("fees.toastSomethingWentWrong", "Something went wrong"))
     } finally {
       setIsLoading(false)
     }
   }
 
   const standardMonthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
+    t("months.jan", "January"),
+    t("months.feb", "February"),
+    t("months.mar", "March"),
+    t("months.apr", "April"),
+    t("months.may", "May"),
+    t("months.jun", "June"),
+    t("months.jul", "July"),
+    t("months.aug", "August"),
+    t("months.sep", "September"),
+    t("months.oct", "October"),
+    t("months.nov", "November"),
+    t("months.dec", "December"),
   ];
   const displayMonthOrder = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2];
 
   const formatFeeLabel = (type: string) => {
     switch (type) {
-      case 'monthly': return 'Monthly Fee';
-      case 'examination': return 'Examination Fee';
-      case 'admission': return 'Admission Fee';
-      case 'admissionFees': return 'Admission Fees';
-      case 'registrationFees': return 'Registration Fees';
+      case 'monthly': return t("fees.feeTypeMonthly", "Monthly Fee");
+      case 'examination': return t("fees.feeTypeExam", "Examination Fee");
+      case 'admission': return t("fees.feeTypeAdmission", "Admission Fee");
+      case 'admissionFees': return t("fees.feeTypeAdmissionFees", "Admission Fees");
+      case 'registrationFees': return t("fees.feeTypeRegistrationFees", "Registration Fees");
       default: return type.charAt(0).toUpperCase() + type.slice(1).replace(/([A-Z])/g, ' $1').trim();
     }
   }
@@ -342,7 +367,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
       <BackButton />
       <Card>
         <CardHeader>
-          <CardTitle>Collect Fee</CardTitle>
+          <CardTitle>{t("fees.collectTitle", "Collect Fee")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -355,18 +380,18 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
                   name="classId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Filter by Class</FormLabel>
+                      <FormLabel>{t("fees.filterByClass", "Filter by Class")}</FormLabel>
                       <Select onValueChange={(val) => {
                         field.onChange(val);
                         form.setValue("studentId", "");
                       }} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="All Classes" />
+                            <SelectValue placeholder={t("fees.allClasses", "All Classes")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="all">All Classes</SelectItem>
+                          <SelectItem value="all">{t("fees.allClasses", "All Classes")}</SelectItem>
                           {classes.map((c) => (
                             <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                           ))}
@@ -382,7 +407,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
                   name="studentId"
                   render={({ field }) => (
                     <FormItem className="flex flex-col mt-2">
-                      <FormLabel>Student</FormLabel>
+                      <FormLabel>{t("fees.student", "Student")}</FormLabel>
                       <Popover open={open} onOpenChange={setOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -397,16 +422,16 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
                             >
                               {field.value
                                 ? students.find((s) => s.id === field.value)?.name + ` (${students.find((s) => s.id === field.value)?.registrationNumber})`
-                                : "Select Student"}
+                                : t("fees.selectStudent", "Select Student")}
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-[300px] p-0">
                           <Command>
-                            <CommandInput placeholder="Search student..." />
+                            <CommandInput placeholder={t("fees.searchStudent", "Search student...")} />
                             <CommandList>
-                              <CommandEmpty>No student found.</CommandEmpty>
+                              <CommandEmpty>{t("fees.noStudentFound", "No student found.")}</CommandEmpty>
                               <CommandGroup>
                                 {filteredStudents.map((student) => (
                                   <CommandItem
@@ -443,7 +468,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
                   name="transactionDate"
                   render={({ field }) => (
                     <FormItem className="flex flex-col mt-2">
-                      <FormLabel>Collection Date</FormLabel>
+                      <FormLabel>{t("fees.collectionDate", "Collection Date")}</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} />
                       </FormControl>
@@ -456,7 +481,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
               {/* Add Fee Section */}
               <div className="border rounded-md p-4 bg-muted/30 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium">Add Fee Item</h3>
+                  <h3 className="text-sm font-medium">{t("fees.addFeeItem", "Add Fee Item")}</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -465,11 +490,11 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
                     name="feeType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Fee Type</FormLabel>
+                        <FormLabel>{t("fees.feeType", "Fee Type")}</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select Type" />
+                              <SelectValue placeholder={t("fees.selectType", "Select Type")} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -478,7 +503,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
                                 {formatFeeLabel(type)}
                               </SelectItem>
                             ))}
-                            <SelectItem value="other">Other</SelectItem>
+                            <SelectItem value="other">{t("fees.other", "Other")}</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -491,12 +516,12 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
                     name="year"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Session Start Year</FormLabel>
+                        <FormLabel>{t("fees.sessionStartYear", "Session Start Year")}</FormLabel>
                         <FormControl>
                           <Input type="number" {...field} />
                         </FormControl>
                         <FormDescription className="text-[10px]">
-                          Academic session starts in April of this year.
+                          {t("fees.sessionNote", "Academic session starts in April of this year.")}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -506,7 +531,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
 
                 {feeType === 'monthly' && (
                   <div className="space-y-3 border p-4 rounded-md bg-background">
-                    <FormLabel>Select Months</FormLabel>
+                    <FormLabel>{t("fees.selectMonths", "Select Months")}</FormLabel>
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                       {displayMonthOrder.map((monthIndex) => (
                         <div key={monthIndex} className="flex items-center space-x-2">

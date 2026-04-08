@@ -1,30 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { Home, UserCircle, CalendarDays, CreditCard, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { defaultLocale, hasLocale, type Locale } from "@/lib/i18n";
+import { withLocale } from "@/lib/locale-path";
+import { useI18n } from "@/components/i18n-provider";
 
 const navItems = [
-  { name: "Home", href: "/parent/dashboard", icon: Home },
-  { name: "Attendance", href: "/parent/attendance", icon: CalendarDays },
-  { name: "Fees", href: "/parent/fees", icon: CreditCard },
-  { name: "Profile", href: "/parent/profile", icon: UserCircle },
-  { name: "Share", href: "/share", icon: Share2 },
+  { nameKey: "nav.home", fallback: "Home", href: "/parent/dashboard", icon: Home },
+  { nameKey: "nav.attendance", fallback: "Attendance", href: "/parent/attendance", icon: CalendarDays },
+  { nameKey: "nav.fees", fallback: "Fees", href: "/parent/fees", icon: CreditCard },
+  { nameKey: "nav.profile", fallback: "Profile", href: "/parent/profile", icon: UserCircle },
+  { nameKey: "nav.share", fallback: "Share", href: "/share", icon: Share2 },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
+  const params = useParams<{ lang?: string }>();
+  const lang = hasLocale(params.lang ?? "") ? (params.lang as Locale) : defaultLocale;
+  const base = `/${lang}`;
+  const normalizedPathname = pathname?.startsWith(`${base}/`) ? pathname.slice(base.length) : pathname;
+  const { t } = useI18n();
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 flex h-20 items-center justify-around border-t bg-background/95 pb-safe backdrop-blur-md transition-all duration-300 md:h-24 lg:justify-center">
       <div className="flex w-full items-center justify-around max-w-md mx-auto lg:max-w-lg lg:gap-12">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = normalizedPathname === item.href;
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={withLocale(lang, item.href)}
               className="group relative flex flex-col items-center gap-1.5 px-3 py-1 transition-all duration-300 active:scale-95 shrink-0"
             >
               <div
@@ -41,7 +49,7 @@ export function BottomNav() {
                   isActive ? "text-primary opacity-100 translate-y-0" : "text-muted-foreground opacity-70 group-hover:opacity-100"
                 )}
               >
-                {item.name}
+                {t(item.nameKey, item.fallback)}
               </span>)}
               {/* {isActive && (
                 <span className="absolute -bottom-1 h-1 w-1 rounded-full bg-primary" />

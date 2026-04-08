@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useMemo, useState, useEffect, useCallback } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -34,21 +34,21 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { getStudentsForAttendance, saveAttendance, StudentForAttendance } from "@/actions/attendance"
 import { useSession } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { BackButton } from "../ui/back-button"
-
-const formSchema = z.object({
-  date: z.date(),
-  classId: z.string().min(1, "Class is required"),
-  section: z.string().min(1, "Section is required"),
-})
+import { defaultLocale, hasLocale } from "@/lib/i18n"
+import { withLocale } from "@/lib/locale-path"
+import { useI18n } from "@/components/i18n-provider"
 
 interface AttendanceFormProps {
   initialClasses: { id: string; name: string }[]
 }
 
 export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
+  const { t } = useI18n()
   const { data: session } = useSession()
+  const params = useParams<{ lang?: string }>()
+  const lang = hasLocale(params.lang ?? "") ? (params.lang as string) : defaultLocale
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -67,6 +67,16 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
   const [attendanceState, setAttendanceState] = useState<Record<string, string>>({})
   const [isHoliday, setIsHoliday] = useState(false)
   const [holidayReason, setHolidayReason] = useState<string | null>(null)
+
+  const formSchema = useMemo(
+    () =>
+      z.object({
+        date: z.date(),
+        classId: z.string().min(1, t("attendance.validationClassRequired", "Class is required")),
+        section: z.string().min(1, t("attendance.validationSectionRequired", "Section is required")),
+      }),
+    [t]
+  )
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -114,10 +124,10 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
         })
         setAttendanceState(initialState)
       } else {
-        toast.error("Failed to fetch students")
+        toast.error(t("attendance.toastFetchFailed", "Failed to fetch students"))
       }
     } catch {
-      toast.error("An error occurred")
+      toast.error(t("attendance.toastGenericError", "An error occurred"))
     } finally {
       setLoading(false)
     }
@@ -163,7 +173,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (students.length === 0) {
-      toast.error("No students to mark attendance for")
+      toast.error(t("attendance.toastNoStudents", "No students to mark attendance for"))
       return
     }
 
@@ -184,14 +194,14 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
       })
 
       if (result.success) {
-        toast.success("Attendance saved successfully")
+        toast.success(t("attendance.toastSaved", "Attendance saved successfully"))
         router.refresh()
-        router.push("/attendance/dashboard")
+        router.push(withLocale(lang, "/attendance/dashboard"))
       } else {
-        toast.error(result.error || "Failed to save attendance")
+        toast.error(result.error || t("attendance.toastSaveFailed", "Failed to save attendance"))
       }
     } catch {
-      toast.error("An error occurred while saving")
+      toast.error(t("attendance.toastSaveError", "An error occurred while saving"))
     } finally {
       setSaving(false)
     }
@@ -214,8 +224,10 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
       <BackButton />
       {isHoliday && (
         <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 rounded-md" role="alert">
-          <p className="font-bold">Holiday: {holidayReason}</p>
-          <p>Attendance is automatically marked as &apos;Holiday&apos; for all students.</p>
+          <p className="font-bold">
+            {t("attendance.holidayPrefix", "Holiday:")} {holidayReason}
+          </p>
+          <p>{t("attendance.holidayNote", "Attendance is automatically marked as 'Holiday' for all students.")}</p>
         </div>
       )}
       <Form {...form}>
@@ -226,7 +238,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
               name="date"
               render={({ field }) => (
                 <FormItem className="flex flex-col col-span-2">
-                  <FormLabel>Date</FormLabel>
+                  <FormLabel>{t("attendance.date", "Date")}</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -240,7 +252,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
                           {field.value ? (
                             format(field.value, "PPP")
                           ) : (
-                            <span>Pick a date</span>
+                            <span>{t("attendance.pickDate", "Pick a date")}</span>
                           )}
                           <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button>
@@ -274,11 +286,11 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
               name="classId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Class</FormLabel>
+                  <FormLabel>{t("attendance.class", "Class")}</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select Class" />
+                        <SelectValue placeholder={t("attendance.selectClass", "Select Class")} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -299,11 +311,11 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
               name="section"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Section</FormLabel>
+                  <FormLabel>{t("attendance.section", "Section")}</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select Section" />
+                        <SelectValue placeholder={t("attendance.selectSection", "Select Section")} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -332,17 +344,27 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
             <div className="relative w-full md:w-[300px]">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, roll no..."
+                placeholder={t("attendance.searchPlaceholder", "Search by name, roll no...")}
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 className="pl-8 w-full"
               />
             </div>
             <div className="flex flex-wrap gap-3 text-sm font-medium w-full md:w-auto">
-              <span className="text-muted-foreground px-2 py-1 bg-secondary rounded-md">Total: {total}</span>
-              <span className="text-green-700 bg-green-100 px-2 py-1 rounded-md">Present: {presentCount}</span>
-              <span className="text-red-700 bg-red-100 px-2 py-1 rounded-md">Absent: {absentCount}</span>
-              {holidayCount > 0 && <span className="text-blue-700 bg-blue-100 px-2 py-1 rounded-md">Holiday: {holidayCount}</span>}
+              <span className="text-muted-foreground px-2 py-1 bg-secondary rounded-md">
+                {t("attendance.total", "Total:")} {total}
+              </span>
+              <span className="text-green-700 bg-green-100 px-2 py-1 rounded-md">
+                {t("attendance.present", "Present:")} {presentCount}
+              </span>
+              <span className="text-red-700 bg-red-100 px-2 py-1 rounded-md">
+                {t("attendance.absent", "Absent:")} {absentCount}
+              </span>
+              {holidayCount > 0 && (
+                <span className="text-blue-700 bg-blue-100 px-2 py-1 rounded-md">
+                  {t("attendance.holiday", "Holiday:")} {holidayCount}
+                </span>
+              )}
             </div>
           </div>
 
@@ -362,11 +384,13 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate text-black">{student.name}</div>
-                    <div className="text-xs text-gray-500 truncate">Roll: {student.rollNumber || "-"}</div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {t("attendance.rollPrefix", "Roll:")} {student.rollNumber || "-"}
+                    </div>
                   </div>
                   <div className="ml-3">
                      {isHoliday ? (
-                        <span className="text-blue-600 font-bold text-xs px-2 py-1 bg-blue-100 rounded">Holiday</span>
+                        <span className="text-blue-600 font-bold text-xs px-2 py-1 bg-blue-100 rounded">{t("attendance.holidayStatus", "Holiday")}</span>
                      ) : (
                        <Button 
                           size="sm" 
@@ -390,11 +414,11 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
             {/* Desktop View: Table */}
             <div className="p-4 grid grid-cols-12 gap-4 bg-muted/50 font-medium text-sm">
               <div className="col-span-1">#</div>
-              <div className="col-span-1">Photo</div>
-              <div className="col-span-3">Name / Father&apos;s Name</div>
-              <div className="col-span-2">Roll No</div>
-              <div className="col-span-2">Reg No</div>
-              <div className="col-span-3 text-right">Status</div>
+              <div className="col-span-1">{t("attendance.photo", "Photo")}</div>
+              <div className="col-span-3">{t("attendance.nameFather", "Name / Father's Name")}</div>
+              <div className="col-span-2">{t("attendance.rollNo", "Roll No")}</div>
+              <div className="col-span-2">{t("attendance.regNo", "Reg No")}</div>
+              <div className="col-span-3 text-right">{t("attendance.status", "Status")}</div>
             </div>
             <div className="divide-y">
               {filteredStudents.map((student, index) => (
@@ -414,7 +438,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
                   <div className="col-span-2 text-sm">{student.registrationNumber || "-"}</div>
                   <div className="col-span-3 flex justify-end gap-2">
                     {isHoliday ? (
-                      <span className="text-blue-600 font-medium bg-blue-100 px-2 py-1 rounded">Holiday</span>
+                      <span className="text-blue-600 font-medium bg-blue-100 px-2 py-1 rounded">{t("attendance.holidayStatus", "Holiday")}</span>
                     ) : (
                       <div className="flex gap-2">
                         <Button
@@ -428,7 +452,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
                           )}
                           onClick={() => handleStatusChange(student.id, "Present")}
                         >
-                          Present
+                          {t("attendance.presentBtn", "Present")}
                         </Button>
                         <Button
                           type="button"
@@ -440,7 +464,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
                           )}
                           onClick={() => handleStatusChange(student.id, "Absent")}
                         >
-                          Absent
+                          {t("attendance.absentBtn", "Absent")}
                         </Button>
                       </div>
                     )}
@@ -454,7 +478,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t md:relative md:bg-transparent md:border-0 md:p-0 z-10">
               <Button size="lg" onClick={form.handleSubmit(onSubmit)} disabled={saving} className="w-full md:w-auto">
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Submit Attendance ({presentCount} Present)
+                {t("attendance.submit", "Submit Attendance")} ({presentCount} {t("attendance.presentWord", "Present")})
               </Button>
             </div>
           ) : null}
@@ -464,7 +488,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
       ) : (
         selectedClass && selectedSection && (
           <div className="text-center p-8 text-muted-foreground">
-            No students found for this class and section.
+            {t("attendance.noStudentsFound", "No students found for this class and section.")}
           </div>
         )
       )}
