@@ -398,21 +398,25 @@ export async function getFeeReport({
         const paidTxn = studentAllTxns.find(t => t.feeType === 'monthly' && t.month === m && t.year === y);
         
         const isAprilIncluded = (() => {
-            if (m === 4 && !paidTxn) {
-                 const admTxn = studentAllTxns.find(t => (t.feeType === 'admission' || t.feeType === 'admissionFees') && t.year === y);
-                 const regTxn = studentAllTxns.find(t => t.feeType === 'registrationFees' && t.year === y);
-                 if ((admIncludesApril && admTxn) || (regIncludesApril && regTxn)) {
-                     return admTxn || regTxn;
-                 }
+          if (m === 4) {
+            const admTxn = studentAllTxns.find(t => (t.feeType === 'admission' || t.feeType === 'admissionFees') && t.year === y);
+            const regTxn = studentAllTxns.find(t => t.feeType === 'registrationFees' && t.year === y);
+            if ((admIncludesApril && admTxn) || (regIncludesApril && regTxn)) {
+              return admTxn || regTxn;
             }
-            return null;
+          }
+          return null;
         })();
 
         if (isAprilIncluded) {
-             feeStatuses[monthHeader] = { 
-                 status: 'paid', // visually looks paid
-                 date: format(new Date(isAprilIncluded.transactionDate || (isAprilIncluded as { createdAt?: Date }).createdAt || new Date()), 'dd-MM-yy') 
-             };
+          if (paidTxn) {
+            paidAmount += paidTxn.amount;
+          }
+          const dateSource = paidTxn || isAprilIncluded;
+          feeStatuses[monthHeader] = { 
+            status: 'paid',
+            date: format(new Date(dateSource.transactionDate || (dateSource as { createdAt?: Date }).createdAt || new Date()), 'dd-MM-yy') 
+          };
         } else {
             expectedAmount += monthlyFee;
             if (paidTxn) {

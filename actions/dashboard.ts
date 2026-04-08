@@ -230,25 +230,28 @@ async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: strin
 
                 if (isAfterAdmission) {
                     let isPaid = hasPaidFeeFast(studentId, 'monthly', m, y);
+                    let isAprilCovered = false
                     
-                    if (m === 4 && !isPaid) {
+                    if (m === 4) {
                         const paidAdm = hasPaidFeeFast(studentId, 'admission', undefined, y) || hasPaidFeeFast(studentId, 'admissionFees', undefined, y);
                         const paidReg = hasPaidFeeFast(studentId, 'registrationFees', undefined, y);
                         
                         if ((admIncludesApril && paidAdm) || (regIncludesApril && paidReg)) {
+                            isAprilCovered = true
                             isPaid = true;
                         }
                     }
 
-                    totalExpected += monthlyAmount;
+                    const expectedForMonth = isAprilCovered ? 0 : monthlyAmount
+                    totalExpected += expectedForMonth;
 
-                    if (!isPaid) {
-                        studentUnpaidAmount += monthlyAmount;
+                    if (!isPaid && expectedForMonth > 0) {
+                        studentUnpaidAmount += expectedForMonth;
                         studentUnpaidDetails.push(`${format(monthDate, 'MMM')} ${y}`);
 
                         // Accumulate monthly unpaid for overview
                         const current = monthlyUnpaidMap.get(monthKey) || 0;
-                        monthlyUnpaidMap.set(monthKey, current + monthlyAmount);
+                        monthlyUnpaidMap.set(monthKey, current + expectedForMonth);
                     }
                 }
             }
