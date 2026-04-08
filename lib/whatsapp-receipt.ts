@@ -5,8 +5,19 @@ import License from "@/models/License"
 import Setting from "@/models/Setting"
 import dbConnect from "./db"
 
+type ReceiptStudent = {
+    name?: string;
+    registrationNumber?: string;
+    rollNumber?: string;
+    classId?: { name?: string };
+    className?: string;
+    section?: string;
+    contacts?: { mobile?: string[] };
+    parents?: { father?: { name?: string }; mother?: { name?: string } };
+}
+
 interface SendReceiptParams {
-    student: any;
+    student: ReceiptStudent | null | undefined;
     totalAmount: number;
     receiptNumber: string;
     monthsStr: string;
@@ -19,21 +30,27 @@ export async function sendWhatsAppReceipt({ student, totalAmount, receiptNumber,
         await dbConnect();
         // 1. Check if alerts are enabled globally in Settings
         const whatsappReceiptEnabled = await Setting.findOne({ key: "whatsapp_receipt_alert" }).lean();
-        const isAlertEnabled = whatsappReceiptEnabled ? (whatsappReceiptEnabled as any).value === true : false;
+        const isAlertEnabled = whatsappReceiptEnabled ? (whatsappReceiptEnabled as { value?: boolean }).value === true : false;
 
-        if (!isAlertEnabled || !whatsappConfig.enabled || !student?.contacts?.mobile?.[0]) {
+        if (!student) {
+            return { success: false, reason: "Missing student" };
+        }
+
+        const studentContacts = student.contacts?.mobile;
+        if (!isAlertEnabled || !whatsappConfig.enabled || !studentContacts?.[0]) {
             return { success: false, reason: "Alerts disabled or no mobile number" };
         }
 
-        const mobile = student.contacts.mobile[0];
+        const mobile = studentContacts[0];
 
         // 2. Format Receipt URL via query parameters
+        const classIdObj = student.classId;
         const searchParams = new URLSearchParams({
             receiptNumber,
-            studentName: student.name,
+            studentName: student.name || 'Student',
             studentRegNo: student.registrationNumber || 'N/A',
             rollNumber: student.rollNumber || 'N/A',
-            className: student.classId?.name || student.className || 'N/A',
+            className: classIdObj?.name || student.className || 'N/A',
             section: student.section || 'A',
             amount: totalAmount.toString(),
             date: (transactionDate || new Date()).toISOString(),

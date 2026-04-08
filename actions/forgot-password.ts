@@ -42,7 +42,7 @@ export async function requestForgotPasswordOtp(phone: string) {
 
     // 4. Send via System OTP route (dedicated route from feeease-worker)
     const license = await License.findOne().sort({ createdAt: -1 }).lean();
-    const scName = (license as any)?.schoolName || whatsappConfig.schoolName || 'School';
+    const scName = (license as { schoolName?: string })?.schoolName || whatsappConfig.schoolName || 'School';
 
     const res = await fetch(`${whatsappConfig.worker.url}/api/v1/system/otp`, {
         method: 'POST',

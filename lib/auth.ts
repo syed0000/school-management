@@ -6,6 +6,7 @@ import Teacher from "@/models/Teacher";
 import Student from "@/models/Student";
 import Otp from "@/models/Otp";
 import bcrypt from "bcryptjs";
+import { demoConfig } from "@/lib/demo-config";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET, // Ensure secret is explicitly passed
@@ -18,11 +19,42 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
         phone: { label: "Phone", type: "text" },
         otp: { label: "OTP", type: "text" },
-        role: { label: "Role", type: "text" }
+        role: { label: "Role", type: "text" },
+        demo: { label: "Demo", type: "text" }
       },
       async authorize(credentials) {
         if (!credentials) return null;
         await dbConnect();
+
+        if (credentials.demo === "true") {
+          if (!demoConfig.adminInstitute) {
+            throw new Error("Demo login is not enabled");
+          }
+
+          const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const email = (credentials.email || "").trim();
+          if (!email) {
+            throw new Error("Demo email is required");
+          }
+
+          const demoUser = await User.findOne({
+            isDemo: true,
+            isActive: true,
+            email: { $regex: `^${escapeRegExp(email)}$`, $options: "i" },
+          });
+          if (!demoUser) {
+            throw new Error("Demo user not found");
+          }
+
+          return {
+            id: demoUser._id.toString(),
+            name: demoUser.name,
+            email: demoUser.email,
+            role: demoUser.role,
+            requiresPasswordChange: false,
+            isDemo: true
+          };
+        }
         
         // Handle OTP-based login (Teacher/Parent)
         if (credentials.phone && credentials.otp && credentials.role) {
@@ -58,7 +90,13 @@ export const authOptions: NextAuthOptions = {
             return {
                 id: entity._id.toString(),
                 name: entity.name,
-                email: (entity as any).email || (entity as any).contacts?.email?.[0] || "",
+                email: (() => {
+                  const maybe = entity as unknown as { email?: unknown; contacts?: { email?: unknown } };
+                  const direct = typeof maybe.email === "string" ? maybe.email : "";
+                  const contactArr = Array.isArray(maybe.contacts?.email) ? maybe.contacts?.email : [];
+                  const contact = typeof contactArr[0] === "string" ? contactArr[0] : "";
+                  return direct || contact || "";
+                })(),
                 role: role,
                 requiresPasswordChange: false
             };
@@ -121,17 +159,21 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role;
         token.requiresPasswordChange = user.requiresPasswordChange;
         token.id = user.id;
+        token.isDemo = (user as unknown as { isDemo?: boolean }).isDemo === true;
+        token.impersonation = null;
         token.lastRefetchedAt = Math.floor(Date.now() / 1000);
       }
       
       // Allow manual refresh via update() if needed
       if (trigger === "update" && session) {
-        token.role = session.user?.role || token.role;
+        if (token.isDemo) {
+          token.impersonation = session.user?.impersonation ?? null;
+        }
         token.lastRefetchedAt = Math.floor(Date.now() / 1000);
       }
 
       // Throttled re-validation for non-OTP roles
-      if (token.id && !['teacher', 'parent'].includes(token.role as string)) {
+      if (token.id && !token.isDemo && !['teacher', 'parent'].includes(token.role as string)) {
         const now = Math.floor(Date.now() / 1000);
         const lastRefetched = (token.lastRefetchedAt as number) || 0;
 
@@ -157,13 +199,20 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (token.error === "AccountInactive") {
-         return null as any; 
+         return null as unknown as typeof session;
       }
       
       if (token) {
-        session.user.role = token.role;
+        session.user.isDemo = token.isDemo === true;
+        session.user.actorId = token.id as string;
+        session.user.impersonation = token.impersonation ?? null;
+
+        const effectiveRole = token.impersonation?.role || token.role;
+        const effectiveId = token.impersonation?.id || (token.id as string);
+
+        session.user.role = effectiveRole;
         session.user.requiresPasswordChange = token.requiresPasswordChange;
-        session.user.id = token.id as string;
+        session.user.id = effectiveId;
       }
       return session;
     }

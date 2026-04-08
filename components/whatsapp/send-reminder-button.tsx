@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { sendBulkReminders, type ReminderStudent } from "@/actions/whatsapp-reminders"
 import { getWhatsAppSummary } from "@/actions/whatsapp-stats"
-import WhatsAppPricing from "@/models/WhatsAppPricing"
 
 interface CostEstimate {
   recipientCount: number

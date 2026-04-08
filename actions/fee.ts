@@ -63,11 +63,13 @@ export async function getPendingFees() {
 import logger from "@/lib/logger"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 export async function verifyFee(transactionId: string, action: 'approve' | 'reject') {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user.role !== 'admin') throw new Error('Unauthorized');
+    if (isDemoSession(session)) return demoWriteSuccess();
 
     await dbConnect();
     

@@ -11,7 +11,6 @@ import { getNotificationHistory } from "@/actions/notification"
 import { NotificationComposer } from "@/components/notifications/notification-composer"
 import { NotificationHistoryList } from "@/components/notifications/notification-history-list"
 import { MessageSquare, Bell } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +26,7 @@ export default async function WhatsAppPage() {
     getNotificationHistory(),
   ]);
 
-  const { history, totalPages, currentPage, totalCount } = historyData;
+  const { history, totalPages, currentPage } = historyData;
 
   return (
     <div className="flex-1 space-y-6">

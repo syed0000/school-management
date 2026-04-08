@@ -6,6 +6,13 @@ declare module "next-auth" {
       id: string;
       role: string;
       requiresPasswordChange: boolean;
+      isDemo?: boolean;
+      actorId?: string;
+      impersonation?: {
+        id: string;
+        role: string;
+        name?: string;
+      } | null;
     } & DefaultSession["user"]
   }
 
@@ -13,6 +20,7 @@ declare module "next-auth" {
     id: string;
     role: string;
     requiresPasswordChange: boolean;
+    isDemo?: boolean;
   }
 }
 
@@ -21,6 +29,12 @@ declare module "next-auth/jwt" {
     id: string;
     role: string;
     requiresPasswordChange: boolean;
+    isDemo?: boolean;
+    impersonation?: {
+      id: string;
+      role: string;
+      name?: string;
+    } | null;
     error?: string;
     lastRefetchedAt?: number;
   }

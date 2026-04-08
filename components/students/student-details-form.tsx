@@ -17,10 +17,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Plus, Trash, Save } from "lucide-react"
+import { Loader2, Plus, Trash, Save, Printer } from "lucide-react"
 import { updateStudent } from "@/actions/student"
 import { useRouter } from "next/navigation"
 import { FileUploader } from "@/components/ui/file-uploader"
+import { AdmissionPrintDocument, type AdmissionPrintDocumentData } from "@/components/students/admission-print-document"
 
 const formSchema = z.object({
   registrationNumber: z.string().min(1, "Registration Number is required"),
@@ -100,6 +101,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [photo, setPhoto] = useState<string | null>(student.photo || null)
+  const [printData, setPrintData] = useState<AdmissionPrintDocumentData | null>(null)
 
   const form = useForm<z.infer<typeof formSchema>>({
     
@@ -180,6 +182,50 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handlePrint = () => {
+    const values = form.getValues()
+    const className = classes.find((c) => c.id === values.classId)?.name || student.className || ""
+
+    setPrintData({
+      student: {
+        registrationNumber: values.registrationNumber,
+        name: values.name,
+        className,
+        section: values.section,
+        rollNumber: values.rollNumber,
+        dateOfBirth: values.dateOfBirth,
+        dateOfAdmission: values.dateOfAdmission,
+        gender: values.gender,
+        aadhaar: values.aadhaar,
+        pen: values.pen,
+        lastInstitution: values.lastInstitution,
+        tcNumber: values.tcNumber,
+        address: values.address,
+        mobile: values.mobile.map((m) => m.value).filter(Boolean),
+        email: (values.email || []).map((e) => e.value).filter(Boolean),
+        fatherName: values.parents.father.name,
+        fatherAadhaar: values.parents.father.aadhaarNumber,
+        motherName: values.parents.mother.name,
+        motherAadhaar: values.parents.mother.aadhaarNumber,
+        photoSrc: photo || undefined,
+        documents: (values.documents || []).map((d) => ({
+          type: d.type,
+          documentNumber: d.documentNumber,
+          imageSrc: d.image,
+        })),
+      },
+      meta: {
+        printedAtIso: new Date().toISOString(),
+      },
+    })
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.print()
+      })
+    })
   }
 
   return (
@@ -631,13 +677,53 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                 </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <Save className="mr-2 h-4 w-4" />
-              Save Changes
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3 print:hidden">
+              <Button type="button" variant="secondary" onClick={handlePrint} disabled={isLoading}>
+                <Printer className="mr-2 h-4 w-4" />
+                Print Admission Form
+              </Button>
+              <Button type="submit" className="sm:ml-auto" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Save className="mr-2 h-4 w-4" />
+                Save Changes
+              </Button>
+            </div>
           </form>
         </Form>
+
+        <div className="hidden print:block admission-print">
+          {printData ? (
+            <div className="p-0">
+              <AdmissionPrintDocument data={printData} />
+            </div>
+          ) : null}
+        </div>
+
+        <style jsx global>{`
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            .admission-print, .admission-print * {
+              visibility: visible;
+            }
+            .admission-print {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+            }
+            @page {
+              size: A4;
+              margin: 12mm;
+            }
+            html, body {
+              background: #fff !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+          }
+        `}</style>
       </CardContent>
     </Card>
   )

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,7 @@ interface StudentFeeRecord {
   collectedPeriod: number;
   dueAmount: number;
   photo?: string;
-  feeStatuses: Record<string, any>;
+  feeStatuses: Record<string, { status: string; date?: string }>;
 }
 
 interface FeeReportData {
@@ -40,7 +40,7 @@ interface FeeReportData {
     totalPending: number;
     collectionRate: string | number;
   };
-  trend: any[];
+  trend: Record<string, unknown>[];
   studentReport: StudentFeeRecord[];
 }
 
@@ -50,27 +50,26 @@ export function ClassFeeTab({ classId, section }: ClassFeeTabProps) {
   const [reportData, setReportData] = useState<FeeReportData | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const fetchData = () => {
+  const fetchData = useCallback(() => {
     if (!date?.from || !date?.to) return;
 
     startTransition(async () => {
       try {
         const res = await getTeacherClassFeeReport(classId, section, date.from!, date.to!);
         if (res?.success && res.data) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setReportData(res.data as any);
+          setReportData(res.data as unknown as FeeReportData);
         } else {
           toast.error(res?.error || "Failed to load fee report");
         }
-      } catch (error) {
+      } catch {
         toast.error("An error occurred");
       }
     });
-  };
+  }, [classId, section, date]);
 
   useEffect(() => {
     fetchData();
-  }, [date, classId, section]);
+  }, [fetchData]);
 
   const filteredStudents = reportData?.studentReport.filter(
     (s) =>

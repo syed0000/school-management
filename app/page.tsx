@@ -33,6 +33,9 @@ export default async function Home() {
   const session = await getServerSession(authOptions);
 
   if (session) {
+    if (session.user.isDemo) {
+      redirect("/demo/access-as");
+    }
     if (session.user.role === "admin") {
       redirect("/admin/dashboard");
     } else if (session.user.role === "attendance_staff") {

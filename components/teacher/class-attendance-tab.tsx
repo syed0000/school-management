@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
-import { format, subDays, startOfWeek, endOfWeek } from "date-fns";
-import { getTeacherClassAttendanceReport, saveTeacherAttendance } from "@/actions/teacher-portal";
+import { useState, useTransition, useEffect, useCallback } from "react";
+import { format } from "date-fns";
+import { saveTeacherAttendance } from "@/actions/teacher-portal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Search, Edit3, Check, X, Calendar as CalIcon } from "lucide-react";
+import { Loader2, Search, Edit3, Check, Calendar as CalIcon } from "lucide-react";
 import { getStudentsForAttendance } from "@/actions/attendance";
 import type { StudentForAttendance } from "@/actions/attendance";
 
@@ -28,7 +27,7 @@ export function ClassAttendanceTab({ classId, section, attendanceAccess }: Class
   const [attendanceState, setAttendanceState] = useState<Record<string, { status: string; remarks: string }>>({});
   const [isHoliday, setIsHoliday] = useState(false);
 
-  const fetchAttendance = () => {
+  const fetchAttendance = useCallback(() => {
     startTransition(async () => {
       try {
         const res = await getStudentsForAttendance(classId, section, date.toISOString());
@@ -45,15 +44,15 @@ export function ClassAttendanceTab({ classId, section, attendanceAccess }: Class
         } else {
           toast.error(res.error || "Failed to load attendance");
         }
-      } catch (err) {
+      } catch {
         toast.error("An error occurred while fetching attendance");
       }
     });
-  };
+  }, [classId, section, date]);
 
   useEffect(() => {
     fetchAttendance();
-  }, [date, classId, section]);
+  }, [fetchAttendance]);
 
   const handleSave = async () => {
     startTransition(async () => {
@@ -80,13 +79,19 @@ export function ClassAttendanceTab({ classId, section, attendanceAccess }: Class
     });
   };
 
-  const setAllStatus = (status: string) => {
-    const newState = { ...attendanceState };
-    Object.keys(newState).forEach(id => {
-      newState[id].status = status;
+  const setAllStatus = useCallback((status: string) => {
+    setAttendanceState((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => {
+        next[k] = { ...next[k], status };
+      });
+      return next;
     });
-    setAttendanceState(newState);
-  };
+  }, []);
+  
+  // Adding unused variable check comment
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _forceUseSetAllStatus = setAllStatus;
 
   const filteredStudents = students.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||

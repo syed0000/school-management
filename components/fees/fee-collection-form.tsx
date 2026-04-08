@@ -299,11 +299,19 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
       }
 
       const result = await collectFees(payload, userId)
-      if (result?.success && result?.receiptNumber) {
+      if (result.success && 'receiptNumber' in result && typeof result.receiptNumber === 'string') {
+        const demoReceipt = (result as unknown as { demoReceipt?: unknown }).demoReceipt
+        if (demoReceipt) {
+          try {
+            sessionStorage.setItem(`demoReceipt:${result.receiptNumber}`, JSON.stringify(demoReceipt))
+          } catch {
+          }
+        }
         toast.success(`Fee collected successfully!`)
         router.push(`/fees/receipt?receiptNumber=${result?.receiptNumber}`)
       } else {
-        toast.error(`Failed: ${result?.error}`)
+        const error = 'error' in result ? result.error : 'Failed to collect fee'
+        toast.error(`Failed: ${error}`)
       }
     } catch {
       toast.error("Something went wrong")

@@ -36,7 +36,7 @@ export default function ParentAttendancePage() {
         } else {
           toast.error("Failed to load attendance");
         }
-      } catch (error) {
+      } catch {
         toast.error("An error occurred");
       }
     });

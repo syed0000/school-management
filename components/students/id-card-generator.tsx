@@ -105,7 +105,7 @@ export function IDCardGenerator({ students, classes }: IDCardGeneratorProps) {
         setSignatureUrl(res.url)
         toast.success("Signature uploaded and saved")
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to upload signature")
     } finally {
       setIsUploading(false)
@@ -120,8 +120,8 @@ export function IDCardGenerator({ students, classes }: IDCardGeneratorProps) {
       formData.append('signatureUrl', signatureUrl)
       await saveSignature(formData, sigConfig)
       toast.success("Signature settings saved")
-    } catch (error) {
-      toast.error("Failed to save settings")
+    } catch {
+      toast.error("Failed to save config")
     } finally {
       setIsUploading(false)
     }
@@ -371,6 +371,7 @@ export function IDCardGenerator({ students, classes }: IDCardGeneratorProps) {
             
             {signatureUrl && (
                 <div className="p-4 bg-muted/50 rounded-lg flex items-center justify-center border border-dashed h-24 relative overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
                         src={signatureUrl} 
                         alt="Current Signature" 

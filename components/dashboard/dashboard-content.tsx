@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, FilePlus, ClipboardList, IndianRupee, PlusCircle, Headset } from "lucide-react"
+import { Users, FilePlus, ClipboardList, IndianRupee, Headset } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
 import { DashboardFilter } from "@/components/dashboard/dashboard-filter"
@@ -12,7 +12,6 @@ import { CustomPieChart } from "@/components/dashboard/charts/pie-chart"
 import { getDashboardStats } from "@/actions/dashboard"
 import { UnpaidStudentsTable, UnpaidStudent } from "@/components/dashboard/unpaid-students-table"
 import { DateRange } from "react-day-picker"
-import { subDays } from "date-fns"
 import { formatNumber, getCurrentSessionRange } from "@/lib/utils"
 interface DashboardStats {
   collected: number

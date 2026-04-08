@@ -7,6 +7,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import crypto from "crypto"
 import logger from "@/lib/logger"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 import { saveFile } from "@/lib/upload";
 
@@ -24,6 +25,8 @@ export async function createTeacher(formData: FormData) {
     if (!session) {
       return { success: false, error: "Unauthorized" }
     }
+
+    if (isDemoSession(session)) return demoWriteSuccess();
 
     const name = formData.get('name') as string;
     const email = formData.get('email') as string;
@@ -138,6 +141,8 @@ export async function updateTeacher(id: string, formData: FormData) {
     if (!session) {
       return { success: false, error: "Unauthorized" }
     }
+
+    if (isDemoSession(session)) return demoWriteSuccess();
     
     // Parse fields
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -311,6 +316,8 @@ export async function deleteTeacher(id: string) {
     if (!session || session.user.role !== "admin") {
       return { success: false, error: "Unauthorized. Only admins can delete teachers." }
     }
+
+    if (isDemoSession(session)) return demoWriteSuccess();
 
     const teacher = await Teacher.findByIdAndDelete(id)
     

@@ -9,6 +9,9 @@ import ClassFee from "@/models/ClassFee"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { findGroupForClass } from "@/actions/school-settings"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 export async function getClasses() {
   await dbConnect();
@@ -71,6 +74,8 @@ const registerStudentSchema = z.object({
 })
 
 export async function getNextRegistrationNumber(classId?: string) {
+  const session = await getServerSession(authOptions);
+  const isDemo = isDemoSession(session);
   await dbConnect();
 
   // Determine which counter to use
@@ -92,21 +97,21 @@ export async function getNextRegistrationNumber(classId?: string) {
   let counter = await Counter.findById(counterId);
 
   if (!counter) {
-    counter = await Counter.create({ _id: counterId, seq: defaultSeq });
+    if (!isDemo) {
+      counter = await Counter.create({ _id: counterId, seq: defaultSeq });
+    }
   }
 
   // Return the *next* number (seq + 1) formatted
-  let nextSeq = counter.seq + 1;
+  let nextSeq = (counter ? counter.seq : defaultSeq) + 1;
   let nextRegNo = String(nextSeq).padStart(4, '0');
 
   // Check for collision and auto-heal
   let attempts = 0;
   while (attempts < 100 && await Student.exists({ registrationNumber: nextRegNo })) {
-      await Counter.findByIdAndUpdate(
-          counterId,
-          { $set: { seq: nextSeq } },
-          { new: true }
-      );
+      if (!isDemo) {
+        await Counter.findByIdAndUpdate(counterId, { $set: { seq: nextSeq } }, { new: true });
+      }
       nextSeq++;
       nextRegNo = String(nextSeq).padStart(4, '0');
       attempts++;
@@ -117,6 +122,8 @@ export async function getNextRegistrationNumber(classId?: string) {
 
 // Function to actually increment and get — supports class-group counters
 async function incrementRegistrationNumber(classId?: string) {
+  const session = await getServerSession(authOptions);
+  const isDemo = isDemoSession(session);
   await dbConnect();
 
   let counterId = 'registrationNumber';
@@ -132,13 +139,14 @@ async function incrementRegistrationNumber(classId?: string) {
     }
   }
 
-  const counter = await Counter.findByIdAndUpdate(
-    counterId,
-    { $inc: { seq: 1 } },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
-  );
+  if (isDemo) {
+    const existing = await Counter.findById(counterId).lean() as { seq?: number } | null;
+    const seq = (existing?.seq ?? defaultSeq) + 1;
+    return String(seq).padStart(4, "0");
+  }
 
-  return String(counter.seq).padStart(4, '0');
+  const counter = await Counter.findByIdAndUpdate(counterId, { $inc: { seq: 1 } }, { new: true, upsert: true, setDefaultsOnInsert: true });
+  return String(counter.seq).padStart(4, "0");
 }
 
 
@@ -147,6 +155,13 @@ import { saveFile } from "@/lib/upload";
 
 export async function registerStudent(formData: FormData) {
   try {
+    const session = await getServerSession(authOptions);
+    if (isDemoSession(session)) {
+      const classId = (formData.get('classId') as string) || undefined;
+      const provided = (formData.get('registrationNumber') as string) || "";
+      const regNo = provided || (await getNextRegistrationNumber(classId));
+      return { success: true, regNo, demo: true };
+    }
     await dbConnect();
 
     // Parse manual JSON fields
@@ -317,6 +332,8 @@ export async function registerStudent(formData: FormData) {
 
 export async function updateStudent(id: string, data: z.infer<typeof registerStudentSchema>) {
     try {
+    const session = await getServerSession(authOptions);
+    if (isDemoSession(session)) return demoWriteSuccess();
       registerStudentSchema.parse(data);
       await dbConnect();
       
@@ -419,6 +436,8 @@ export async function updateStudent(id: string, data: z.infer<typeof registerStu
 
 export async function deleteStudent(id: string) {
     try {
+        const session = await getServerSession(authOptions);
+        if (isDemoSession(session)) return demoWriteSuccess();
         await dbConnect();
         await Student.findByIdAndUpdate(id, { isActive: false });
         revalidatePath("/students/list");
@@ -479,7 +498,7 @@ export async function getStudents(searchQuery?: string, classId?: string, sortBy
     query.classId = classId;
   }
   
-  let sortConfig: any = { createdAt: -1 };
+  let sortConfig: Record<string, 1 | -1> = { createdAt: -1 };
   if (sortBy) {
     switch (sortBy) {
       case "name_asc": sortConfig = { name: 1 }; break;

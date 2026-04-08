@@ -9,6 +9,9 @@ import { getSchoolDateBoundaries } from "@/lib/tz-utils"
 import { Types } from "mongoose"
 import logger from "@/lib/logger"
 import { checkIsHoliday } from "@/actions/holiday"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 interface StudentDoc {
   _id: Types.ObjectId;
@@ -148,6 +151,8 @@ export async function saveAttendance({
   holidayReason
 }: SaveAttendanceParams) {
   try {
+    const session = await getServerSession(authOptions);
+    if (isDemoSession(session)) return demoWriteSuccess();
     await dbConnect()
 
     const attendanceDate = new Date(date)

@@ -3,6 +3,7 @@ import { Suspense } from "react"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import { demoConfig } from "@/lib/demo-config"
 
 export default async function AdminLoginPage() {
   const session = await getServerSession(authOptions)
@@ -20,7 +21,7 @@ export default async function AdminLoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/50 p-4">
       <Suspense fallback={<div>Loading...</div>}>
-        <LoginForm type="admin" />
+        <LoginForm type="admin" allowDemo={demoConfig.adminInstitute} />
       </Suspense>
     </div>
   )

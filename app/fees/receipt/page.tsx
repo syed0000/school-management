@@ -42,6 +42,22 @@ function ReceiptContent() {
             return
         }
 
+        if (receiptNumber.startsWith('DEMO-')) {
+            try {
+                const raw = sessionStorage.getItem(`demoReceipt:${receiptNumber}`)
+                if (raw) {
+                    const parsed = JSON.parse(raw)
+                    setReceiptData({
+                        ...parsed,
+                        date: new Date(parsed.date),
+                    })
+                    setLoading(false)
+                    return
+                }
+            } catch {
+            }
+        }
+
         try {
             const data = await getReceiptDetails(receiptNumber)
             if (data) {

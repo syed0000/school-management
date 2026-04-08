@@ -12,6 +12,9 @@ import { getYearForMonth } from "@/lib/utils"
 import User from "@/models/User"
 import { sendWhatsAppReceipt } from "@/lib/whatsapp-receipt"
 import { sendAppNotification } from "./notification"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 const feeItemSchema = z.object({
   feeType: z.string().min(1, "Fee type is required"),
@@ -141,6 +144,8 @@ interface TransactionDoc {
 export async function collectFees(data: z.infer<typeof collectFeesSchema>, userId: string) {
   try {
     collectFeesSchema.parse(data);
+    const session = await getServerSession(authOptions);
+    const isDemo = isDemoSession(session);
     await dbConnect();
 
     const student = await Student.findById(data.studentId).populate('classId', 'name').lean();
@@ -152,7 +157,7 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
     const isActuallyAdmin = submissionUser?.role === 'admin';
     const initialStatus = isActuallyAdmin ? 'verified' : 'pending';
 
-    const baseReceiptNumber = await generateReceiptNumber();
+    const baseReceiptNumber = isDemo ? `DEMO-${Date.now()}` : await generateReceiptNumber();
     let totalAmount = 0;
     const transactionDocs: TransactionDoc[] = [];
 
@@ -185,8 +190,8 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
               import('@/models/Setting').then(m => m.default.findOne({ key: "admission_fee_includes_april" }).lean()),
               import('@/models/Setting').then(m => m.default.findOne({ key: "registration_fee_includes_april" }).lean())
             ]);
-            const admIncludesApril = admSetting ? (admSetting as any).value === true : true;
-            const regIncludesApril = regSetting ? (regSetting as any).value === true : true;
+            const admIncludesApril = admSetting ? (admSetting as { value?: boolean }).value === true : true;
+            const regIncludesApril = regSetting ? (regSetting as { value?: boolean }).value === true : true;
 
             if (admIncludesApril || regIncludesApril) {
               const paidAdm = await FeeTransaction.findOne({
@@ -275,13 +280,14 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
       }
     }
 
-    // Save all transactions
-    await FeeTransaction.insertMany(transactionDocs);
+    if (!isDemo) {
+      await FeeTransaction.insertMany(transactionDocs);
+    }
 
     revalidatePath("/fees/collect");
 
     try {
-      if (initialStatus === 'verified') {
+      if (!isDemo && initialStatus === 'verified') {
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const getSessionRank = (m: number) => (m - 3 + 12) % 12; // April (3) becomes rank 0
 
@@ -321,7 +327,7 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
       }
 
       // Always trigger in-app push notification if verified, independent of WhatsApp setting
-      if (initialStatus === 'verified') {
+      if (!isDemo && initialStatus === 'verified') {
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const getSessionRank = (m: number) => (m - 3 + 12) % 12;
 
@@ -361,6 +367,29 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
     return {
       success: true,
       receiptNumber: baseReceiptNumber,
+      ...(isDemo
+        ? demoWriteSuccess({
+            demoReceipt: {
+              receiptNumber: baseReceiptNumber,
+              studentName: (student as { name?: string })?.name || "Unknown",
+              studentRegNo: (student as { registrationNumber?: string })?.registrationNumber || "N/A",
+              rollNumber: (student as { rollNumber?: string })?.rollNumber || "N/A",
+              className: (student as { classId?: { name?: string } })?.classId?.name || "N/A",
+              section: (student as { section?: string })?.section || "A",
+              date: submissionDate,
+              totalAmount,
+              items: data.fees.map((f: { feeType: string; amount: number; months?: number[]; year?: number; examType?: string; title?: string; remarks?: string }) => ({
+                feeType: f.feeType,
+                amount: f.amount,
+                months: Array.isArray(f.months) ? f.months.map((m: number) => m + 1) : [],
+                year: f.year,
+                examType: f.examType,
+                title: f.title,
+                remarks: f.remarks,
+              })),
+            },
+          })
+        : {}),
     };
 
   } catch (error: unknown) {

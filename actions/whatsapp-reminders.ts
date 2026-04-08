@@ -5,6 +5,9 @@ import WhatsAppStat from "@/models/WhatsAppStat"
 import WhatsAppPricing from "@/models/WhatsAppPricing"
 import License from "@/models/License"
 import mongoose from "mongoose"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { isDemoSession } from "@/lib/demo-guard"
 
 import { whatsappConfig } from "@/lib/whatsapp-config"
 export interface ReminderStudent {
@@ -20,6 +23,10 @@ export async function sendBulkReminders(
   students: ReminderStudent[],
   language: 'hindi' | 'english' | 'urdu'
 ) {
+  const session = await getServerSession(authOptions)
+  if (isDemoSession(session)) {
+    return { success: true, demo: true, message: "Demo mode: reminders were not sent." }
+  }
   if (!whatsappConfig.enabled) {
     return { success: false, error: "WhatsApp integration is disabled" };
   }

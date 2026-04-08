@@ -26,7 +26,7 @@ export default async function TeacherProfilePage() {
       <div className="flex h-[50vh] items-center justify-center">
         <div className="text-center space-y-2 text-muted-foreground p-8 rounded-xl border bg-muted/20">
           <p className="font-semibold text-foreground">Profile not found</p>
-          <p className="text-sm">We couldn't locate your profile details.</p>
+          <p className="text-sm">We couldn&apos;t locate your profile details.</p>
         </div>
       </div>
     );

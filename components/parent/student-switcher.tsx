@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +22,6 @@ interface StudentSwitcherProps {
 import { setActiveParentStudentId } from "@/actions/parent";
 
 export function StudentSwitcher({ students, activeStudentId }: StudentSwitcherProps) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   const activeStudent = students.find((s) => s._id === activeStudentId) ?? students[0];
@@ -48,7 +46,7 @@ export function StudentSwitcher({ students, activeStudentId }: StudentSwitcherPr
     setOpen(false);
     await setActiveParentStudentId(studentId);
     // Hard refresh to reload server components with the new cookie
-    window.location.href = window.location.pathname;
+    window.location.assign(window.location.pathname);
   };
 
   return (

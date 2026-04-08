@@ -122,7 +122,7 @@ export function TeacherForm({ teacher, isEdit = false }: TeacherFormProps) {
         effectiveDate: teacher?.salary?.effectiveDate ? new Date(teacher.salary.effectiveDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       },
       documents: teacher?.documents || [],
-      assignedClasses: teacher?.assignedClasses?.map((ac: any) => ({
+      assignedClasses: teacher?.assignedClasses?.map((ac: { classId?: string | { _id?: string }; section?: string; attendanceAccess?: boolean; feeAccess?: boolean }) => ({
         classId: typeof ac.classId === 'object' && ac.classId !== null ? String(ac.classId._id || ac.classId) : String(ac.classId || ''),
         section: ac.section as typeof SECTIONS[number],
         attendanceAccess: Boolean(ac.attendanceAccess),

@@ -8,6 +8,9 @@ import WhatsAppStat from "@/models/WhatsAppStat"
 import WhatsAppPricing from "@/models/WhatsAppPricing"
 import License from "@/models/License"
 import mongoose from "mongoose"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 import { whatsappConfig } from "@/lib/whatsapp-config"
 
@@ -56,13 +59,15 @@ export async function getNotificationEstimate(classIds: string[]) {
        balance,
        hasSufficientBalance: balance >= totalCost
     };
-  } catch (err) {
+  } catch {
     return { success: false, error: "Failed to estimate cost" };
   }
 }
 
 export async function sendBulkNotification(formData: FormData) {
   try {
+    const session = await getServerSession(authOptions)
+    if (isDemoSession(session)) return demoWriteSuccess()
     await dbConnect();
 
     const classIds = formData.getAll('classIds') as string[];

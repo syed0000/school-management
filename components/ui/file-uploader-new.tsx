@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import { Upload, X, Camera, SwitchCamera, ZoomIn } from "lucide-react"
+import { Upload, X, Camera, SwitchCamera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 /* ─────────────────────────────────────────────
@@ -46,12 +46,18 @@ export function FileUploader({
 
   /* ── detect camera availability once on mount ── */
   useEffect(() => {
+    let mounted = true
     if (
       typeof navigator !== "undefined" &&
       navigator.mediaDevices &&
       typeof navigator.mediaDevices.getUserMedia === "function"
     ) {
-      setCameraAvailable(true)
+      if (mounted) {
+        setTimeout(() => setCameraAvailable(true), 0)
+      }
+    }
+    return () => {
+      mounted = false
     }
   }, [])
 

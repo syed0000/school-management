@@ -9,6 +9,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { getSchoolDateBoundaries } from "@/lib/tz-utils"
 import { Types } from "mongoose"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 // Zod schema for validation
 const expenseSchema = z.object({
@@ -81,6 +82,7 @@ export async function createExpense(formData: FormData) {
     if (!session || !session.user?.id) {
         return { success: false, error: "Unauthorized" };
     }
+    if (isDemoSession(session)) return demoWriteSuccess();
     const userId = session.user.id;
     
     // Manual parsing
@@ -181,6 +183,7 @@ export async function updateExpense(id: string, formData: FormData) {
     if (!session || !session.user?.id) {
         return { success: false, error: "Unauthorized" };
     }
+    if (isDemoSession(session)) return demoWriteSuccess();
     const userId = session.user.id;
 
     await dbConnect();
@@ -289,6 +292,7 @@ export async function deleteExpense(id: string) {
     if (!session || !session.user?.id) {
         return { success: false, error: "Unauthorized" };
     }
+    if (isDemoSession(session)) return demoWriteSuccess();
     const userId = session.user.id;
     
     // Only admin can delete expenses

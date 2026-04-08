@@ -117,10 +117,7 @@ export async function getAttendanceReport({
       .populate('records.studentId', 'name rollNumber')
       .lean() as unknown as AttendanceRecordDoc[];
 
-    let totalDays = 0;
     let totalPresent = 0;
-    let totalAbsent = 0;
-
     const studentStats: Record<string, StudentStat> = {};
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -169,17 +166,16 @@ export async function getAttendanceReport({
     const getStatsForClass = (cId: string) => {
       if (classStatsCache[cId]) return classStatsCache[cId];
       
-      const relevantHolidays = dbHolidays.filter((h: any) => 
+      const relevantHolidays = dbHolidays.filter((h: { affectedClasses?: { toString: () => string }[] }) => 
         !h.affectedClasses || 
         h.affectedClasses.length === 0 || 
-        h.affectedClasses.some((ac: any) => ac.toString() === cId)
+        h.affectedClasses.some((ac) => ac.toString() === cId)
       );
 
       const isWorkingDate = (d: Date) => {
         if (d.getDay() === 0) return false;
-        return !relevantHolidays.some((h: any) => {
-          // These are timezone dependent too ideally, but interval logic using Date comparison requires careful thought.
-          // Since it's iterating day by day (UTC 00:00 locally), we need to check if the day is in the holiday range
+        return !relevantHolidays.some((h: { startDate?: Date; endDate?: Date }) => {
+          if (!h.startDate || !h.endDate) return false;
           const hStart = new Date(h.startDate).getTime();
           const hEnd = new Date(h.endDate).getTime();
           return d.getTime() >= hStart && d.getTime() <= hEnd;
@@ -219,9 +215,9 @@ export async function getAttendanceReport({
     });
 
     // 5. Finalize Statistics (Per Student)
-    const studentReport = students.map((s: any) => {
-      const sId = s._id.toString();
-      const cId = s.classId?._id.toString() || 'unknown';
+    const studentReport = students.map((s: { _id?: { toString: () => string }; classId?: { _id?: { toString: () => string } } }) => {
+      const sId = s._id?.toString() || 'unknown';
+      const cId = s.classId?._id?.toString() || 'unknown';
       const stats = getStatsForClass(cId);
       
       return {
@@ -235,7 +231,6 @@ export async function getAttendanceReport({
     });
 
     // For Daily Stats - using a global/default working day check or filtering
-    const globalStats = getStatsForClass('global'); // Fallback logic
     
     const dailyStats: DailyStat[] = [];
     const attendanceByDate: Record<string, AttendanceRecordDoc[]> = {};
@@ -252,11 +247,11 @@ export async function getAttendanceReport({
       let dayPresent = 0;
       let dayTotal = 0;
 
-      students.forEach((s: any) => {
-         const stats = getStatsForClass(s.classId?._id.toString() || 'unknown');
+      students.forEach((s: { _id?: { toString: () => string }; classId?: { _id?: { toString: () => string } } }) => {
+         const stats = getStatsForClass(s.classId?._id?.toString() || 'unknown');
          if (stats.isWorkingDate(day)) {
             dayTotal++;
-            const studentAttendance = recordsForDay?.flatMap(r => r.records).find(rec => rec.studentId?._id.toString() === s._id.toString());
+            const studentAttendance = recordsForDay?.flatMap(r => r.records).find(rec => rec.studentId?._id.toString() === s._id?.toString());
             if (studentAttendance?.status === 'Present') dayPresent++;
          }
       });
@@ -279,9 +274,9 @@ export async function getAttendanceReport({
         totalDays: totalCalendarDays,
         totalWorkingDays: firstStudent.workingDays, 
         totalHolidays: firstStudent.holidays,
-        averageAttendance: totalPresent > 0 ? ((totalPresent / studentReport.reduce((acc, s) => acc + (s as any).workingDays, 0)) * 100).toFixed(1) : 0,
+        averageAttendance: totalPresent > 0 ? ((totalPresent / studentReport.reduce((acc, s) => acc + (s as { workingDays?: number }).workingDays!, 0)) * 100).toFixed(1) : 0,
         totalPresent,
-        totalAbsent: studentReport.reduce((acc, s) => acc + (s as any).absent, 0),
+        totalAbsent: studentReport.reduce((acc, s) => acc + (s as { absent?: number }).absent!, 0),
       },
       dailyStats,
       studentReport,
@@ -385,7 +380,7 @@ export async function getFeeReport({
       const exams = getExamsForClass(cId);
 
       const dueMonthsList: string[] = [];
-      const feeStatuses: Record<string, any> = {};
+      const feeStatuses: Record<string, { status: string; date?: string }> = {};
 
       // 1. Monthly Fees in Period
       const currentIterDate = startOfMonth(startDate);
@@ -416,7 +411,7 @@ export async function getFeeReport({
         if (isAprilIncluded) {
              feeStatuses[monthHeader] = { 
                  status: 'paid', // visually looks paid
-                 date: format(new Date(isAprilIncluded.transactionDate || (isAprilIncluded as any).createdAt), 'dd-MM-yy') 
+                 date: format(new Date(isAprilIncluded.transactionDate || (isAprilIncluded as { createdAt?: Date }).createdAt || new Date()), 'dd-MM-yy') 
              };
         } else {
             expectedAmount += monthlyFee;
@@ -424,7 +419,7 @@ export async function getFeeReport({
               paidAmount += paidTxn.amount;
               feeStatuses[monthHeader] = { 
                 status: 'paid', 
-                date: format(new Date(paidTxn.transactionDate || (paidTxn as any).createdAt), 'dd-MM-yy') 
+                date: format(new Date(paidTxn.transactionDate || (paidTxn as { createdAt?: Date }).createdAt || new Date()), 'dd-MM-yy') 
               };
             } else {
               feeStatuses[monthHeader] = { status: 'unpaid' };
@@ -451,7 +446,7 @@ export async function getFeeReport({
           paidAmount += admissionTxn.amount;
           feeStatuses[headerName] = { 
             status: 'paid', 
-            date: format(new Date(admissionTxn.transactionDate || (admissionTxn as any).createdAt), 'dd-MM-yy') 
+            date: format(new Date(admissionTxn.transactionDate || (admissionTxn as { createdAt?: Date }).createdAt || new Date()), 'dd-MM-yy') 
           };
         } else {
           // If not paid, expect either the admission fee or the registration fee.
@@ -486,7 +481,7 @@ export async function getFeeReport({
                 paidAmount += paidExamTxn.amount;
                 feeStatuses[headerName] = { 
                   status: 'paid', 
-                  date: format(new Date(paidExamTxn.transactionDate || (paidExamTxn as any).createdAt), 'dd-MM-yy') 
+                  date: format(new Date(paidExamTxn.transactionDate || (paidExamTxn as { createdAt?: Date }).createdAt || new Date()), 'dd-MM-yy') 
                 };
               } else {
                 feeStatuses[headerName] = { status: 'unpaid' };

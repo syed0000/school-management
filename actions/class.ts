@@ -5,6 +5,9 @@ import Class from "@/models/Class"
 import ClassFee from "@/models/ClassFee"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 const createClassSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -50,6 +53,8 @@ const updateExamsSchema = z.object({
 
 export async function createClass(data: z.infer<typeof createClassSchema>) {
   try {
+    const session = await getServerSession(authOptions)
+    if (isDemoSession(session)) return demoWriteSuccess()
     createClassSchema.parse(data);
     await dbConnect();
     const existingClass = await Class.findOne({ name: data.name });
@@ -140,6 +145,8 @@ interface ExistingFee {
 
 export async function updateClassWithFees(data: z.infer<typeof updateClassWithFeesSchema>) {
     try {
+    const session = await getServerSession(authOptions)
+    if (isDemoSession(session)) return demoWriteSuccess()
         updateClassWithFeesSchema.parse(data);
         await dbConnect();
         
@@ -299,6 +306,8 @@ export async function updateClassWithFees(data: z.infer<typeof updateClassWithFe
 
 export async function updateClassExams(data: z.infer<typeof updateExamsSchema>) {
   try {
+    const session = await getServerSession(authOptions)
+    if (isDemoSession(session)) return demoWriteSuccess()
     updateExamsSchema.parse(data);
     await dbConnect();
     await Class.findByIdAndUpdate(data.classId, { exams: data.exams });
@@ -312,6 +321,8 @@ export async function updateClassExams(data: z.infer<typeof updateExamsSchema>) 
 
 export async function addClassFee(data: z.infer<typeof feeSchema>) {
   try {
+    const session = await getServerSession(authOptions)
+    if (isDemoSession(session)) return demoWriteSuccess()
     feeSchema.parse(data);
     await dbConnect();
     

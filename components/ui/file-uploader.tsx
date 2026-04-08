@@ -50,12 +50,18 @@ export function FileUploader({
 
   /* ── detect camera once on mount ── */
   useEffect(() => {
+    let mounted = true
     if (
       typeof navigator !== "undefined" &&
       navigator.mediaDevices &&
       typeof navigator.mediaDevices.getUserMedia === "function"
     ) {
-      setCameraAvailable(true)
+      if (mounted) {
+        setTimeout(() => setCameraAvailable(true), 0)
+      }
+    }
+    return () => {
+      mounted = false
     }
   }, [])
 

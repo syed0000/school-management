@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { getToken } from "next-auth/jwt";
+import type { JWT } from "next-auth/jwt";
 
 // Define public paths that don't require license check
 const PUBLIC_PATHS = [
@@ -33,13 +34,13 @@ const LICENSE_COOKIE_SECRET = new TextEncoder().encode(process.env.LICENSE_COOKI
 
 // Helper to verify signed cookie
 async function verifySignedCookie(token: string | undefined) {
-    if (!token) return null;
-    try {
-        const { payload } = await jwtVerify(token, LICENSE_COOKIE_SECRET);
-        return payload as { status: string; expiry: number; verifiedAt: number };
-    } catch {
-        return null; // Invalid signature
-    }
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, LICENSE_COOKIE_SECRET);
+    return payload as { status: string; expiry: number; verifiedAt: number };
+  } catch {
+    return null; // Invalid signature
+  }
 }
 
 // Helper to check if license is valid
@@ -50,16 +51,16 @@ async function checkLicense(req: NextRequest) {
 
   if (payload && payload.status === 'active') {
     const expiryDate = new Date(payload.expiry);
-    
+
     // Check if cookie is expired (time-based)
     if (expiryDate <= new Date()) {
-        return { valid: false, needsValidation: true };
+      return { valid: false, needsValidation: true };
     }
 
     // Check if verification is stale (Force re-check every 24 hours)
     // 24 hours balances security with server load.
     if (!payload.verifiedAt || (Date.now() - payload.verifiedAt > 24 * 60 * 60 * 1000)) {
-        return { valid: false, needsValidation: true };
+      return { valid: false, needsValidation: true };
     }
 
     return { valid: true };
@@ -81,13 +82,13 @@ export async function proxy(req: NextRequest) {
 
   if (licenseCheck.valid) {
     // RBAC Check (After License Check)
-    let token = null;
+    let token: JWT | null = null;
     try {
-      token = await getToken({ 
-        req: req as any, 
-        secret: process.env.NEXTAUTH_SECRET 
+      token = await getToken({
+        req: req as unknown as Parameters<typeof getToken>[0]["req"],
+        secret: process.env.NEXTAUTH_SECRET
       });
-    } catch (e) {
+    } catch {
       // If decryption fails (e.g. secret changed), treat as no token
       token = null;
     }
@@ -100,55 +101,85 @@ export async function proxy(req: NextRequest) {
         }
         return NextResponse.next();
       }
-      
+
+      const isDemo = token?.isDemo === true;
+      if (isDemo) {
+        return NextResponse.redirect(new URL("/demo/access-as", req.url));
+      }
+
       const role = token.role;
       if (role === "admin") return NextResponse.redirect(new URL("/admin/dashboard", req.url));
       if (role === "attendance_staff") return NextResponse.redirect(new URL("/attendance/dashboard", req.url));
       if (role === "teacher") return NextResponse.redirect(new URL("/teacher/dashboard", req.url));
       if (role === "parent") return NextResponse.redirect(new URL("/parent/dashboard", req.url));
-      
+
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
     // 1. Admin & Staff Routes
     if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
-      if (!token || (token.role !== "admin" && token.role !== "staff")) {
+      const isDemo = token?.isDemo === true;
+      const effectiveRole = token?.impersonation?.role || token?.role;
+      if (isDemo) {
+        return NextResponse.next();
+      }
+      if (!token || (effectiveRole !== "admin" && effectiveRole !== "staff")) {
         return NextResponse.redirect(new URL("/admin/login", req.url));
       }
     }
 
     // 2. Attendance Staff Routes
     if (pathname.startsWith("/attendance")) {
-      if (!token || (token.role !== "attendance_staff" && token.role !== "admin")) {
+      const isDemo = token?.isDemo === true;
+      const effectiveRole = token?.impersonation?.role || token?.role;
+      if (isDemo) {
+        return NextResponse.next();
+      }
+      if (!token || (effectiveRole !== "attendance_staff" && effectiveRole !== "admin")) {
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }
     }
 
     // 3. General Staff/Admin Dashboard & Management
-    if (pathname.startsWith("/dashboard") || 
-        pathname.startsWith("/students") || 
-        pathname.startsWith("/teachers") || 
-        pathname.startsWith("/fees") || 
-        pathname.startsWith("/whatsapp") || 
-        pathname.startsWith("/id-cards")
+    if (pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/students") ||
+      pathname.startsWith("/teachers") ||
+      pathname.startsWith("/fees") ||
+      pathname.startsWith("/whatsapp") ||
+      pathname.startsWith("/id-cards")
     ) {
-      if (!token || (token.role !== "staff" && token.role !== "admin")) {
-         if (token?.role === 'parent') return NextResponse.redirect(new URL("/parent/dashboard", req.url));
-         if (token?.role === 'teacher') return NextResponse.redirect(new URL("/teacher/dashboard", req.url));
-         return NextResponse.redirect(new URL("/login", req.url));
+      const isDemo = token?.isDemo === true;
+      const effectiveRole = token?.impersonation?.role || token?.role;
+      if (isDemo) {
+        return NextResponse.next();
+      }
+      if (!token || (effectiveRole !== "staff" && effectiveRole !== "admin")) {
+        if (effectiveRole === 'parent') return NextResponse.redirect(new URL("/parent/dashboard", req.url));
+        if (effectiveRole === 'teacher') return NextResponse.redirect(new URL("/teacher/dashboard", req.url));
+        return NextResponse.redirect(new URL("/login", req.url));
       }
     }
 
     // 4. Parent Portal Routes
     if (pathname.startsWith("/parent")) {
-      if (!token || (token.role !== "parent" && token.role !== "admin")) {
+      const isDemo = token?.isDemo === true;
+      const effectiveRole = token?.impersonation?.role || token?.role;
+      if (isDemo) {
+        return NextResponse.next();
+      }
+      if (!token || (effectiveRole !== "parent" && effectiveRole !== "admin")) {
         return NextResponse.redirect(new URL("/login/otp", req.url));
       }
     }
 
     // 5. Teacher Portal Routes
     if (pathname.startsWith("/teacher") && !pathname.startsWith("/teachers")) {
-      if (!token || (token.role !== "teacher" && token.role !== "admin")) {
+      const isDemo = token?.isDemo === true;
+      const effectiveRole = token?.impersonation?.role || token?.role;
+      if (isDemo) {
+        return NextResponse.next();
+      }
+      if (!token || (effectiveRole !== "teacher" && effectiveRole !== "admin")) {
         return NextResponse.redirect(new URL("/login/otp", req.url));
       }
     }

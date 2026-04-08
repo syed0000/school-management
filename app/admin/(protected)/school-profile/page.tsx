@@ -44,7 +44,7 @@ export default async function SchoolProfilePage() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>WhatsApp Integration Disabled</AlertTitle>
           <AlertDescription>
-            WhatsApp integration is currently disabled in your project. You won't be able to use WhatsApp features until it is enabled by FeeEase support.
+            WhatsApp integration is currently disabled in your project. You won&apos;t be able to use WhatsApp features until it is enabled by FeeEase support.
           </AlertDescription>
         </Alert>
       )}
@@ -100,7 +100,7 @@ export default async function SchoolProfilePage() {
               <CardTitle>Global Institute Settings</CardTitle>
             </div>
             <CardDescription>
-              Manage your institute's global identity, timezone, and core settings.
+              Manage your institute&apos;s global identity, timezone, and core settings.
             </CardDescription>
           </CardHeader>
           <CardContent>

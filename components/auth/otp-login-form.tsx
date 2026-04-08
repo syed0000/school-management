@@ -19,7 +19,7 @@ import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { requestOtp } from "@/actions/auth-otp"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, Smartphone, KeyRound, RefreshCw, Clock } from "lucide-react"
 import { whatsappConfig } from "@/lib/whatsapp-config"
 
@@ -105,8 +105,8 @@ export function OtpLoginForm() {
         return true
       } else {
         // Server told us to wait — pre-seed the countdown
-        if ((res as any).retryAfterSeconds) {
-          startCountdown((res as any).retryAfterSeconds)
+        if ((res as { retryAfterSeconds?: number }).retryAfterSeconds) {
+          startCountdown((res as { retryAfterSeconds?: number }).retryAfterSeconds!)
         }
         toast.error(res.error)
         return false
@@ -176,7 +176,7 @@ export function OtpLoginForm() {
       </CardHeader>
       <CardContent>
         {enableParentLogin && enableTeacherLogin && (
-          <Tabs value={role} onValueChange={(v) => setRole(v as any)} className="mb-6">
+          <Tabs value={role} onValueChange={(v) => setRole(v as "parent" | "teacher")} className="mb-6">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="parent">Parent</TabsTrigger>
               <TabsTrigger value="teacher">Teacher</TabsTrigger>

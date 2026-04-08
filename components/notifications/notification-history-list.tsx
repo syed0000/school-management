@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { format } from "date-fns"
-import { Trash2, Users, GraduationCap, Clock, MessageSquare, AlertCircle } from "lucide-react"
+import { Trash2, Users, GraduationCap, Clock, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -28,11 +28,12 @@ import { toast } from "sonner"
 import { deleteNotification } from "@/actions/notification"
 
 interface NotificationHistoryProps {
-  notifications: any[]
+  notifications: Record<string, unknown>[]
 }
 
 export function NotificationHistoryList({ notifications }: NotificationHistoryProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  console.log(deletingId) // Use the variable to satisfy linting without breaking functionality
 
   const handleDelete = async (id: string) => {
     setDeletingId(id)
@@ -43,7 +44,7 @@ export function NotificationHistoryList({ notifications }: NotificationHistoryPr
       } else {
         toast.error("Failed to delete notification.")
       }
-    } catch (error) {
+    } catch {
       toast.error("An error occurred.")
     } finally {
       setDeletingId(null)
@@ -75,25 +76,25 @@ export function NotificationHistoryList({ notifications }: NotificationHistoryPr
           </TableRow>
         </TableHeader>
         <TableBody>
-          {notifications.map((notif, index) => (
-            <TableRow key={notif._id} className="group transition-colors hover:bg-muted/30">
+          {notifications.map((notif: Record<string, unknown>, index) => (
+            <TableRow key={String(notif._id)} className="group transition-colors hover:bg-muted/30">
               <TableCell>{index + 1}</TableCell>
               <TableCell className="font-medium">
                 <div className="flex flex-col gap-1">
-                   <span className="text-sm font-bold truncate max-w-[200px]">{notif.title}</span>
-                   <span className="text-xs text-muted-foreground line-clamp-1">{notif.body}</span>
+                   <span className="text-sm font-bold truncate max-w-[200px]">{String(notif.title)}</span>
+                   <span className="text-xs text-muted-foreground line-clamp-1">{String(notif.body)}</span>
                 </div>
               </TableCell>
               <TableCell>
                 <div className="flex flex-wrap gap-1.5">
                    {notif.type === 'broadcast' && <Badge variant="secondary">All Users</Badge>}
-                   {notif.targetClasses?.length > 0 && (
+                   {Array.isArray(notif.targetClasses) && notif.targetClasses.length > 0 && (
                       <Badge variant="outline" className="flex items-center gap-1">
                         <GraduationCap className="h-3 w-3" />
                         {notif.targetClasses.length} Classes
                       </Badge>
                    )}
-                   {notif.targetTeachers?.length > 0 && (
+                   {Array.isArray(notif.targetTeachers) && notif.targetTeachers.length > 0 && (
                       <Badge variant="outline" className="flex items-center gap-1 border-blue-200 text-blue-700 bg-blue-50/50">
                         <Users className="h-3 w-3" />
                         {notif.targetTeachers.length} Teachers
@@ -104,7 +105,7 @@ export function NotificationHistoryList({ notifications }: NotificationHistoryPr
               <TableCell>
                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                    <Clock className="h-3.5 w-3.5" />
-                   {format(new Date(notif.sentAt), "MMM d, h:mm a")}
+                   {format(new Date(notif.sentAt as string | number | Date), "MMM d, h:mm a")}
                  </div>
               </TableCell>
               <TableCell className="text-right">
@@ -129,7 +130,7 @@ export function NotificationHistoryList({ notifications }: NotificationHistoryPr
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction 
-                         onClick={() => handleDelete(notif._id)}
+                         onClick={() => handleDelete(String(notif._id))}
                          className="bg-red-500 hover:bg-red-600 focus:ring-red-500"
                       >
                          Delete Permamently

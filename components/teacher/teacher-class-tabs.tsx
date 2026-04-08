@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { ClassAttendanceTab } from "./class-attendance-tab";
 import { ClassFeeTab } from "./class-fee-tab";
 import type { TeacherClassAccess } from "@/types";

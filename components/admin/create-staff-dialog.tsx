@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Plus, Loader2 } from "lucide-react"
-import { createStaff } from "@/actions/admin"
+import { createDemoUser, createStaff } from "@/actions/admin"
 
 import {
   Select,
@@ -36,17 +36,26 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-const formSchema = z.object({
+const staffSchema = z.object({
+  userType: z.literal("staff"),
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email"),
   phone: z.string().min(10, "Phone number must be at least 10 digits").max(12, "Invalid phone number"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(['staff', 'attendance_staff']),
+  role: z.enum(["staff", "attendance_staff"]),
 })
+
+const demoSchema = z.object({
+  userType: z.literal("demo"),
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email"),
+})
+
+const formSchema = z.union([staffSchema, demoSchema])
 
 type StaffFormValues = z.infer<typeof formSchema>
 
-export function CreateStaffDialog() {
+export function CreateStaffDialog({ allowDemo = false }: { allowDemo?: boolean }) {
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -54,6 +63,7 @@ export function CreateStaffDialog() {
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      userType: "staff",
       name: "",
       email: "",
       phone: "",
@@ -65,14 +75,17 @@ export function CreateStaffDialog() {
   const onSubmit: SubmitHandler<StaffFormValues> = async (values) => {
     setIsLoading(true)
     try {
-      const result = await createStaff(values)
+      const result =
+        values.userType === "demo"
+          ? await createDemoUser({ name: values.name, email: values.email })
+          : await createStaff(values)
       if (result.success) {
-        toast.success("Staff member created successfully")
+        toast.success(values.userType === "demo" ? "Demo user created" : "Staff member created successfully")
         setOpen(false)
         form.reset()
         router.refresh()
       } else {
-        toast.error(`Failed to create staff: ${result.error}`)
+        toast.error(result.error || "Failed")
       }
     } catch {
       toast.error("Something went wrong")
@@ -80,6 +93,8 @@ export function CreateStaffDialog() {
       setIsLoading(false)
     }
   }
+
+  const userType = form.watch("userType")
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -91,13 +106,38 @@ export function CreateStaffDialog() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Staff Member</DialogTitle>
+          <DialogTitle>{userType === "demo" ? "Add Demo User" : "Add Staff Member"}</DialogTitle>
           <DialogDescription>
-            Create a new staff account. They can login with email and password.
+            {userType === "demo"
+              ? "Demo users can log in without credentials and can access all areas in view-only mode."
+              : "Create a new staff account. They can login with email and password."}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {allowDemo && (
+              <FormField
+                control={form.control}
+                name="userType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>User Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select user type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="staff">Staff</SelectItem>
+                        <SelectItem value="demo">Demo User</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="name"
@@ -107,27 +147,6 @@ export function CreateStaffDialog() {
                   <FormControl>
                     <Input placeholder="John Doe" {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Role</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a role" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="staff">Staff</SelectItem>
-                      <SelectItem value="attendance_staff">Attendance Staff</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -145,36 +164,62 @@ export function CreateStaffDialog() {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>WhatsApp Number</FormLabel>
-                  <FormControl>
-                    <Input placeholder="10-digit number" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="••••••" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+
+            {userType !== "demo" && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="staff">Staff</SelectItem>
+                          <SelectItem value="attendance_staff">Attendance Staff</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>WhatsApp Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="10-digit number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
             <DialogFooter>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Account
+                {userType === "demo" ? "Create Demo User" : "Create Account"}
               </Button>
             </DialogFooter>
           </form>

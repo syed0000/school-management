@@ -10,6 +10,7 @@ import logger from '@/lib/logger';
 import type { TeacherClassAccess } from '@/types';
 import { getAttendanceReport, getFeeReport } from '@/actions/reports';
 import { saveAttendance } from '@/actions/attendance';
+import { demoWriteSuccess, isDemoSession } from '@/lib/demo-guard';
 
 // ---------------------------------------------------------------------------
 // Internal interfaces
@@ -157,6 +158,7 @@ export async function updateTeacherProfilePhoto(formData: FormData) {
     await dbConnect();
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== 'teacher') return { success: false, error: 'Unauthorized' };
+    if (isDemoSession(session)) return demoWriteSuccess();
 
     const photoFile = formData.get('photo') as File;
     if (!photoFile || photoFile.size === 0) return { success: false, error: 'No photo provided' };
@@ -187,6 +189,7 @@ export async function saveTeacherAttendance(params: {
 }) {
   const session = await getServerSession(authOptions);
   if (!session) return { success: false, error: 'Unauthorized' };
+  if (isDemoSession(session)) return demoWriteSuccess();
 
   const teacherSessionId = session.user.id;
   const { allowed, attendanceAccess } = await validateTeacherClassAccess(

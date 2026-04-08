@@ -14,7 +14,11 @@ export default function SharePage() {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    setOrigin(window.location.origin)
+    let mounted = true
+    if (mounted) {
+      setTimeout(() => setOrigin(window.location.origin), 0)
+    }
+    return () => { mounted = false }
   }, [])
 
   const handleShare = async () => {

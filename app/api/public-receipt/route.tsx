@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
                             </div>
                             {remarks && (
                                 <span style={{ fontSize: '14px', color: '#555', fontStyle: 'italic', marginTop: '4px', borderLeft: '2px solid #ccc', paddingLeft: '6px' }}>
-                                    "{remarks}"
+                                    &quot;{remarks}&quot;
                                 </span>
                             )}
                         </div>
@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
                         <p style={{ margin: 0 }}>Generated via FeeEase System | feeease.com</p>
                     </div>
                 </div>
-            ) as any,
+            ) as unknown as React.ReactElement,
             {
                 width: 800,
                 height: 800,

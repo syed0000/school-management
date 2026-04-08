@@ -9,6 +9,7 @@ import { authOptions } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import bcrypt from "bcryptjs"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 const updateProfileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").optional(),
@@ -34,6 +35,8 @@ export async function updateProfile(data: z.infer<typeof updateProfileSchema>) {
     if (!session) {
       return { success: false, error: "Unauthorized" };
     }
+
+    if (isDemoSession(session)) return demoWriteSuccess();
 
     const result = updateProfileSchema.safeParse(data);
     if (!result.success) {
@@ -99,27 +102,27 @@ export async function getUserProfile(userId: string) {
     const role = session.user.role;
 
     if (role === 'teacher') {
-        const teacher = await Teacher.findById(userId).lean();
+        const teacher = await Teacher.findById(userId).lean() as unknown as { _id?: string; name?: string; email?: string; phone?: string };
         if (!teacher) return null;
         return {
-            name: (teacher as any).name,
-            email: (teacher as any).email || "",
+            name: teacher.name,
+            email: teacher.email || "",
             role: 'teacher',
-            id: (teacher as any)._id.toString(),
-            phone: (teacher as any).phone
+            id: String(teacher._id),
+            phone: teacher.phone
         };
     }
 
     if (role === 'parent') {
-        const student = await Student.findById(userId).lean();
+        const student = await Student.findById(userId).lean() as unknown as { _id?: string; name?: string; parents?: { father?: { name?: string }; mother?: { name?: string } }; contacts?: { email?: string[]; mobile?: string[] } };
         if (!student) return null;
-        const parentName = (student as any).parents?.father?.name || (student as any).parents?.mother?.name || (student as any).name;
+        const parentName = student.parents?.father?.name || student.parents?.mother?.name || student.name;
         return {
             name: parentName,
-            email: (student as any).contacts?.email?.[0] || "",
+            email: student.contacts?.email?.[0] || "",
             role: 'parent',
-            id: (student as any)._id.toString(),
-            phone: (student as any).contacts?.mobile?.[0]
+            id: String(student._id),
+            phone: student.contacts?.mobile?.[0]
         };
     }
 

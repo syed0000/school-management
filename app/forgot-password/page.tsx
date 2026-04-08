@@ -62,7 +62,7 @@ function ForgotPasswordForm() {
       } else {
         toast.error(res.error);
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to send OTP");
     } finally {
       setLoading(false);
@@ -79,7 +79,7 @@ function ForgotPasswordForm() {
       } else {
         toast.error(res.error);
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to reset password");
     } finally {
       setLoading(false);
@@ -101,7 +101,7 @@ function ForgotPasswordForm() {
               <FormField
                 control={phoneForm.control}
                 name="phone"
-                render={({ field }: any) => (
+                render={({ field }) => (
                   <FormItem>
                     <FormLabel>Registered WhatsApp Number</FormLabel>
                     <FormControl>
@@ -143,7 +143,7 @@ function ForgotPasswordForm() {
               <FormField
                 control={resetForm.control}
                 name="otp"
-                render={({ field }: any) => (
+                render={({ field }) => (
                   <FormItem>
                     <FormLabel>6-Digit OTP</FormLabel>
                     <FormControl>
@@ -161,7 +161,7 @@ function ForgotPasswordForm() {
                 <FormField
                   control={resetForm.control}
                   name="password"
-                  render={({ field }: any) => (
+                  render={({ field }) => (
                     <FormItem>
                       <FormLabel>New Password</FormLabel>
                       <FormControl>
@@ -192,7 +192,7 @@ function ForgotPasswordForm() {
                 <FormField
                   control={resetForm.control}
                   name="confirmPassword"
-                  render={({ field }: any) => (
+                  render={({ field }) => (
                     <FormItem>
                       <FormLabel>Confirm Password</FormLabel>
                       <FormControl>

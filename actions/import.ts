@@ -5,6 +5,9 @@ import Student from "@/models/Student"
 import Class from "@/models/Class"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { isDemoSession } from "@/lib/demo-guard"
 
 // Zod schema for student import
 const importStudentSchema = z.object({
@@ -93,6 +96,11 @@ const importStudentSchema = z.object({
 
 export async function bulkImportStudents(data: Record<string, unknown>[], confirm: boolean = false) {
   try {
+    const session = await getServerSession(authOptions);
+    const demo = isDemoSession(session);
+    if (demo) {
+      confirm = false;
+    }
     await dbConnect();
     
     // Fetch all classes to map names to IDs

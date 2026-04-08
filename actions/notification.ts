@@ -5,7 +5,9 @@ import Notification from "@/models/Notification";
 import Student from "@/models/Student";
 import Teacher from "@/models/Teacher";
 import { revalidatePath } from "next/cache";
-import mongoose from "mongoose";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard";
 
 export interface CreateNotificationPayload {
   title: string;
@@ -18,6 +20,8 @@ export interface CreateNotificationPayload {
 
 export async function sendAppNotification(payload: CreateNotificationPayload) {
   try {
+    const session = await getServerSession(authOptions);
+    if (isDemoSession(session)) return demoWriteSuccess();
     await dbConnect();
 
     // 1. Save to Persistent DB
@@ -135,19 +139,23 @@ export async function getNotificationHistory() {
 
 export async function deleteNotification(id: string) {
   try {
+    const session = await getServerSession(authOptions);
+    if (isDemoSession(session)) return demoWriteSuccess();
     await dbConnect();
     await Notification.findByIdAndDelete(id);
     revalidatePath("/whatsapp");
     return { success: true };
-  } catch (error) {
+  } catch {
     return { success: false, error: "Failed to delete notification" };
   }
 }
 
 export async function updatePushToken(userId: string, role: 'teacher' | 'parent', token: string, enable: boolean) {
   try {
+    const session = await getServerSession(authOptions);
+    if (isDemoSession(session)) return demoWriteSuccess();
     await dbConnect();
-    const Model = (role === 'teacher' ? Teacher : Student) as any;
+    const Model = (role === 'teacher' ? Teacher : Student) as unknown as { findByIdAndUpdate: (id: string, update: Record<string, unknown>, options: Record<string, unknown>) => Promise<void> };
     if (enable) {
       await Model.findByIdAndUpdate(userId, {
         $addToSet: { pushTokens: token },
@@ -160,15 +168,17 @@ export async function updatePushToken(userId: string, role: 'teacher' | 'parent'
     }
 
     return { success: true };
-  } catch (error) {
+  } catch {
     return { success: false, error: "Failed to update token" };
   }
 }
 
 export async function togglePushSetting(userId: string, role: 'teacher' | 'parent', enabled: boolean) {
   try {
+    const session = await getServerSession(authOptions);
+    if (isDemoSession(session)) return demoWriteSuccess();
     await dbConnect();
-    const Model = (role === 'teacher' ? Teacher : Student) as any;
+    const Model = (role === 'teacher' ? Teacher : Student) as unknown as { findByIdAndUpdate: (id: string, update: Record<string, unknown>, options: Record<string, unknown>) => Promise<void> };
     await Model.findByIdAndUpdate(userId, {
       $set: { "notificationSettings.pushEnabled": enabled }
     }, {});
@@ -176,8 +186,7 @@ export async function togglePushSetting(userId: string, role: 'teacher' | 'paren
 
 
     return { success: true };
-  } catch (error) {
+  } catch {
     return { success: false, error: "Failed to toggle setting" };
   }
 }
-

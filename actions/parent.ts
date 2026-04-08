@@ -12,7 +12,7 @@ import ClassFee from '@/models/ClassFee';
 import Setting from '@/models/Setting';
 import { Types } from 'mongoose';
 import { cookies } from 'next/headers';
-import { format, eachMonthOfInterval, isAfter, isBefore, startOfMonth, endOfMonth } from 'date-fns';
+import { format, eachMonthOfInterval, isAfter, startOfMonth, endOfMonth } from 'date-fns';
 import { getSchoolDateBoundaries } from '@/lib/tz-utils';
 import logger from '@/lib/logger';
 import { saveFile } from '@/lib/upload';
@@ -24,6 +24,7 @@ import type {
   MonthlyFeeStatus,
 } from '@/types';
 import { getCurrentSessionStartYear } from '@/lib/utils';
+import { demoWriteSuccess, isDemoSession } from '@/lib/demo-guard';
 
 // ---------------------------------------------------------------------------
 // Internal interfaces for Mongoose lean() results
@@ -149,7 +150,21 @@ export async function getCurrentParentStudents() {
   // Ensure Class schema is registered
   import('@/models/Class');
 
-  const student = await Student.findById(session.user.id).select('contacts classId').populate('classId', 'name').lean() as any;
+  const student = await Student.findById(session.user.id)
+    .select('contacts classId')
+    .populate('classId', 'name')
+    .lean() as unknown as {
+      _id: { toString: () => string }
+      name?: string
+      photo?: string
+      section?: string
+      rollNumber?: string
+      registrationNumber?: string
+      dateOfAdmission?: Date
+      isActive?: boolean
+      classId?: { name?: string }
+      contacts?: { mobile?: string[] }
+    } | null;
   if (!student) return [];
 
   const phone = student?.contacts?.mobile?.[0];
@@ -322,6 +337,12 @@ export async function updateStudentPhotoForParent(
       return { success: false, error: 'Unauthorized' };
     }
 
+    if (isDemoSession(session)) {
+      await dbConnect();
+      const existing = await Student.findById(studentId).select('photo').lean() as { photo?: string } | null;
+      return demoWriteSuccess({ photoUrl: existing?.photo || '' }) as unknown as { success: boolean; error?: string; photoUrl?: string };
+    }
+
     await dbConnect();
 
     // For parent role, validate access via phone stored in session id
@@ -386,7 +407,7 @@ export async function getStudentAttendanceCalendar(
       const from = startOfMonth(new Date(y, m - 1, 1));
       const to = endOfMonth(from);
 
-      const { startUtc, endUtc } = await getSchoolDateBoundaries(from); // if 'to' is same as 'from', this is buggy. 'to' should be endUtc of 'to'.
+      const { startUtc } = await getSchoolDateBoundaries(from);
       const { endUtc: finalEndUtc } = await getSchoolDateBoundaries(to);
 
       const records = await Attendance.find({
@@ -590,8 +611,8 @@ export async function getStudentFeeOverview(
               paid: 0,
               due: 0,
               status: 'Included in Admission/Registration',
-              transactionDate: format(new Date(isAprilIncluded.transactionDate || (isAprilIncluded as any).createdAt || new Date()), 'dd-MM-yy'),
-            } as any;
+              transactionDate: format(new Date(isAprilIncluded.transactionDate || (isAprilIncluded as { createdAt?: Date }).createdAt || new Date()), 'dd-MM-yy'),
+            } as unknown as MonthlyFeeStatus;
         }
 
         const paid = paidTxn ? paidTxn.amount : 0;
@@ -613,7 +634,7 @@ export async function getStudentFeeOverview(
           status: due <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Due',
           transactionDate: paidTxn ? format(new Date(paidTxn.transactionDate), 'dd-MM-yy') : undefined,
         };
-      }).filter((m: any) => m.expected > 0 || m.paid > 0 || m.status === 'Included in Admission/Registration');
+      }).filter((m: MonthlyFeeStatus) => m.expected > 0 || m.paid > 0 || m.status === 'Included in Admission/Registration');
 
       // Other fees: admission, registration, exam
       const otherFeeTypes = ['admissionFees', 'registrationFees', 'admission', 'examination'];

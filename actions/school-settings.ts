@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache"
 import { whatsappConfig } from "@/lib/whatsapp-config"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 export async function getWhatsAppReceiptSetting() {
     await dbConnect()
@@ -17,6 +18,8 @@ export async function getWhatsAppReceiptSetting() {
 }
 
 export async function updateWhatsAppReceiptSetting(enabled: boolean) {
+    const session = await getServerSession(authOptions)
+    if (isDemoSession(session)) return demoWriteSuccess()
     if (enabled && !whatsappConfig.enabled) {
         return {
             success: false,
@@ -47,6 +50,7 @@ export async function updateTimezoneSetting(timezone: string) {
     if (!session || session.user.role !== "admin") {
         return { success: false, error: "Unauthorized" }
     }
+    if (isDemoSession(session)) return demoWriteSuccess()
 
     if (!timezone) return { success: false, error: "Timezone required" }
 
@@ -81,6 +85,7 @@ export async function updateFeePolicySettings(admission: boolean, registration: 
     if (!session || session.user.role !== "admin") {
         return { success: false, error: "Unauthorized" }
     }
+    if (isDemoSession(session)) return demoWriteSuccess()
 
     await dbConnect()
     await Promise.all([
@@ -143,6 +148,7 @@ export async function updateCounter(id: string, seq: number) {
     if (!session || session.user.role !== "admin") {
         return { success: false, error: "Unauthorized" }
     }
+    if (isDemoSession(session)) return demoWriteSuccess()
 
     // Allow main counters and class-group-specific counters (prefixed with 'classGroup_')
     const isGroupCounter = id.startsWith("classGroup_")
@@ -203,6 +209,7 @@ export async function createClassGroup(name: string, classIds: string[], startFr
     if (!session || session.user.role !== "admin") {
         return { success: false, error: "Unauthorized" }
     }
+    if (isDemoSession(session)) return demoWriteSuccess()
     if (!name.trim()) return { success: false, error: "Group name is required" }
     if (!classIds.length) return { success: false, error: "Select at least one class" }
     if (!Number.isInteger(startFrom) || startFrom < 0) {
@@ -245,6 +252,7 @@ export async function updateClassGroup(
     if (!session || session.user.role !== "admin") {
         return { success: false, error: "Unauthorized" }
     }
+    if (isDemoSession(session)) return demoWriteSuccess()
     if (!name.trim()) return { success: false, error: "Group name is required" }
     if (!classIds.length) return { success: false, error: "Select at least one class" }
 
@@ -280,6 +288,7 @@ export async function deleteClassGroup(groupId: string) {
     if (!session || session.user.role !== "admin") {
         return { success: false, error: "Unauthorized" }
     }
+    if (isDemoSession(session)) return demoWriteSuccess()
 
     await dbConnect()
     await ClassGroup.findByIdAndUpdate(groupId, { isActive: false })

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FileUploader } from "@/components/ui/file-uploader-new";
 import { toast } from "sonner";
 import { updateTeacherProfilePhoto } from "@/actions/teacher-portal";
-import { Loader2, Camera, Phone, Mail, IdCard, CalendarDays, Wallet, BadgeCheck, PhoneCall } from "lucide-react";
+import { Loader2, Camera, Phone, Mail, IdCard, Wallet, BadgeCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -38,7 +38,7 @@ export function TeacherProfileClient({ teacher }: { teacher: Teacher }) {
       } else {
         toast.error(res.error || "Failed to update photo");
       }
-    } catch (error) {
+    } catch {
       toast.error("Something went wrong");
     } finally {
       setLoading(false);
@@ -179,9 +179,9 @@ export function TeacherProfileClient({ teacher }: { teacher: Teacher }) {
                 <span className="text-muted-foreground">Assigned Classes</span>
                 <div className="flex flex-wrap gap-2 mt-1">
                   {teacher.assignedClasses && teacher.assignedClasses.length > 0 ? (
-                    teacher.assignedClasses.map((ac: any, i) => (
+                    (teacher.assignedClasses as unknown as Array<{ classId?: string | { name?: string }; section?: string }>).map((ac, i) => (
                       <span key={i} className="px-2.5 py-1 bg-secondary text-secondary-foreground rounded-md text-xs font-medium">
-                        {ac.classId?.name || "Class"} {ac.section}
+                        {(typeof ac.classId === "object" && ac.classId ? ac.classId.name : "Class")} {ac.section}
                       </span>
                     ))
                   ) : <span className="font-medium text-muted-foreground">None</span>}

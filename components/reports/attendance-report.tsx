@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
-import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { format } from 'date-fns';
 import { CalendarDateRangePicker } from '@/components/dashboard/date-range-picker';
 import {
   Select,
@@ -13,14 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+
 import {
   Card,
   CardContent,
@@ -106,8 +99,7 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
           classId: classId === 'all' ? undefined : classId,
           section: section === 'all' ? undefined : section,
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setReportData(data as any);
+        setReportData(data as ReportData);
       } catch (error) {
         console.error('Failed to fetch report:', error);
       }

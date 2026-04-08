@@ -9,7 +9,7 @@ import "@/models/Class"
 import Expense from "@/models/Expense"
 import Attendance from "@/models/Attendance"
 import Setting from "@/models/Setting"
-import { startOfDay, endOfDay, startOfMonth, endOfMonth, eachMonthOfInterval, format, subMonths, subWeeks, subDays } from "date-fns"
+import { startOfMonth, endOfMonth, eachMonthOfInterval, format, subMonths, subWeeks, subDays } from "date-fns"
 import { Types } from "mongoose"
 import logger from "@/lib/logger"
 import { unstable_cache } from "next/cache"
@@ -357,7 +357,7 @@ export const getDashboardStats = unstable_cache(
 
         if (filter.startDate && filter.endDate) {
             // Adjust to timezone boundaries for UTC servers
-            const { startUtc, endUtc } = await getSchoolDateBoundaries(filter.startDate);
+            const { startUtc } = await getSchoolDateBoundaries(filter.startDate);
             const { endUtc: finalEndUtc } = await getSchoolDateBoundaries(filter.endDate);
             
             query.transactionDate = {
@@ -515,7 +515,7 @@ export const getDashboardStats = unstable_cache(
         // Calculate Expenses
         const expenseQuery: Record<string, unknown> = { status: 'active' };
         if (filter.startDate && filter.endDate) {
-            const { startUtc, endUtc } = await getSchoolDateBoundaries(filter.startDate);
+            const { startUtc } = await getSchoolDateBoundaries(filter.startDate);
             const { endUtc: finalEndUtc } = await getSchoolDateBoundaries(filter.endDate);
             
             expenseQuery.expenseDate = {

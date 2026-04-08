@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { demoConfig } from "@/lib/demo-config"
+import { randomUUID } from "crypto"
 
 const createStaffSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -17,11 +19,13 @@ const createStaffSchema = z.object({
 })
 
 import logger from "@/lib/logger"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 export async function createStaff(data: z.infer<typeof createStaffSchema>) {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user.role !== 'admin') throw new Error('Unauthorized');
+    if (isDemoSession(session)) return demoWriteSuccess();
 
     // Validate input
     createStaffSchema.parse(data);
@@ -48,6 +52,78 @@ export async function createStaff(data: z.infer<typeof createStaffSchema>) {
     return { success: true };
   } catch (error: unknown) {
     logger.error(error, "Failed to create staff");
+    const message = error instanceof Error ? error.message : "An unknown error occurred";
+    return { success: false, error: message };
+  }
+}
+
+const createDemoUserSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email"),
+})
+
+export async function createDemoUser(data: z.infer<typeof createDemoUserSchema>) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (session?.user.role !== 'admin') throw new Error('Unauthorized');
+    if (isDemoSession(session)) return demoWriteSuccess();
+    if (!demoConfig.adminInstitute) throw new Error('Demo is not enabled');
+
+    createDemoUserSchema.parse(data);
+    await dbConnect();
+
+    const existingUser = await User.findOne({ email: data.email });
+    if (existingUser) {
+      return { success: false, error: "Email already exists" };
+    }
+
+    const hashedPassword = await bcrypt.hash(randomUUID(), 10);
+
+    await User.create({
+      name: data.name,
+      email: data.email,
+      password: hashedPassword,
+      role: 'admin',
+      isDemo: true,
+      isActive: true,
+      requiresPasswordChange: false,
+    });
+
+    revalidatePath("/admin/staff");
+    return { success: true };
+  } catch (error: unknown) {
+    logger.error(error, "Failed to create demo user");
+    const message = error instanceof Error ? error.message : "An unknown error occurred";
+    return { success: false, error: message };
+  }
+}
+
+export async function getDemoUsers() {
+  if (!demoConfig.adminInstitute) return [];
+  await dbConnect();
+  const users = await User.find({ isDemo: true }).sort({ createdAt: -1 }).lean();
+  return users.map((u: Record<string, unknown>) => ({
+    id: String(u._id),
+    name: String(u.name),
+    email: String(u.email),
+    isActive: Boolean(u.isActive),
+    createdAt: u.createdAt as Date,
+  }));
+}
+
+export async function toggleDemoUserStatus(id: string, isActive: boolean) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (session?.user.role !== 'admin') throw new Error('Unauthorized');
+    if (isDemoSession(session)) return demoWriteSuccess();
+    if (!demoConfig.adminInstitute) throw new Error('Demo is not enabled');
+
+    await dbConnect();
+    await User.findByIdAndUpdate(id, { isActive });
+    revalidatePath("/admin/staff");
+    return { success: true };
+  } catch (error: unknown) {
+    logger.error(error, `Failed to toggle demo user status for ${id}`);
     const message = error instanceof Error ? error.message : "An unknown error occurred";
     return { success: false, error: message };
   }
@@ -84,6 +160,7 @@ export async function toggleStaffStatus(id: string, isActive: boolean) {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user.role !== 'admin') throw new Error('Unauthorized');
+    if (isDemoSession(session)) return demoWriteSuccess();
 
     await dbConnect();
     await User.findByIdAndUpdate(id, { isActive });
@@ -100,6 +177,7 @@ export async function deleteStaff(id: string) {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user.role !== 'admin') throw new Error('Unauthorized');
+    if (isDemoSession(session)) return demoWriteSuccess();
 
     await dbConnect();
     await User.findByIdAndDelete(id);
@@ -116,6 +194,7 @@ export async function updateStaffPassword(id: string, newPassword: string) {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user.role !== 'admin') throw new Error('Unauthorized');
+    if (isDemoSession(session)) return demoWriteSuccess();
 
     if (!newPassword || newPassword.length < 6) {
         return { success: false, error: "Password must be at least 6 characters" };

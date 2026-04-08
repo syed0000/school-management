@@ -4,6 +4,9 @@ import dbConnect from "@/lib/db"
 import Student from "@/models/Student"
 import Setting from "@/models/Setting"
 import { saveFile } from "@/lib/upload"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { isDemoSession } from "@/lib/demo-guard"
 
 export async function generateIdCard(studentId: string) {
   await dbConnect();
@@ -75,6 +78,13 @@ export async function generateBulkIdCards(classId: string) {
 }
 
 export async function saveSignature(formData: FormData, config: { x: number, y: number, scale: number }) {
+  const session = await getServerSession(authOptions)
+  if (isDemoSession(session)) {
+    await dbConnect();
+    const existing = await Setting.findOne({ key: "id_card_signature" }).lean() as { value?: { url?: string } } | null;
+    const signatureUrl = (formData.get('signatureUrl') as string) || existing?.value?.url || "";
+    return { success: true, demo: true, url: signatureUrl };
+  }
   await dbConnect();
   
   const file = formData.get('file') as File;

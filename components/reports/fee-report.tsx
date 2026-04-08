@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
-import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { format } from 'date-fns';
 import { CalendarDateRangePicker } from '@/components/dashboard/date-range-picker';
 import {
   Select,
@@ -13,14 +13,6 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Card,
   CardContent,
@@ -68,7 +60,7 @@ interface StudentFeeReport {
   dueAmount: number;
   period: string;
   status: string;
-  feeStatuses: Record<string, any>;
+  feeStatuses: Record<string, { status: string; date?: string }>;
 }
 
 interface FeeReportData {
@@ -101,7 +93,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
           classId: classId === 'all' ? undefined : classId,
           section: section === 'all' ? undefined : section,
         });
-        setReportData(data as any);
+        setReportData(data as unknown as FeeReportData);
       } catch (error) {
         console.error('Failed to fetch fee report:', error);
       }
@@ -130,7 +122,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
     const allHeaders = Array.from(new Set(filteredStudents.flatMap(s => Object.keys(s.feeStatuses))));
 
     const ws = XLSX.utils.json_to_sheet(filteredStudents.map((s) => {
-      const row: any = {
+      const row: Record<string, string | number> = {
         'Name': s.name,
         'Roll No': s.rollNumber,
         'Class': s.className,
@@ -141,7 +133,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
         'Status': s.status,
       };
       allHeaders.forEach(h => {
-        row[h] = s.feeStatuses[h] === 'paid' ? 'Paid' : 'Unpaid';
+        row[h] = s.feeStatuses[h]?.status === 'paid' ? 'Paid' : 'Unpaid';
       });
       return row;
     }));
@@ -418,14 +410,14 @@ export default function FeeReport({ classes }: FeeReportProps) {
                       return (
                         <td key={header} className="p-1 text-center border-x border-b">
                           <div className="flex items-center justify-center w-full h-full min-h-[40px]">
-                            {status && typeof status === 'object' && status.status === 'paid' ? (
+                            {status?.status === 'paid' ? (
                               <div className="flex flex-col items-center gap-0.5">
                                 <div className="w-4 h-4 bg-green-500 rounded flex items-center justify-center text-white shadow-sm">
                                   <span className="text-[8px] font-bold">✓</span>
                                 </div>
                                 <span className="text-[9px] text-muted-foreground font-medium whitespace-nowrap">{status.date}</span>
                               </div>
-                            ) : status === 'unpaid' || (status && typeof status === 'object' && status.status === 'unpaid') ? (
+                            ) : status?.status === 'unpaid' ? (
                               <div className="w-5 h-5 border-2 border-slate-300 rounded bg-white/50"></div>
                             ) : (
                               <span className="text-muted-foreground">-</span>

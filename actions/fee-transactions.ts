@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import logger from "@/lib/logger"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 interface TransactionFilter {
   startDate?: Date
@@ -28,7 +29,7 @@ export async function getFeeTransactions(filter: TransactionFilter, page: number
   const query: Record<string, unknown> = {}
 
   if (filter.startDate && filter.endDate) {
-    const { startUtc, endUtc } = await getSchoolDateBoundaries(filter.startDate)
+    const { startUtc } = await getSchoolDateBoundaries(filter.startDate)
     const { endUtc: finalEndUtc } = await getSchoolDateBoundaries(filter.endDate)
     query.transactionDate = {
       $gte: startUtc,
@@ -179,7 +180,7 @@ export async function getTransactionStats(filter: TransactionFilter) {
   const query: Record<string, unknown> = {}
 
   if (filter.startDate && filter.endDate) {
-    const { startUtc, endUtc } = await getSchoolDateBoundaries(filter.startDate)
+    const { startUtc } = await getSchoolDateBoundaries(filter.startDate)
     const { endUtc: finalEndUtc } = await getSchoolDateBoundaries(filter.endDate)
     query.transactionDate = {
       $gte: startUtc,
@@ -229,6 +230,7 @@ export async function deleteFeeTransaction(transactionId: string) {
     if (!session || session.user.role !== 'admin') {
       return { success: false, error: "Unauthorized" }
     }
+    if (isDemoSession(session)) return demoWriteSuccess();
 
     await dbConnect()
 

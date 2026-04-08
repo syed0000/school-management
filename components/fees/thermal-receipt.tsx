@@ -158,7 +158,7 @@ export function ThermalReceipt({ receiptData }: ReceiptProps) {
                             <span className="whitespace-nowrap">₹{formatNumber(item.amount)}</span>
                         </div>
                         {item.remarks && (
-                            <span className="text-[10px] text-gray-700 italic border-l block pl-1 ml-1 mt-0.5 border-gray-400">"{item.remarks}"</span>
+                            <span className="text-[10px] text-gray-700 italic border-l block pl-1 ml-1 mt-0.5 border-gray-400">&quot;{item.remarks}&quot;</span>
                         )}
                     </div>
                 ))}

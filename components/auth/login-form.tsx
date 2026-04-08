@@ -35,13 +35,15 @@ const staffSchema = z.object({
 
 interface LoginFormProps {
   type: "admin" | "staff"
+  allowDemo?: boolean
 }
 
-export function LoginForm({ type }: LoginFormProps) {
+export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [demoEmail, setDemoEmail] = useState("")
 
   const schema = type === "admin" ? adminSchema : staffSchema
   
@@ -94,6 +96,34 @@ export function LoginForm({ type }: LoginFormProps) {
         }
         
         router.push(redirectUrl)
+        router.refresh()
+      }
+    } catch {
+      toast.error("Something went wrong")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function onDemoLogin() {
+    setIsLoading(true)
+    try {
+      const email =
+        type === "staff" ? (form.getValues("email") || "").trim() : demoEmail.trim()
+      if (!email) {
+        toast.error("Enter demo email")
+        return
+      }
+      const result = await signIn("credentials", {
+        redirect: false,
+        demo: "true",
+        email,
+      })
+
+      if (result?.error) {
+        toast.error("Invalid demo email")
+      } else {
+        router.push("/demo/access-as")
         router.refresh()
       }
     } catch {
@@ -176,6 +206,25 @@ export function LoginForm({ type }: LoginFormProps) {
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sign In
             </Button>
+            {allowDemo && (
+              <>
+                {type === "admin" && (
+                  <div className="space-y-2">
+                    <FormLabel>Demo Email</FormLabel>
+                    <Input
+                      placeholder="demo@example.com"
+                      value={demoEmail}
+                      onChange={(e) => setDemoEmail(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                )}
+                <Button type="button" variant="outline" className="w-full" disabled={isLoading} onClick={onDemoLogin}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Demo Login
+                </Button>
+              </>
+            )}
             <div className="text-center text-sm">
               {type === "admin" ? (
                 <Link href="/login" className="underline underline-offset-4 hover:text-primary">

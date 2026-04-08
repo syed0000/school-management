@@ -33,7 +33,7 @@ export function TimezoneEditor({ initialTimezone }: { initialTimezone: string })
       } else {
         toast.error(result.error || "Failed to update timezone")
       }
-    } catch (e) {
+    } catch {
       toast.error("An error occurred")
     } finally {
       setIsPending(false)
@@ -44,9 +44,9 @@ export function TimezoneEditor({ initialTimezone }: { initialTimezone: string })
     <div className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="timezone-select">Institute Timezone</Label>
-        <Select 
-          value={initialTimezone} 
-          onValueChange={handleTimezoneChange} 
+        <Select
+          value={initialTimezone}
+          onValueChange={handleTimezoneChange}
           disabled={isPending}
         >
           <SelectTrigger id="timezone-select" className="w-full">

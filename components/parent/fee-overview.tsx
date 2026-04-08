@@ -68,9 +68,9 @@ export function FeeOverview({ feeData }: FeeOverviewProps) {
                       <span className="text-sm font-medium">
                         {entry.monthName} {entry.year}
                       </span>
-                      {(entry as any).transactionDate && (
+                      {(entry as { transactionDate?: string }).transactionDate && (
                         <span className="text-[10px] text-muted-foreground italic flex items-center gap-1">
-                          {entry.status === "Included in Admission/Registration" ? "Part of Admission" : `Paid on: ${(entry as any).transactionDate}`}
+                          {entry.status === "Included in Admission/Registration" ? "Part of Admission" : `Paid on: ${(entry as { transactionDate?: string }).transactionDate}`}
                         </span>
                       )}
                     </div>
@@ -123,9 +123,9 @@ export function FeeOverview({ feeData }: FeeOverviewProps) {
                     )}
                     <div className="flex flex-col">
                       <span className="text-sm font-medium">{fee.label}</span>
-                      {(fee as any).transactionDate && (
+                      {(fee as { transactionDate?: string }).transactionDate && (
                         <span className="text-[10px] text-muted-foreground italic flex items-center gap-1">
-                          Paid on: {(fee as any).transactionDate}
+                          Paid on: {(fee as { transactionDate?: string }).transactionDate}
                         </span>
                       )}
                     </div>

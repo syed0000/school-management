@@ -3,7 +3,7 @@
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { useState, useEffect } from "react"
+import { useRef, useState, useEffect } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,12 +17,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, Plus, Trash } from "lucide-react"
+import { Loader2, Plus, Trash, Printer } from "lucide-react"
 import { registerStudent, getNextRegistrationNumber } from "@/actions/student"
 import { useRouter } from "next/navigation"
 import { FileUploader } from "@/components/ui/file-uploader-new"
 import logger from "@/lib/logger"
 import { BackButton } from "@/components/ui/back-button"
+import { AdmissionPrintDocument, type AdmissionPrintDocumentData } from "@/components/students/admission-print-document"
 
 const formSchema = z.object({
     registrationNumber: z.string().optional(),
@@ -75,6 +76,8 @@ export function AdmissionForm({ classes }: AdmissionFormProps) {
     const [documentFiles, setDocumentFiles] = useState<{ index: number, file: File | null }[]>([])
     const [nextRegNo, setNextRegNo] = useState("")
     const [regNoLoading, setRegNoLoading] = useState(false)
+    const [printData, setPrintData] = useState<AdmissionPrintDocumentData | null>(null)
+    const createdObjectUrlsRef = useRef<string[]>([])
 
     useEffect(() => {
         getNextRegistrationNumber().then(setNextRegNo);
@@ -130,6 +133,87 @@ export function AdmissionForm({ classes }: AdmissionFormProps) {
             return filtered;
         });
     };
+
+    useEffect(() => {
+        return () => {
+            for (const url of createdObjectUrlsRef.current) {
+                if (url.startsWith("blob:")) URL.revokeObjectURL(url)
+            }
+            createdObjectUrlsRef.current = []
+        }
+    }, [])
+
+    useEffect(() => {
+        const handleAfterPrint = () => {
+            for (const url of createdObjectUrlsRef.current) {
+                if (url.startsWith("blob:")) URL.revokeObjectURL(url)
+            }
+            createdObjectUrlsRef.current = []
+            setPrintData(null)
+        }
+
+        window.addEventListener("afterprint", handleAfterPrint)
+        return () => window.removeEventListener("afterprint", handleAfterPrint)
+    }, [])
+
+    const handlePrint = () => {
+        for (const url of createdObjectUrlsRef.current) {
+            if (url.startsWith("blob:")) URL.revokeObjectURL(url)
+        }
+        createdObjectUrlsRef.current = []
+
+        const values = form.getValues()
+        const className = classes.find((c) => c.id === values.classId)?.name || ""
+
+        const photoSrc = photoFile ? URL.createObjectURL(photoFile) : undefined
+        if (photoSrc) createdObjectUrlsRef.current.push(photoSrc)
+
+        const documents = (values.documents || []).map((doc, index) => {
+            const file = documentFiles.find((f) => f.index === index)?.file
+            const imageSrc = file ? URL.createObjectURL(file) : undefined
+            if (imageSrc) createdObjectUrlsRef.current.push(imageSrc)
+            return {
+                type: doc.type,
+                documentNumber: doc.documentNumber,
+                imageSrc,
+            }
+        })
+
+        setPrintData({
+            student: {
+                registrationNumber: values.registrationNumber,
+                name: values.name,
+                className,
+                section: values.section,
+                rollNumber: values.rollNumber,
+                dateOfBirth: values.dateOfBirth,
+                dateOfAdmission: values.dateOfAdmission,
+                gender: values.gender,
+                aadhaar: values.aadhaar,
+                pen: values.pen,
+                lastInstitution: values.lastInstitution,
+                tcNumber: values.tcNumber,
+                address: values.address,
+                mobile: values.mobile.map((m) => m.value).filter(Boolean),
+                email: (values.email || []).map((e) => e.value).filter(Boolean),
+                fatherName: values.parents.father.name,
+                fatherAadhaar: values.parents.father.aadhaarNumber,
+                motherName: values.parents.mother.name,
+                motherAadhaar: values.parents.mother.aadhaarNumber,
+                photoSrc,
+                documents,
+            },
+            meta: {
+                printedAtIso: new Date().toISOString(),
+            },
+        })
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                window.print()
+            })
+        })
+    }
 
     useEffect(() => {
         if (nextRegNo && !form.getValues("registrationNumber")) {
@@ -676,12 +760,53 @@ export function AdmissionForm({ classes }: AdmissionFormProps) {
                                 </div>
                             </div>
 
-                            <Button type="submit" className="w-full" disabled={isLoading}>
-                                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Submit Admission
-                            </Button>
+                            <div className="flex flex-col sm:flex-row gap-3 print:hidden">
+                                <Button type="button" variant="secondary" onClick={handlePrint} disabled={isLoading}>
+                                    <Printer className="mr-2 h-4 w-4" />
+                                    Print Admission Form
+                                </Button>
+
+                                <Button type="submit" className="sm:ml-auto" disabled={isLoading}>
+                                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Submit Admission
+                                </Button>
+                            </div>
                         </form>
                     </Form>
+
+                    <div className="hidden print:block admission-print">
+                        {printData ? (
+                            <div className="p-0">
+                                <AdmissionPrintDocument data={printData} />
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <style jsx global>{`
+                      @media print {
+                        body * {
+                          visibility: hidden;
+                        }
+                        .admission-print, .admission-print * {
+                          visibility: visible;
+                        }
+                        .admission-print {
+                          position: absolute;
+                          left: 0;
+                          top: 0;
+                          width: 100%;
+                        }
+                        @page {
+                          size: A4;
+                          margin: 12mm;
+                        }
+                        html, body {
+                          background: #fff !important;
+                          -webkit-print-color-adjust: exact;
+                          print-color-adjust: exact;
+                        }
+                      }
+                    `}</style>
                 </CardContent>
             </Card>
         </div>

@@ -5,6 +5,9 @@ import Holiday from "@/models/Holiday"
 import { revalidatePath } from "next/cache"
 import { getSchoolDateBoundaries } from "@/lib/tz-utils"
 import { z } from "zod"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 const holidaySchema = z.object({
   startDate: z.string().min(1, "Start date is required"),
@@ -22,6 +25,8 @@ const holidaySchema = z.object({
 
 export async function addHoliday(data: z.infer<typeof holidaySchema>) {
   try {
+    const session = await getServerSession(authOptions);
+    if (isDemoSession(session)) return demoWriteSuccess();
     const validatedData = holidaySchema.parse(data);
     await dbConnect();
     
@@ -75,7 +80,7 @@ export async function getHolidays(limit: number = 20) {
     endDate?: Date;
     date?: Date; // Backwards compatibility
     description: string;
-    affectedClasses?: { _id: any; name: string }[];
+    affectedClasses?: { _id: { toString: () => string }; name: string }[];
   }
     
   return holidays.map((h: unknown) => {
@@ -96,6 +101,8 @@ export async function getHolidays(limit: number = 20) {
 
 export async function deleteHoliday(id: string) {
   try {
+    const session = await getServerSession(authOptions);
+    if (isDemoSession(session)) return demoWriteSuccess();
     await dbConnect();
     await Holiday.findByIdAndDelete(id);
     revalidatePath("/attendance/dashboard");
@@ -120,7 +127,7 @@ export async function checkIsHoliday(dateStr: string, classId?: string) {
 
   const { startUtc, endUtc } = await getSchoolDateBoundaries(new Date(dateStr));
 
-  const query: any = {
+  const query: Record<string, unknown> = {
     $or: [
       { startDate: { $lte: endUtc }, endDate: { $gte: startUtc } },
       { date: { $gte: startUtc, $lte: endUtc } }
@@ -133,14 +140,14 @@ export async function checkIsHoliday(dateStr: string, classId?: string) {
   
   const holidays = await Holiday.find(query).lean();
 
-  const relevantHoliday = holidays.find((h: any) => {
+  const relevantHoliday = holidays.find((h: { affectedClasses?: { toString: () => string }[]; description?: string }) => {
      if (!h.affectedClasses || h.affectedClasses.length === 0) return true;
-     if (classId && h.affectedClasses.some((ac: any) => ac.toString() === classId)) return true;
+     if (classId && h.affectedClasses.some((ac) => ac.toString() === classId)) return true;
      return false;
   });
 
   if (relevantHoliday) {
-    return { isHoliday: true, reason: (relevantHoliday as any).description };
+    return { isHoliday: true, reason: relevantHoliday.description };
   }
 
   return { isHoliday: false, reason: null };

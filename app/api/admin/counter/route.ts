@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Counter from '@/models/Counter';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export async function GET() {
   try {
-    // Ideally check auth here
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== 'admin') {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     await dbConnect();
     const counter = await Counter.findById('registrationNumber');
     return NextResponse.json({ 
@@ -19,9 +25,14 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    // Check auth
-    // const session = await getServerSession(authOptions);
-    // if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== 'admin') {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (session.user?.isDemo === true) {
+      return NextResponse.json({ success: true, demo: true });
+    }
 
     const body = await req.json();
     const { seq } = body;

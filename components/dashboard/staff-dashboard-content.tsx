@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Users, UserRoundSearch, CreditCard, ArrowLeft, PlusCircle, Headset } from "lucide-react"
+import { Users, UserRoundSearch, CreditCard, ArrowLeft, Headset } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
 import { CustomLineChart } from "@/components/dashboard/charts/line-chart"

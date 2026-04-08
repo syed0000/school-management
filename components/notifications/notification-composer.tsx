@@ -73,7 +73,7 @@ export function NotificationComposer({ classes, teachers }: NotificationComposer
       } else {
         toast.error("Failed to send notification: " + res.error)
       }
-    } catch (error) {
+    } catch {
       toast.error("An error occurred.")
     } finally {
       setIsSubmitting(false)
