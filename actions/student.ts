@@ -437,6 +437,9 @@ export async function updateStudent(id: string, data: z.infer<typeof registerStu
 export async function deleteStudent(id: string) {
     try {
         const session = await getServerSession(authOptions);
+        if (!session || session.user.role !== "admin") {
+            throw new Error("Unauthorized");
+        }
         if (isDemoSession(session)) return demoWriteSuccess();
         await dbConnect();
         await Student.findByIdAndUpdate(id, { isActive: false });

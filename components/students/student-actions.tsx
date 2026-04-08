@@ -20,10 +20,12 @@ import { useConfirm } from "@/context/ConfirmDialogContext"
 
 interface StudentActionsProps {
   id: string
+  name: string
+  registrationNumber: string
   isAdmin: boolean
 }
 
-export function StudentActions({ id, isAdmin }: StudentActionsProps) {
+export function StudentActions({ id, name, registrationNumber, isAdmin }: StudentActionsProps) {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { confirm } = useConfirm()
@@ -31,8 +33,8 @@ export function StudentActions({ id, isAdmin }: StudentActionsProps) {
   async function handleDelete() {
     if (!await confirm({
       title: "Delete Student",
-      description: "Are you sure you want to delete this student? This action cannot be undone.",
-      confirmText: "Delete",
+      description: `Delete ${name} (${registrationNumber})? This will deactivate the student and remove them from active lists.`,
+      confirmText: "Delete Student",
       variant: "destructive"
     })) return
 
@@ -52,8 +54,8 @@ export function StudentActions({ id, isAdmin }: StudentActionsProps) {
     }
   }
 
-  const editPath = isAdmin ? `/admin/students/${id}` : `/students/${id}`;
-  const viewPath = isAdmin ? `/admin/students/${id}` : `/students/${id}`;
+  const editPath = `/students/${id}`;
+  const viewPath = `/students/${id}`;
 
   return (
     <DropdownMenu>

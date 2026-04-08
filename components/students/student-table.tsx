@@ -78,7 +78,12 @@ export function StudentTable({ students, isAdmin }: StudentTableProps) {
               <TableCell>{student.fatherName}</TableCell>
               <TableCell>{student.mobile}</TableCell>
               <TableCell className="text-right">
-                <StudentActions id={student.id} isAdmin={isAdmin} />
+                <StudentActions
+                  id={student.id}
+                  name={student.name}
+                  registrationNumber={student.registrationNumber}
+                  isAdmin={isAdmin}
+                />
               </TableCell>
             </TableRow>
           ))}
