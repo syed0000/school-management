@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { CalendarDateRangePicker } from '@/components/dashboard/date-range-picker';
 import {
   Select,
@@ -147,10 +147,11 @@ export default function FeeReport({ classes }: FeeReportProps) {
     window.print();
   };
 
-  const COLORS = ['#00C49F', '#FF8042'];
+  const COLORS = ['#00C49F', '#FFBB28', '#FF8042'];
 
   const pieData = reportData ? [
     { name: 'Paid', value: reportData.studentReport.filter((s) => s.status === 'Paid').length },
+    { name: 'Partial', value: reportData.studentReport.filter((s) => s.status === 'Partial').length },
     { name: 'Due', value: reportData.studentReport.filter((s) => s.status === 'Due').length },
   ] : [];
 
@@ -313,9 +314,9 @@ export default function FeeReport({ classes }: FeeReportProps) {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={reportData.trend}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tickFormatter={(str) => format(new Date(str), 'MMM dd')} />
+                  <XAxis dataKey="date" tickFormatter={(str) => format(parseISO(str), 'MMM dd')} />
                   <YAxis />
-                  <Tooltip labelFormatter={(str) => format(new Date(str), 'PPP')} formatter={(value) => `₹${value}`} />
+                  <Tooltip labelFormatter={(str) => format(parseISO(str), 'PPP')} formatter={(value) => `₹${value}`} />
                   <Bar dataKey="amount" fill="#0088FE" name="Collected" />
                 </BarChart>
               </ResponsiveContainer>

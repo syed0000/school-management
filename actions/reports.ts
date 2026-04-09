@@ -8,7 +8,8 @@ import ClassFee from '@/models/ClassFee';
 import Setting from '@/models/Setting';
 import Holiday from '@/models/Holiday';
 import { format, eachDayOfInterval, isBefore, isAfter, startOfMonth, endOfMonth } from 'date-fns';
-import { getSchoolDateBoundaries } from '@/lib/tz-utils';
+import { formatInTimeZone } from 'date-fns-tz';
+import { getSchoolDateBoundaries, getSchoolTimezone } from '@/lib/tz-utils';
 import logger from "@/lib/logger";
 import { Types } from "mongoose";
 import { normalizeFeeType } from '@/lib/fee-type';
@@ -100,6 +101,7 @@ export async function getAttendanceReport({
   await dbConnect();
 
   try {
+    const tz = await getSchoolTimezone();
     const { startUtc: startOfStartDate } = await getSchoolDateBoundaries(startDate);
     const { endUtc: endOfEndDate } = await getSchoolDateBoundaries(endDate);
 
@@ -237,13 +239,13 @@ export async function getAttendanceReport({
     const dailyStats: DailyStat[] = [];
     const attendanceByDate: Record<string, AttendanceRecordDoc[]> = {};
     attendanceRecords.forEach((record) => {
-      const d = format(new Date(record.date), 'yyyy-MM-dd');
+      const d = formatInTimeZone(new Date(record.date), tz, 'yyyy-MM-dd');
       if (!attendanceByDate[d]) attendanceByDate[d] = [];
       attendanceByDate[d].push(record);
     });
 
     daysInterval.forEach((day) => {
-      const dateStr = format(day, 'yyyy-MM-dd');
+      const dateStr = formatInTimeZone(day, tz, 'yyyy-MM-dd');
       const recordsForDay = attendanceByDate[dateStr];
       
       let dayPresent = 0;
@@ -302,6 +304,7 @@ export async function getFeeReport({
   await dbConnect();
 
   try {
+    const tz = await getSchoolTimezone();
     const [admSetting, regSetting] = await Promise.all([
         Setting.findOne({ key: "admission_fee_includes_april" }).lean(),
         Setting.findOne({ key: "registration_fee_includes_april" }).lean()
@@ -546,7 +549,7 @@ export async function getFeeReport({
         collectedPeriod: paidAmount,
         expectedPeriod: expectedAmount,
         dueAmount,
-        status: dueAmount <= 0 ? 'Paid' : 'Due',
+        status: dueAmount <= 0 ? 'Paid' : paidAmount > 0 ? 'Partial' : 'Due',
         period: periodStr,
         feeStatuses,
         lastPaymentDate: studentAllTxns.length > 0 ? studentAllTxns.sort((a, b) => new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime())[0].transactionDate : null,
@@ -559,11 +562,11 @@ export async function getFeeReport({
     const days = eachDayOfInterval({ start: startDate, end: endDate });
     const txnsByDate: Record<string, number> = {};
     transactions.forEach((txn) => {
-      const d = format(new Date(txn.transactionDate), 'yyyy-MM-dd');
+      const d = formatInTimeZone(new Date(txn.transactionDate), tz, 'yyyy-MM-dd');
       txnsByDate[d] = (txnsByDate[d] || 0) + txn.amount;
     });
     days.forEach((day) => {
-      const d = format(day, 'yyyy-MM-dd');
+      const d = formatInTimeZone(day, tz, 'yyyy-MM-dd');
       collectionTrend.push({ date: d, amount: txnsByDate[d] || 0 });
     });
 

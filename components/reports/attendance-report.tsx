@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { CalendarDateRangePicker } from '@/components/dashboard/date-range-picker';
 import {
   Select,
@@ -331,9 +331,9 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={reportData.dailyStats}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tickFormatter={(str) => format(new Date(str), 'MMM dd')} />
+                  <XAxis dataKey="date" tickFormatter={(str) => format(parseISO(str), 'MMM dd')} />
                   <YAxis domain={[0, 100]} />
-                  <Tooltip labelFormatter={(str) => format(new Date(str), 'PPP')} />
+                  <Tooltip labelFormatter={(str) => format(parseISO(str), 'PPP')} />
                   <Line type="monotone" dataKey="percentage" stroke="#8884d8" name="Attendance %" />
                 </LineChart>
               </ResponsiveContainer>
