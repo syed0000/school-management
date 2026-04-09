@@ -13,8 +13,8 @@ import logger from "@/lib/logger"
 import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 
 interface TransactionFilter {
-  startDate?: Date
-  endDate?: Date
+  startDate?: Date | string
+  endDate?: Date | string
   classId?: string
   studentId?: string
   feeType?: string

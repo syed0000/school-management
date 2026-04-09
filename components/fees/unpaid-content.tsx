@@ -6,7 +6,7 @@ import { UnpaidFilters } from "@/components/fees/unpaid-filters"
 import { UnpaidStudentList } from "@/components/fees/unpaid-student-list"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { BackButton } from "@/components/ui/back-button"
 
 interface UnpaidStudent {
@@ -46,8 +46,8 @@ export function UnpaidContent({
     endDate?: string
   }) => {
     // Update display dates if provided, otherwise fallback to initial/current
-    const newStart = filters.startDate ? new Date(filters.startDate) : initialStartDate
-    const newEnd = filters.endDate ? new Date(filters.endDate) : initialEndDate
+    const newStart = filters.startDate ? parseISO(filters.startDate) : initialStartDate
+    const newEnd = filters.endDate ? parseISO(filters.endDate) : initialEndDate
     
     setDisplayStart(newStart)
     setDisplayEnd(newEnd)
@@ -56,8 +56,8 @@ export function UnpaidContent({
       const data = await getUnpaidStudents({
         searchQuery: filters.search,
         classId: filters.classId,
-        startDate: filters.startDate ? new Date(filters.startDate) : undefined,
-        endDate: filters.endDate ? new Date(filters.endDate) : undefined
+        startDate: filters.startDate || undefined,
+        endDate: filters.endDate || undefined
       })
       setStudents(data)
     })

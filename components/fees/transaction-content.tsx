@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { getCurrentSessionRange } from "@/lib/utils"
+import { format } from "date-fns"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -113,8 +114,8 @@ export function TransactionContent({
   }>(() => {
     const { from, to } = getCurrentSessionRange()
     return {
-      startDate: from.toISOString().split('T')[0],
-      endDate: to.toISOString().split('T')[0]
+      startDate: format(from, 'yyyy-MM-dd'),
+      endDate: format(to, 'yyyy-MM-dd')
     }
   })
 
@@ -122,8 +123,8 @@ export function TransactionContent({
   const fetchData = (filters: any, page: number) => {
     startTransition(async () => {
       const filterObj = {
-        startDate: filters.startDate ? new Date(filters.startDate) : undefined,
-        endDate: filters.endDate ? new Date(filters.endDate) : undefined,
+        startDate: filters.startDate || undefined,
+        endDate: filters.endDate || undefined,
         classId: filters.classId,
         feeType: filters.feeType,
         status: filters.status,

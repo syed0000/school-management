@@ -12,8 +12,8 @@ import { coerceBoolean } from "@/lib/setting-coerce"
 interface UnpaidFilter {
     classId?: string
     searchQuery?: string
-    startDate?: Date
-    endDate?: Date
+    startDate?: Date | string
+    endDate?: Date | string
 }
 
 export interface UnpaidStudent {
@@ -31,8 +31,11 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
     await dbConnect()
 
     // Use provided dates or default to current year
-    const end = filter.endDate ? new Date(filter.endDate) : endOfMonth(new Date())
-    const start = filter.startDate ? new Date(filter.startDate) : startOfMonth(new Date(new Date().getFullYear(), 0, 1))
+    const toDateObj = (value: Date | string) =>
+        typeof value === "string" ? new Date(`${value}T00:00:00.000Z`) : value
+
+    const end = filter.endDate ? toDateObj(filter.endDate) : endOfMonth(new Date())
+    const start = filter.startDate ? toDateObj(filter.startDate) : startOfMonth(new Date(new Date().getFullYear(), 0, 1))
 
     const monthsToCheck = eachMonthOfInterval({ start, end })
 

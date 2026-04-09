@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, Check, ChevronsUpDown, Plus, Trash2 } from "lucide-react"
 import { collectFees, getStudentFeeDetails } from "@/actions/fee-collection"
 import { useParams, useRouter } from "next/navigation"
+import { format } from "date-fns"
 import {
   Command,
   CommandEmpty,
@@ -115,7 +116,7 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
       examType: "",
       title: "",
       remarks: "",
-      transactionDate: new Date().toISOString().split('T')[0],
+      transactionDate: format(new Date(), 'yyyy-MM-dd'),
     },
   })
 

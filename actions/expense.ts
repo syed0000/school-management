@@ -356,11 +356,11 @@ export async function getExpenses({
   if (startDate || endDate) {
     query.expenseDate = {};
     if (startDate) {
-        const { startUtc } = await getSchoolDateBoundaries(new Date(startDate));
+        const { startUtc } = await getSchoolDateBoundaries(startDate);
         query.expenseDate.$gte = startUtc;
     }
     if (endDate) {
-        const { endUtc } = await getSchoolDateBoundaries(new Date(endDate));
+        const { endUtc } = await getSchoolDateBoundaries(endDate);
         query.expenseDate.$lte = endUtc;
     }
   }
@@ -424,11 +424,11 @@ export async function getAllExpensesForExport({
   if (startDate || endDate) {
     query.expenseDate = {};
     if (startDate) {
-        const { startUtc } = await getSchoolDateBoundaries(new Date(startDate));
+        const { startUtc } = await getSchoolDateBoundaries(startDate);
         query.expenseDate.$gte = startUtc;
     }
     if (endDate) {
-        const { endUtc } = await getSchoolDateBoundaries(new Date(endDate));
+        const { endUtc } = await getSchoolDateBoundaries(endDate);
         query.expenseDate.$lte = endUtc;
     }
   }
