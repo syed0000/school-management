@@ -17,6 +17,7 @@ import { getSchoolDateBoundaries } from '@/lib/tz-utils';
 import logger from '@/lib/logger';
 import { saveFile } from '@/lib/upload';
 import { normalizeFeeType } from '@/lib/fee-type';
+import { coerceBoolean } from '@/lib/setting-coerce';
 import type {
   ParentStudentProfile,
   AttendanceCalendarEntry,
@@ -540,8 +541,8 @@ export async function getStudentFeeOverview(
           Setting.findOne({ key: "admission_fee_includes_april" }).lean(),
           Setting.findOne({ key: "registration_fee_includes_april" }).lean()
       ]);
-      const admIncludesApril = admSetting ? admSetting.value === true : true;
-      const regIncludesApril = regSetting ? regSetting.value === true : true;
+      const admIncludesApril = coerceBoolean((admSetting as { value?: unknown } | null)?.value, true)
+      const regIncludesApril = coerceBoolean((regSetting as { value?: unknown } | null)?.value, true)
 
       const hasAccess = await validateParentAccess(sId, p);
       if (!hasAccess) return null;

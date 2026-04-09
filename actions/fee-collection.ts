@@ -16,6 +16,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
 import { normalizeFeeType } from "@/lib/fee-type"
+import { coerceBoolean } from "@/lib/setting-coerce"
 
 const feeItemSchema = z.object({
   feeType: z.string().min(1, "Fee type is required"),
@@ -192,8 +193,8 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
               import('@/models/Setting').then(m => m.default.findOne({ key: "admission_fee_includes_april" }).lean()),
               import('@/models/Setting').then(m => m.default.findOne({ key: "registration_fee_includes_april" }).lean())
             ]);
-            const admIncludesApril = admSetting ? (admSetting as { value?: boolean }).value === true : true;
-            const regIncludesApril = regSetting ? (regSetting as { value?: boolean }).value === true : true;
+            const admIncludesApril = coerceBoolean((admSetting as { value?: unknown } | null)?.value, true)
+            const regIncludesApril = coerceBoolean((regSetting as { value?: unknown } | null)?.value, true)
 
             if (admIncludesApril || regIncludesApril) {
               const paidAdm = await FeeTransaction.findOne({

@@ -9,12 +9,13 @@ import { whatsappConfig } from "@/lib/whatsapp-config"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
+import { coerceBoolean } from "@/lib/setting-coerce"
 
 export async function getWhatsAppReceiptSetting() {
     await dbConnect()
     const setting = await Setting.findOne({ key: "whatsapp_receipt_alert" }).lean()
     // Default to false if not set
-    return setting ? setting.value === true : false
+    return coerceBoolean((setting as { value?: unknown } | null)?.value, false)
 }
 
 export async function updateWhatsAppReceiptSetting(enabled: boolean) {
@@ -75,8 +76,8 @@ export async function getFeePolicySettings() {
     
     // Default to true as requested
     return {
-        admissionFeeIncludesApril: admSetting ? admSetting.value === true : true,
-        registrationFeeIncludesApril: regSetting ? regSetting.value === true : true,
+        admissionFeeIncludesApril: coerceBoolean((admSetting as { value?: unknown } | null)?.value, true),
+        registrationFeeIncludesApril: coerceBoolean((regSetting as { value?: unknown } | null)?.value, true),
     }
 }
 

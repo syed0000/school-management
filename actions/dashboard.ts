@@ -16,6 +16,7 @@ import { unstable_cache } from "next/cache"
 import { getCurrentSessionRange } from "@/lib/utils"
 import { getSchoolDateBoundaries } from "@/lib/tz-utils"
 import { normalizeFeeType } from "@/lib/fee-type"
+import { coerceBoolean } from "@/lib/setting-coerce"
 
 interface DashboardFilter {
     startDate?: Date;
@@ -129,8 +130,8 @@ async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: strin
         Setting.findOne({ key: "admission_fee_includes_april" }).lean(),
         Setting.findOne({ key: "registration_fee_includes_april" }).lean()
     ]);
-    const admIncludesApril = admSetting ? admSetting.value === true : true;
-    const regIncludesApril = regSetting ? regSetting.value === true : true;
+    const admIncludesApril = coerceBoolean((admSetting as { value?: unknown } | null)?.value, true)
+    const regIncludesApril = coerceBoolean((regSetting as { value?: unknown } | null)?.value, true)
 
     // 2. Efficiently Fetch Students and Fees
     const studentQuery: Record<string, unknown> = { isActive: true };
@@ -417,6 +418,8 @@ export const getDashboardStats = unstable_cache(
         const { from: sessionStart, to: sessionEnd } = getCurrentSessionRange();
         const start = filter.startDate || sessionStart;
         const end = filter.endDate || sessionEnd;
+        const { startUtc: periodStartUtc } = await getSchoolDateBoundaries(start);
+        const { endUtc: periodEndUtc } = await getSchoolDateBoundaries(end);
         const monthsToCheck = eachMonthOfInterval({ start, end });
 
         // 1. Get Monthly Collected/Pending Stats via Aggregation
@@ -425,7 +428,7 @@ export const getDashboardStats = unstable_cache(
             {
                 $match: {
                     status: { $in: ['verified', 'pending'] },
-                    transactionDate: { $gte: start, $lte: end }
+                    transactionDate: { $gte: periodStartUtc, $lte: periodEndUtc }
                 }
             },
             {
@@ -445,7 +448,7 @@ export const getDashboardStats = unstable_cache(
             {
                 $match: {
                     status: 'active',
-                    expenseDate: { $gte: start, $lte: end }
+                    expenseDate: { $gte: periodStartUtc, $lte: periodEndUtc }
                 }
             },
             {
@@ -570,12 +573,17 @@ export const getDashboardStats = unstable_cache(
         const lastWeekStart = subWeeks(today, 1);
         const twoWeeksAgoStart = subWeeks(today, 2);
 
+        const { endUtc: todayEndUtc } = await getSchoolDateBoundaries(today);
+        const { startUtc: lastWeekStartUtc } = await getSchoolDateBoundaries(lastWeekStart);
+        const { startUtc: twoWeeksAgoStartUtc } = await getSchoolDateBoundaries(twoWeeksAgoStart);
+        const { endUtc: lastWeekEndUtc } = await getSchoolDateBoundaries(subDays(today, 7));
+
         const revenueThisWeekResult = await FeeTransaction.aggregate([
-            { $match: { transactionDate: { $gte: lastWeekStart, $lte: today }, status: 'verified' } },
+            { $match: { transactionDate: { $gte: lastWeekStartUtc, $lte: todayEndUtc }, status: 'verified' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
         ]);
         const revenueLastWeekResult = await FeeTransaction.aggregate([
-            { $match: { transactionDate: { $gte: twoWeeksAgoStart, $lt: lastWeekStart }, status: 'verified' } },
+            { $match: { transactionDate: { $gte: twoWeeksAgoStartUtc, $lte: lastWeekEndUtc }, status: 'verified' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
         ]);
 
@@ -593,11 +601,11 @@ export const getDashboardStats = unstable_cache(
 
         // Calculate Expense Change (Current vs Last Week)
         const expenseThisWeekResult = await Expense.aggregate([
-            { $match: { expenseDate: { $gte: lastWeekStart, $lte: today }, status: 'active' } },
+            { $match: { expenseDate: { $gte: lastWeekStartUtc, $lte: todayEndUtc }, status: 'active' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
         ]);
         const expenseLastWeekResult = await Expense.aggregate([
-            { $match: { expenseDate: { $gte: twoWeeksAgoStart, $lt: lastWeekStart }, status: 'active' } },
+            { $match: { expenseDate: { $gte: twoWeeksAgoStartUtc, $lte: lastWeekEndUtc }, status: 'active' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
         ]);
 
@@ -616,12 +624,16 @@ export const getDashboardStats = unstable_cache(
         const lastMonthStart = startOfMonth(subMonths(today, 1));
         const lastMonthEnd = endOfMonth(subMonths(today, 1));
 
+        const { startUtc: thisMonthStartUtc } = await getSchoolDateBoundaries(thisMonthStart);
+        const { startUtc: lastMonthStartUtc } = await getSchoolDateBoundaries(lastMonthStart);
+        const { endUtc: lastMonthEndUtc } = await getSchoolDateBoundaries(lastMonthEnd);
+
         const pendingThisMonthResult = await FeeTransaction.aggregate([
-            { $match: { transactionDate: { $gte: thisMonthStart, $lte: today }, status: 'pending' } },
+            { $match: { transactionDate: { $gte: thisMonthStartUtc, $lte: todayEndUtc }, status: 'pending' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
         ]);
         const pendingLastMonthResult = await FeeTransaction.aggregate([
-            { $match: { transactionDate: { $gte: lastMonthStart, $lte: lastMonthEnd }, status: 'pending' } },
+            { $match: { transactionDate: { $gte: lastMonthStartUtc, $lte: lastMonthEndUtc }, status: 'pending' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
         ]);
 

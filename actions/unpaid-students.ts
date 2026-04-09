@@ -7,6 +7,7 @@ import FeeTransaction from "@/models/FeeTransaction"
 import Setting from "@/models/Setting"
 import { startOfMonth, endOfMonth, eachMonthOfInterval, format } from "date-fns"
 import { normalizeFeeType } from "@/lib/fee-type"
+import { coerceBoolean } from "@/lib/setting-coerce"
 
 interface UnpaidFilter {
     classId?: string
@@ -39,8 +40,8 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
         Setting.findOne({ key: "admission_fee_includes_april" }).lean(),
         Setting.findOne({ key: "registration_fee_includes_april" }).lean()
     ])
-    const admIncludesApril = admSetting ? admSetting.value === true : true;
-    const regIncludesApril = regSetting ? regSetting.value === true : true;
+    const admIncludesApril = coerceBoolean((admSetting as { value?: unknown } | null)?.value, true)
+    const regIncludesApril = coerceBoolean((regSetting as { value?: unknown } | null)?.value, true)
 
     const studentQuery: Record<string, unknown> = { isActive: true }
     if (filter.classId && filter.classId !== "all") {

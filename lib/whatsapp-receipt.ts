@@ -4,6 +4,7 @@ import WhatsAppPricing from "@/models/WhatsAppPricing"
 import License from "@/models/License"
 import Setting from "@/models/Setting"
 import dbConnect from "./db"
+import { coerceBoolean } from "./setting-coerce"
 
 type ReceiptStudent = {
     name?: string;
@@ -30,7 +31,7 @@ export async function sendWhatsAppReceipt({ student, totalAmount, receiptNumber,
         await dbConnect();
         // 1. Check if alerts are enabled globally in Settings
         const whatsappReceiptEnabled = await Setting.findOne({ key: "whatsapp_receipt_alert" }).lean();
-        const isAlertEnabled = whatsappReceiptEnabled ? (whatsappReceiptEnabled as { value?: boolean }).value === true : false;
+        const isAlertEnabled = coerceBoolean((whatsappReceiptEnabled as { value?: unknown } | null)?.value, false)
 
         if (!student) {
             return { success: false, reason: "Missing student" };
