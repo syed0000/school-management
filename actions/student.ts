@@ -299,7 +299,7 @@ export async function registerStudent(formData: FormData) {
     const classFees = await ClassFee.find({ 
         classId: rawData.classId, 
         isActive: true,
-        type: { $in: ['admission', 'admissionFees', 'registrationFees'] }
+        type: { $in: ['admissionFees', 'registrationFees'] }
     }).lean();
 
     if (classFees.length > 0) {

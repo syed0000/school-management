@@ -355,7 +355,6 @@ export function FeeCollectionForm({ students, classes, userId }: FeeCollectionFo
     switch (type) {
       case 'monthly': return t("fees.feeTypeMonthly", "Monthly Fee");
       case 'examination': return t("fees.feeTypeExam", "Examination Fee");
-      case 'admission': return t("fees.feeTypeAdmission", "Admission Fee");
       case 'admissionFees': return t("fees.feeTypeAdmissionFees", "Admission Fees");
       case 'registrationFees': return t("fees.feeTypeRegistrationFees", "Registration Fees");
       default: return type.charAt(0).toUpperCase() + type.slice(1).replace(/([A-Z])/g, ' $1').trim();

@@ -15,6 +15,7 @@ import logger from "@/lib/logger"
 import { unstable_cache } from "next/cache"
 import { getCurrentSessionRange } from "@/lib/utils"
 import { getSchoolDateBoundaries } from "@/lib/tz-utils"
+import { normalizeFeeType } from "@/lib/fee-type"
 
 interface DashboardFilter {
     startDate?: Date;
@@ -55,6 +56,7 @@ interface PaidFeeItem {
     m?: number;
     y: number;
     title?: string;
+    amount: number;
 }
 
 interface PaidFeeAggResult {
@@ -89,7 +91,7 @@ interface StudentDoc {
     name: string;
     registrationNumber?: string;
     classId: { _id: Types.ObjectId; name: string };
-    admissionDate?: Date;
+    dateOfAdmission?: Date;
     createdAt: Date;
     rollNumber?: string;
     photo?: string;
@@ -136,7 +138,7 @@ async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: strin
         studentQuery.classId = classIdFilter;
     }
     const allStudents = await Student.find(studentQuery)
-        .select('name classId admissionDate createdAt photo contacts registrationNumber rollNumber mobile email')
+        .select('name classId dateOfAdmission createdAt photo contacts registrationNumber rollNumber mobile email')
         .populate('classId', 'name')
         .lean();
 
@@ -161,6 +163,7 @@ async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: strin
                 year: { $in: Array.from(yearsToCheck) }
             }
         },
+        { $sort: { transactionDate: -1 } },
         {
             $group: {
                 _id: "$studentId",
@@ -169,7 +172,8 @@ async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: strin
                         type: "$feeType",
                         m: "$month",
                         y: "$year",
-                        title: "$examType"
+                        title: "$examType",
+                        amount: "$amount"
                     }
                 }
             }
@@ -178,16 +182,24 @@ async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: strin
 
     // Create a fast lookup map: StudentID -> Set of "Type-Month-Year"
     const studentPaidMap = new Map<string, Set<string>>();
+    const studentEntryTxnMap = new Map<string, { feeType: string; year: number; amount: number }>()
     paidFeesAgg.forEach((item: unknown) => {
         const i = item as PaidFeeAggResult;
         const set = new Set<string>();
         i.paid.forEach((p) => {
-            if (p.type === 'monthly') {
-                set.add(`${p.type}-${p.m}-${p.y}`);
-            } else if (p.type === 'examination' && p.title) {
-                set.add(`${p.type}-${p.title}-${p.y}`);
+            const t = normalizeFeeType(p.type)
+            if (t === 'monthly') {
+                set.add(`${t}-${p.m}-${p.y}`);
+            } else if (t === 'examination' && p.title) {
+                set.add(`${t}-${p.title}-${p.y}`);
             } else {
-                set.add(`${p.type}-${p.y}`);
+                set.add(`${t}-${p.y}`);
+            }
+
+            if (!studentEntryTxnMap.has(i._id.toString())) {
+                if (t === 'registrationFees' || t === 'admissionFees') {
+                    studentEntryTxnMap.set(i._id.toString(), { feeType: t, year: p.y, amount: p.amount })
+                }
             }
         });
         studentPaidMap.set(i._id.toString(), set);
@@ -211,7 +223,7 @@ async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: strin
         const student = s as StudentDoc;
         const studentId = student._id.toString();
         const studentFees = feeMap.get(student.classId._id.toString()) || [];
-        const admissionDate = new Date(student.admissionDate || student.createdAt);
+        const admissionDate = new Date(student.dateOfAdmission || student.createdAt);
         const admMonth = admissionDate.getMonth() + 1;
         const admYear = admissionDate.getFullYear();
 
@@ -233,7 +245,7 @@ async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: strin
                     let isAprilCovered = false
                     
                     if (m === 4) {
-                        const paidAdm = hasPaidFeeFast(studentId, 'admission', undefined, y) || hasPaidFeeFast(studentId, 'admissionFees', undefined, y);
+                        const paidAdm = hasPaidFeeFast(studentId, 'admissionFees', undefined, y);
                         const paidReg = hasPaidFeeFast(studentId, 'registrationFees', undefined, y);
                         
                         if ((admIncludesApril && paidAdm) || (regIncludesApril && paidReg)) {
@@ -292,28 +304,40 @@ async function calculateUnpaidStats(monthsToCheck: Date[], classIdFilter?: strin
         )
 
         if (isAdmissionInPeriod) {
-            // Check if ANY entrance fee has been paid (Admission or Registration)
-            const hasPaidAdmission = hasPaidFeeFast(studentId, 'admission', undefined, admYear) || 
-                                    hasPaidFeeFast(studentId, 'admissionFees', undefined, admYear);
-            const hasPaidRegistration = hasPaidFeeFast(studentId, 'registrationFees', undefined, admYear);
+            const admissionFeeConfig = studentFees.find(f => f.type === 'admissionFees');
+            const registrationFeeConfig = studentFees.find(f => f.type === 'registrationFees');
 
-            if (!hasPaidAdmission && !hasPaidRegistration) {
-                // Not paid any. See what we should expect.
-                const admissionFeeConfig = studentFees.find(f => f.type === 'admission' || f.type === 'admissionFees');
-                const registrationFeeConfig = studentFees.find(f => f.type === 'registrationFees');
-                
-                // Only expect ONE (prefer Admission if both configured, or whichever exists)
-                const entranceConfig = admissionFeeConfig || registrationFeeConfig;
+            const entryTxn = studentEntryTxnMap.get(studentId)
+            const resolvedType =
+                entryTxn?.feeType === 'registrationFees'
+                    ? 'registrationFees'
+                    : entryTxn
+                        ? 'admissionFees'
+                        : admissionFeeConfig
+                            ? 'admissionFees'
+                            : 'registrationFees'
 
-                if (entranceConfig) {
-                    totalExpected += entranceConfig.amount;
-                    studentUnpaidAmount += entranceConfig.amount;
-                    studentUnpaidDetails.push(entranceConfig.type === 'registrationFees' ? 'Registration Fee' : 'Admission Fee');
+            const expected =
+                resolvedType === 'registrationFees'
+                    ? (registrationFeeConfig?.amount ?? 0)
+                    : (admissionFeeConfig?.amount ?? 0)
 
-                    const admKey = `${admMonth}-${admYear}`;
-                    const current = monthlyUnpaidMap.get(admKey) || 0;
-                    monthlyUnpaidMap.set(admKey, current + entranceConfig.amount);
-                }
+            const paid = entryTxn?.amount ?? 0
+            const expectedFinal = expected > 0 ? expected : paid
+            const due = expectedFinal > 0 ? Math.max(0, expectedFinal - paid) : 0
+
+            if (expectedFinal > 0) {
+                totalExpected += expectedFinal
+            }
+
+            if (due > 0) {
+                studentUnpaidAmount += due;
+                const label = resolvedType === 'registrationFees' ? 'Registration Fee' : 'Admission Fee'
+                studentUnpaidDetails.push(paid > 0 ? `${label} (Remaining)` : label);
+
+                const admKey = `${admMonth}-${admYear}`;
+                const current = monthlyUnpaidMap.get(admKey) || 0;
+                monthlyUnpaidMap.set(admKey, current + due);
             }
         }
 

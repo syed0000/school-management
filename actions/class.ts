@@ -41,7 +41,7 @@ const updateClassWithFeesSchema = z.object({
 
 const feeSchema = z.object({
   classId: z.string().min(1, "Class is required"),
-  type: z.enum(['monthly', 'examination', 'admission', 'admissionFees', 'registrationFees']),
+  type: z.enum(['monthly', 'examination', 'admissionFees', 'registrationFees']),
   amount: z.number().min(0, "Amount must be positive"),
   effectiveFrom: z.string().min(1, "Effective Date is required"), // YYYY-MM-DD
 })
@@ -386,8 +386,8 @@ export async function getClassesWithFees() {
       monthlyFee: latestFees['monthly']?.amount || 0,
       monthlyFeeEffectiveFrom: latestFees['monthly']?.effectiveFrom,
       examFees: Object.values(latestExamFees),
-      admissionFee: latestFees['admissionFees']?.amount || latestFees['admission']?.amount || 0,
-      admissionFeeEffectiveFrom: latestFees['admissionFees']?.effectiveFrom || latestFees['admission']?.effectiveFrom,
+      admissionFee: latestFees['admissionFees']?.amount || 0,
+      admissionFeeEffectiveFrom: latestFees['admissionFees']?.effectiveFrom,
       registrationFee: latestFees['registrationFees']?.amount || 0,
       registrationFeeEffectiveFrom: latestFees['registrationFees']?.effectiveFrom,
     };

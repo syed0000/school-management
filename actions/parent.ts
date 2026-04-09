@@ -16,6 +16,7 @@ import { format, eachMonthOfInterval, isAfter, startOfMonth, endOfMonth } from '
 import { getSchoolDateBoundaries } from '@/lib/tz-utils';
 import logger from '@/lib/logger';
 import { saveFile } from '@/lib/upload';
+import { normalizeFeeType } from '@/lib/fee-type';
 import type {
   ParentStudentProfile,
   AttendanceCalendarEntry,
@@ -563,6 +564,11 @@ export async function getStudentFeeOverview(
         status: 'verified',
       }).lean() as unknown as FeeTransactionDoc[];
 
+      const normalizedTxns = allTxns.map((t) => ({
+        ...t,
+        feeType: normalizeFeeType(t.feeType),
+      })) as unknown as FeeTransactionDoc[];
+
       // Check if admissionDate is valid. If inherited from createdAt mid-session due to data import,
       // without actual dateOfAdmission, it shouldn't chop the fees. We'll default to sessionStart
       // if dateOfAdmission isn't explicitly defined and we rely on createdAt (which is often late).
@@ -589,12 +595,12 @@ export async function getStudentFeeOverview(
         const m = date.getMonth() + 1; // 1-12
         const y = date.getFullYear();
 
-        const paidTxn = allTxns.find((t) => t.feeType === 'monthly' && t.month === m && t.year === y);
+        const paidTxn = normalizedTxns.find((t) => t.feeType === 'monthly' && t.month === m && t.year === y);
         
         const isAprilIncluded = (() => {
           if (m === 4) {
-            const admTxn = allTxns.find((t) => (t.feeType === 'admission' || t.feeType === 'admissionFees') && t.year === y);
-            const regTxn = allTxns.find((t) => t.feeType === 'registrationFees' && t.year === y);
+            const admTxn = normalizedTxns.find((t) => t.feeType === 'admissionFees' && t.year === y);
+            const regTxn = normalizedTxns.find((t) => t.feeType === 'registrationFees' && t.year === y);
             if ((admIncludesApril && admTxn) || (regIncludesApril && regTxn)) {
               return admTxn || regTxn;
             }
@@ -649,28 +655,45 @@ export async function getStudentFeeOverview(
       }).filter((m: MonthlyFeeStatus) => m.expected > 0 || m.paid > 0 || m.status === 'Included in Admission/Registration');
 
       // Other fees: admission, registration, exam
-      const otherFeeTypes = ['admissionFees', 'registrationFees', 'admission', 'examination'];
       const otherFees: StudentFeeOverview['otherFees'] = [];
 
       const examFees = classFees.filter((f) => f.type === 'examination');
-      const entryFee = classFees.find((f) => ['admission', 'admissionFees', 'registrationFees'].includes(f.type));
+      const admissionFeeConf = classFees.find((f) => f.type === 'admissionFees');
+      const registrationFeeConf = classFees.find((f) => f.type === 'registrationFees');
 
       // Admission / Registration fee
-      if (entryFee) {
-        const admYear = admissionDate.getFullYear();
-        const paidTxn = allTxns.find((t) =>
-          (t.feeType === 'admission' || t.feeType === 'admissionFees' || t.feeType === 'registrationFees')
+      if (admissionFeeConf || registrationFeeConf) {
+        const paidTxn = normalizedTxns.find(
+          (t) =>
+            (t.feeType === 'admissionFees' || t.feeType === 'registrationFees') &&
+            t.year === sessionStartYear,
         );
+
+        const resolvedType =
+          paidTxn?.feeType === 'registrationFees'
+            ? 'registrationFees'
+            : paidTxn
+              ? 'admissionFees'
+              : admissionFeeConf
+                ? 'admissionFees'
+                : 'registrationFees';
+
+        const expected =
+          resolvedType === 'registrationFees'
+            ? (registrationFeeConf?.amount ?? 0)
+            : (admissionFeeConf?.amount ?? 0);
+
         const paid = paidTxn?.amount ?? 0;
-        const expected = entryFee.amount;
         const due = Math.max(0, expected - paid);
-        const label = entryFee.type === 'registrationFees' ? 'Registration Fee' : 'Admission Fee';
-        otherFees.push({ 
-          label: `${label} (${admYear})`, 
-          expected, 
-          paid, 
-          due,
-          transactionDate: paidTxn ? format(new Date(paidTxn.transactionDate), 'dd-MM-yy') : undefined
+        const label = resolvedType === 'registrationFees' ? 'Registration Fee' : 'Admission Fee';
+        const yearLabel = paidTxn?.year ?? sessionStartYear;
+
+        otherFees.push({
+          label: `${label} (${yearLabel})`,
+          expected: expected > 0 ? expected : paid,
+          paid,
+          due: expected > 0 ? due : 0,
+          transactionDate: paidTxn ? format(new Date(paidTxn.transactionDate), 'dd-MM-yy') : undefined,
         });
       }
 
@@ -708,7 +731,6 @@ export async function getStudentFeeOverview(
       });
 
       void classId; // used implicitly through classFees query
-      void otherFeeTypes; // listed for clarity
 
       const totalExpected = monthlyBreakdown.reduce((s, m) => s + m.expected, 0) + otherFees.reduce((s, f) => s + f.expected, 0);
       const totalPaid = monthlyBreakdown.reduce((s, m) => s + m.paid, 0) + otherFees.reduce((s, f) => s + f.paid, 0);

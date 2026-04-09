@@ -3,6 +3,7 @@
 import dbConnect from "@/lib/db"
 import FeeTransaction from "@/models/FeeTransaction"
 import Student from "@/models/Student"
+import ClassFee from "@/models/ClassFee"
 import { getSchoolDateBoundaries } from "@/lib/tz-utils"
 
 import { revalidatePath } from "next/cache"
@@ -245,5 +246,243 @@ export async function deleteFeeTransaction(transactionId: string) {
   } catch (error: unknown) {
     logger.error(error, "Error deleting transaction")
     return { success: false, error: "Failed to delete transaction" }
+  }
+}
+
+type EntryFeeType = 'admissionFees' | 'registrationFees'
+
+interface FeeConflictPreviewItem {
+  transactionId: string
+  receiptNumber: string
+  studentName: string
+  studentRegNo: string
+  className: string
+  year: number
+  amount: number
+  admissionFee: number
+  registrationFee: number
+  transactionDate: Date
+  currentFeeType: string
+}
+
+function appendRemark(existing: string | undefined, toAppend: string) {
+  const base = (existing || "").trim()
+  if (!base) return toAppend
+  return `${base} | ${toAppend}`
+}
+
+export async function scanAdmissionRegistrationConflicts(options?: { limit?: number }) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== 'admin') {
+      return { success: false, error: "Unauthorized" }
+    }
+    if (isDemoSession(session)) {
+      return demoWriteSuccess({ conflicts: [], scanned: 0, matched: 0 })
+    }
+
+    const limit = Math.min(Math.max(options?.limit ?? 500, 1), 5000)
+
+    await dbConnect()
+
+    type ClassFeeDoc = { classId: unknown; type: EntryFeeType; amount: number; effectiveFrom: Date }
+    const classFees = await ClassFee.find({
+      isActive: true,
+      type: { $in: ['admissionFees', 'registrationFees'] },
+    }).sort({ effectiveFrom: -1 }).lean() as unknown as ClassFeeDoc[]
+
+    const feeMap = new Map<string, { admissionFee?: number; registrationFee?: number }>()
+    for (const f of classFees) {
+      const classId = String(f.classId)
+      const entry = feeMap.get(classId) || {}
+      if (f.type === 'admissionFees' && entry.admissionFee === undefined) {
+        entry.admissionFee = f.amount
+      }
+      if (f.type === 'registrationFees' && entry.registrationFee === undefined) {
+        entry.registrationFee = f.amount
+      }
+      feeMap.set(classId, entry)
+    }
+
+    interface TxDoc {
+      _id: { toString(): string }
+      receiptNumber: string
+      feeType: string
+      amount: number
+      year: number
+      status: string
+      transactionDate: Date
+      studentId?: { name: string; registrationNumber: string; classId?: { _id: unknown; name: string } }
+    }
+
+    const scannedTxns = await FeeTransaction.find({
+      feeType: 'admissionFees',
+      status: { $ne: 'rejected' },
+    })
+      .sort({ transactionDate: -1 })
+      .limit(limit)
+      .populate({
+        path: 'studentId',
+        select: 'name registrationNumber classId',
+        populate: { path: 'classId', select: 'name' },
+      })
+      .lean() as unknown as TxDoc[]
+
+    const conflicts: FeeConflictPreviewItem[] = []
+    for (const tx of scannedTxns) {
+      const classObj = tx.studentId?.classId as unknown as { _id: unknown; name: string } | undefined
+      const classId = classObj?._id ? String(classObj._id) : ""
+      const fee = classId ? feeMap.get(classId) : undefined
+      const admissionFee = fee?.admissionFee ?? 0
+      const registrationFee = fee?.registrationFee ?? 0
+
+      if (admissionFee > 0 && registrationFee > 0 && tx.amount < admissionFee && tx.amount <= registrationFee) {
+        conflicts.push({
+          transactionId: tx._id.toString(),
+          receiptNumber: tx.receiptNumber,
+          studentName: tx.studentId?.name || "Unknown",
+          studentRegNo: tx.studentId?.registrationNumber || "N/A",
+          className: classObj?.name || "Unknown",
+          year: tx.year,
+          amount: tx.amount,
+          admissionFee,
+          registrationFee,
+          transactionDate: tx.transactionDate,
+          currentFeeType: tx.feeType,
+        })
+      }
+    }
+
+    return { success: true, conflicts, scanned: scannedTxns.length, matched: conflicts.length }
+  } catch (error: unknown) {
+    logger.error(error, "Error scanning admission/registration conflicts")
+    return { success: false, error: "Failed to scan conflicts" }
+  }
+}
+
+export async function reclassifyAdmissionConflictsToRegistration(transactionIds: string[]) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== 'admin') {
+      return { success: false, error: "Unauthorized" }
+    }
+    if (isDemoSession(session)) {
+      return demoWriteSuccess({ updated: 0, skipped: 0 })
+    }
+
+    await dbConnect()
+
+    const ids = Array.isArray(transactionIds) ? transactionIds.filter(Boolean) : []
+    if (ids.length === 0) return { success: false, error: "No transactions selected" }
+    if (ids.length > 5000) return { success: false, error: "Too many transactions selected" }
+
+    type ClassFeeDoc = { classId: unknown; type: EntryFeeType; amount: number; effectiveFrom: Date }
+    const classFees = await ClassFee.find({
+      isActive: true,
+      type: { $in: ['admissionFees', 'registrationFees'] },
+    }).sort({ effectiveFrom: -1 }).lean() as unknown as ClassFeeDoc[]
+
+    const feeMap = new Map<string, { admissionFee?: number; registrationFee?: number }>()
+    for (const f of classFees) {
+      const classId = String(f.classId)
+      const entry = feeMap.get(classId) || {}
+      if (f.type === 'admissionFees' && entry.admissionFee === undefined) {
+        entry.admissionFee = f.amount
+      }
+      if (f.type === 'registrationFees' && entry.registrationFee === undefined) {
+        entry.registrationFee = f.amount
+      }
+      feeMap.set(classId, entry)
+    }
+
+    interface TxDoc {
+      _id: { toString(): string }
+      feeType: string
+      amount: number
+      status: string
+      remarks?: string
+      studentId?: { classId?: { _id: unknown } }
+    }
+
+    const txns = await FeeTransaction.find({
+      _id: { $in: ids },
+      feeType: 'admissionFees',
+      status: { $ne: 'rejected' },
+    })
+      .populate({ path: 'studentId', select: 'classId', populate: { path: 'classId', select: '_id' } })
+      .lean() as unknown as TxDoc[]
+
+    const nowIso = new Date().toISOString()
+    const adminLabel = session.user.name ? `${session.user.name}` : `${session.user.id}`
+    const remarkSuffix = `Reclassified to registrationFees by ${adminLabel} on ${nowIso}`
+
+    let updated = 0
+    let skipped = 0
+
+    for (const tx of txns) {
+      const classObj = tx.studentId?.classId as unknown as { _id: unknown } | undefined
+      const classId = classObj?._id ? String(classObj._id) : ""
+      const fee = classId ? feeMap.get(classId) : undefined
+      const admissionFee = fee?.admissionFee ?? 0
+      const registrationFee = fee?.registrationFee ?? 0
+
+      if (!(admissionFee > 0 && registrationFee > 0 && tx.amount < admissionFee && tx.amount <= registrationFee)) {
+        skipped++
+        continue
+      }
+
+      const newRemarks = appendRemark(tx.remarks, remarkSuffix)
+      await FeeTransaction.updateOne(
+        { _id: tx._id },
+        { $set: { feeType: 'registrationFees', remarks: newRemarks } },
+      )
+      updated++
+    }
+
+    revalidatePath('/fees/transactions')
+    revalidatePath('/parent/fees')
+
+    return { success: true, updated, skipped }
+  } catch (error: unknown) {
+    logger.error(error, "Error reclassifying admission conflicts to registration")
+    return { success: false, error: "Failed to reclassify conflicts" }
+  }
+}
+
+export async function normalizeLegacyEntryFeeTypes() {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== 'admin') {
+      return { success: false, error: "Unauthorized" }
+    }
+    if (isDemoSession(session)) {
+      return demoWriteSuccess({ updatedFeeTransactions: 0, updatedClassFees: 0 })
+    }
+
+    await dbConnect()
+
+    const [txAdmission, txRegistration, feeAdmission, feeRegistration] = await Promise.all([
+      FeeTransaction.updateMany({ feeType: 'admission' }, { $set: { feeType: 'admissionFees' } }),
+      FeeTransaction.updateMany({ feeType: 'registration' }, { $set: { feeType: 'registrationFees' } }),
+      ClassFee.updateMany({ type: 'admission' }, { $set: { type: 'admissionFees' } }),
+      ClassFee.updateMany({ type: 'registration' }, { $set: { type: 'registrationFees' } }),
+    ])
+
+    revalidatePath('/fees/collect')
+    revalidatePath('/fees/transactions')
+    revalidatePath('/fees/unpaid')
+    revalidatePath('/admin/classes')
+    revalidatePath('/admin/dashboard')
+    revalidatePath('/parent/fees')
+
+    return {
+      success: true,
+      updatedFeeTransactions:
+        (txAdmission.modifiedCount || 0) + (txRegistration.modifiedCount || 0),
+      updatedClassFees: (feeAdmission.modifiedCount || 0) + (feeRegistration.modifiedCount || 0),
+    }
+  } catch (error: unknown) {
+    logger.error(error, "Error normalizing legacy entry fee types")
+    return { success: false, error: "Failed to normalize fee types" }
   }
 }

@@ -2,6 +2,7 @@
 import { format } from 'date-fns'
 import { schoolConfig } from '@/lib/config'
 import { formatNumber } from "@/lib/utils"
+import { normalizeFeeType } from '@/lib/fee-type'
 
 interface ReceiptItem {
     feeType: string
@@ -29,7 +30,8 @@ interface ReceiptProps {
 
 export function ThermalReceipt({ receiptData }: ReceiptProps) {
     const getFeeDescription = (item: ReceiptItem) => {
-        const { feeType, months, year, examType, title } = item
+        const { months, year, examType, title } = item
+        const feeType = normalizeFeeType(item.feeType)
 
         if (feeType === 'monthly' && months && months.length > 0) {
             // Sort months to be safe
@@ -59,7 +61,7 @@ export function ThermalReceipt({ receiptData }: ReceiptProps) {
             return `Exam Fee - ${examType || title || 'Annual'} ${year}`
         }
 
-        if (feeType === 'admission' || feeType === 'admissionFees') {
+        if (feeType === 'admissionFees') {
             return `Admission Fee - ${year}`
         }
 

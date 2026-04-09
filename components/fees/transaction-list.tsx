@@ -24,6 +24,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { BackButton } from "@/components/ui/back-button"
 import { useI18n } from "@/components/i18n-provider"
 import { defaultLocale, hasLocale } from "@/lib/i18n"
+import { normalizeFeeType } from "@/lib/fee-type"
 
 interface Transaction {
   id: string
@@ -144,7 +145,7 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
   }
 
   const getFeeDescription = (tx: Transaction) => {
-    const ft = (tx.feeType || '').toLowerCase();
+    const ft = normalizeFeeType(tx.feeType || '')
     
     if (ft === 'monthly') {
       if (tx.month) {
@@ -156,15 +157,15 @@ export function TransactionList({ transactions, pagination, onPageChange, isAdmi
     if (ft === 'examination') {
       return `${t("transactions.feeExam", "Exam")} - ${tx.examType || t("transactions.examAnnual", "Annual")} ${tx.year}`
     }
-    if (ft === 'admission' || ft === 'admissionfees') {
+    if (ft === 'admissionFees') {
       return `${t("transactions.feeAdmission", "Admission")} - ${tx.year}`
     }
-    if (ft === 'registrationfees') {
+    if (ft === 'registrationFees') {
       return `${t("transactions.feeRegistration", "Registration")} - ${tx.year}`
     }
 
     // Default formatting for any other type (e.g., custom or 'other')
-    const displayStr = tx.feeType || t("transactions.feeOther", "Other");
+    const displayStr = ft || t("transactions.feeOther", "Other");
     const spaced = displayStr.replace(/([A-Z])/g, ' $1').trim();
     const capitalized = spaced.charAt(0).toUpperCase() + spaced.slice(1);
     

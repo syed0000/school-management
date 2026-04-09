@@ -11,6 +11,7 @@ import { format, eachDayOfInterval, isBefore, isAfter, startOfMonth, endOfMonth 
 import { getSchoolDateBoundaries } from '@/lib/tz-utils';
 import logger from "@/lib/logger";
 import { Types } from "mongoose";
+import { normalizeFeeType } from '@/lib/fee-type';
 
 // --- Interfaces ---
 
@@ -371,6 +372,10 @@ export async function getFeeReport({
       const cId = student.classId?._id.toString();
 
       const studentAllTxns = allTransactions.filter((t) => t.studentId.toString() === sId);
+      const normalizedStudentTxns = studentAllTxns.map((t) => ({
+        ...t,
+        feeType: normalizeFeeType(t.feeType),
+      })) as unknown as FeeTransactionDoc[];
 
       let expectedAmount = 0;
       let paidAmount = 0;
@@ -395,12 +400,12 @@ export async function getFeeReport({
         const m = tempIterDate.getMonth() + 1; // 1-12
         const monthHeader = tempIterDate.toLocaleString('default', { month: 'short' }) + " " + y;
 
-        const paidTxn = studentAllTxns.find(t => t.feeType === 'monthly' && t.month === m && t.year === y);
+        const paidTxn = normalizedStudentTxns.find(t => t.feeType === 'monthly' && t.month === m && t.year === y);
         
         const isAprilIncluded = (() => {
           if (m === 4) {
-            const admTxn = studentAllTxns.find(t => (t.feeType === 'admission' || t.feeType === 'admissionFees') && t.year === y);
-            const regTxn = studentAllTxns.find(t => t.feeType === 'registrationFees' && t.year === y);
+            const admTxn = normalizedStudentTxns.find(t => t.feeType === 'admissionFees' && t.year === y);
+            const regTxn = normalizedStudentTxns.find(t => t.feeType === 'registrationFees' && t.year === y);
             if ((admIncludesApril && admTxn) || (regIncludesApril && regTxn)) {
               return admTxn || regTxn;
             }
@@ -436,25 +441,34 @@ export async function getFeeReport({
 
       // 2. Admission / Registration Fee in Period
       if (isAfter(admissionDate, startOfStartDate) && isBefore(admissionDate, endOfEndDate)) {
-        // Check if they paid EITHER admission OR registration (anywhere in studentAllTxns)
-        const admissionTxn = studentAllTxns.find(t =>
-          t.feeType === 'admission' ||
-          t.feeType === 'admissionFees' ||
-          t.feeType === 'registrationFees'
+        const entryTxn = normalizedStudentTxns.find(
+          (t) => t.feeType === 'admissionFees' || t.feeType === 'registrationFees',
         );
 
-        const headerName = admissionFee ? "Admission" : "Registration";
-        if (admissionTxn) {
-          // If they paid either, then it's expected and paid.
-          expectedAmount += admissionTxn.amount;
-          paidAmount += admissionTxn.amount;
-          feeStatuses[headerName] = { 
-            status: 'paid', 
-            date: format(new Date(admissionTxn.transactionDate || (admissionTxn as { createdAt?: Date }).createdAt || new Date()), 'dd-MM-yy') 
+        const resolvedType =
+          entryTxn?.feeType === 'registrationFees'
+            ? 'registrationFees'
+            : entryTxn
+              ? 'admissionFees'
+              : admissionFee
+                ? 'admissionFees'
+                : 'registrationFees';
+
+        const headerName = resolvedType === 'registrationFees' ? "Registration" : "Admission";
+        const entryFeeAmount = resolvedType === 'registrationFees' ? registrationFee : admissionFee;
+
+        if (entryTxn) {
+          const expectedEntry = entryFeeAmount > 0 ? entryFeeAmount : entryTxn.amount;
+          expectedAmount += expectedEntry;
+          paidAmount += entryTxn.amount;
+
+          const remaining = Math.max(0, expectedEntry - entryTxn.amount);
+          feeStatuses[headerName] = {
+            status: remaining > 0 ? 'partial' : 'paid',
+            date: format(new Date(entryTxn.transactionDate || (entryTxn as { createdAt?: Date }).createdAt || new Date()), 'dd-MM-yy'),
           };
+          if (remaining > 0) dueMonthsList.push(headerName);
         } else {
-          // If not paid, expect either the admission fee or the registration fee.
-          const entryFeeAmount = admissionFee || registrationFee;
           expectedAmount += entryFeeAmount;
           if (entryFeeAmount > 0) {
             feeStatuses[headerName] = { status: 'unpaid' };
@@ -475,7 +489,7 @@ export async function getFeeReport({
               const headerName = exam.title || "Exam";
               expectedAmount += exam.amount;
 
-              const paidExamTxn = studentAllTxns.find(t =>
+              const paidExamTxn = normalizedStudentTxns.find(t =>
                 t.feeType === 'examination' &&
                 t.year === y &&
                 (t.examType === exam.title || t.feeType === 'examination') // Fallback check

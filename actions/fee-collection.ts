@@ -15,6 +15,7 @@ import { sendAppNotification } from "./notification"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
+import { normalizeFeeType } from "@/lib/fee-type"
 
 const feeItemSchema = z.object({
   feeType: z.string().min(1, "Fee type is required"),
@@ -58,7 +59,7 @@ export async function getStudentFeeDetails(studentId: string) {
     }
     const fee = f as DBFee;
     return {
-      type: fee.type,
+      type: normalizeFeeType(fee.type),
       amount: fee.amount,
       id: fee._id.toString(),
       // Include title and month for examination fees
@@ -164,11 +165,12 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
     // Process each fee item
     for (let i = 0; i < data.fees.length; i++) {
       const feeItem = data.fees[i];
+      const normalizedFeeType = normalizeFeeType(feeItem.feeType);
       totalAmount += feeItem.amount;
 
       // Validation logic for monthly fees
       const monthsToProcess = feeItem.months ? feeItem.months : [];
-      if (feeItem.feeType === 'monthly' && monthsToProcess.length > 0) {
+      if (normalizedFeeType === 'monthly' && monthsToProcess.length > 0) {
         // Validate duplicates
         for (const m of monthsToProcess) {
           const dbMonth = m + 1;
@@ -196,7 +198,7 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
             if (admIncludesApril || regIncludesApril) {
               const paidAdm = await FeeTransaction.findOne({
                 studentId: data.studentId,
-                feeType: { $in: ['admission', 'admissionFees'] },
+                feeType: 'admissionFees',
                 year: actualYear,
                 status: { $ne: 'rejected' }
               });
@@ -242,7 +244,7 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
       } else {
         // Other fees
         // Check duplicates
-        if (feeItem.feeType === 'examination') {
+        if (normalizedFeeType === 'examination') {
           const existing = await FeeTransaction.findOne({
             studentId: data.studentId,
             feeType: 'examination',
@@ -251,14 +253,14 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
             status: { $ne: 'rejected' }
           });
           if (existing) return { success: false, error: `Fee for ${feeItem.examType} ${feeItem.year} already paid/pending.` };
-        } else if (['admission', 'admissionFees', 'registrationFees'].includes(feeItem.feeType)) {
+        } else if (['admissionFees', 'registrationFees'].includes(normalizedFeeType)) {
           const existing = await FeeTransaction.findOne({
             studentId: data.studentId,
-            feeType: feeItem.feeType,
+            feeType: normalizedFeeType,
             year: feeItem.year,
             status: { $ne: 'rejected' }
           });
-          if (existing) return { success: false, error: `${feeItem.feeType} for ${feeItem.year} already paid/pending.` };
+          if (existing) return { success: false, error: `${normalizedFeeType} for ${feeItem.year} already paid/pending.` };
         }
 
         const uniqueSuffix = transactionDocs.length + 1;
@@ -267,7 +269,7 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
         transactionDocs.push({
           receiptNumber,
           studentId: data.studentId,
-          feeType: feeItem.feeType,
+          feeType: normalizedFeeType,
           amount: feeItem.amount,
           year: feeItem.year,
           examType: feeItem.examType,
@@ -301,11 +303,12 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
           data.fees
             .filter(f => f.feeType !== 'monthly')
             .map(f => {
-              if (f.feeType === 'examination' && f.examType) return `${f.examType} Exam`;
-              if (f.feeType === 'admission' || f.feeType === 'admissionFees') return "Admission";
-              if (f.feeType === 'registration' || f.feeType === 'registrationFees') return "Registration";
-              if (f.feeType === 'annual' || f.feeType === 'annualFees') return "Annual";
-              return f.feeType.charAt(0).toUpperCase() + f.feeType.slice(1);
+              const ft = normalizeFeeType(f.feeType)
+              if (ft === 'examination' && f.examType) return `${f.examType} Exam`;
+              if (ft === 'admissionFees') return "Admission";
+              if (ft === 'registrationFees') return "Registration";
+              if (ft === 'annual' || ft === 'annualFees') return "Annual";
+              return ft.charAt(0).toUpperCase() + ft.slice(1);
             })
         ));
 
@@ -341,11 +344,12 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
           data.fees
             .filter(f => f.feeType !== 'monthly')
             .map(f => {
-              if (f.feeType === 'examination' && f.examType) return `${f.examType} Exam`;
-              if (f.feeType === 'admission' || f.feeType === 'admissionFees') return "Admission";
-              if (f.feeType === 'registration' || f.feeType === 'registrationFees') return "Registration";
-              if (f.feeType === 'annual' || f.feeType === 'annualFees') return "Annual";
-              return f.feeType.charAt(0).toUpperCase() + f.feeType.slice(1);
+              const ft = normalizeFeeType(f.feeType)
+              if (ft === 'examination' && f.examType) return `${f.examType} Exam`;
+              if (ft === 'admissionFees') return "Admission";
+              if (ft === 'registrationFees') return "Registration";
+              if (ft === 'annual' || ft === 'annualFees') return "Annual";
+              return ft.charAt(0).toUpperCase() + ft.slice(1);
             })
         ));
 

@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const FeeTransactionSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
   collectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  feeType: { type: String, enum: ['monthly', 'examination', 'admission', 'admissionFees', 'registrationFees', 'other'], required: true },
+  feeType: { type: String, enum: ['monthly', 'examination', 'admissionFees', 'registrationFees', 'other'], required: true },
   amount: { type: Number, required: true },
   month: { type: Number }, // Only for monthly fees
   year: { type: Number, required: true },

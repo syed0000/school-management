@@ -6,6 +6,7 @@ import ClassFee from "@/models/ClassFee"
 import FeeTransaction from "@/models/FeeTransaction"
 import Setting from "@/models/Setting"
 import { startOfMonth, endOfMonth, eachMonthOfInterval, format } from "date-fns"
+import { normalizeFeeType } from "@/lib/fee-type"
 
 interface UnpaidFilter {
     classId?: string
@@ -51,7 +52,7 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
         name: string;
         registrationNumber: string;
         classId: { _id: { toString: () => string }; name: string };
-        admissionDate?: Date;
+        dateOfAdmission?: Date;
         createdAt: Date;
         photo?: string;
         contacts?: { mobile?: string[] };
@@ -91,14 +92,20 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
         feeType: string;
         year: number;
         month?: number;
+        amount: number;
+        transactionDate?: Date;
     }
 
     const yearsToCheck = new Set(monthsToCheck.map(m => m.getFullYear()))
-    const allTransactions = await FeeTransaction.find({
+    const allTransactionsRaw = await FeeTransaction.find({
         status: { $in: ['verified', 'pending'] },
         year: { $in: Array.from(yearsToCheck) },
         studentId: { $in: activeStudentIds }
-    }).lean()
+    }).sort({ transactionDate: -1 }).lean()
+    const allTransactions = (allTransactionsRaw as unknown as TransactionDoc[]).map((t) => ({
+        ...t,
+        feeType: normalizeFeeType(t.feeType),
+    })) as unknown as TransactionDoc[]
 
     const unpaidList: UnpaidStudent[] = []
 
@@ -114,10 +121,25 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
         })
     }
 
+    const getEntryTxn = (studentId: string) => {
+        const reg = allTransactions.find((tx: unknown) => {
+            const t = tx as TransactionDoc;
+            const txStudentId = t.studentId?.toString() || t.studentId
+            return txStudentId === studentId && t.feeType === 'registrationFees'
+        }) as unknown as TransactionDoc | undefined
+        if (reg) return reg
+        const adm = allTransactions.find((tx: unknown) => {
+            const t = tx as TransactionDoc;
+            const txStudentId = t.studentId?.toString() || t.studentId
+            return txStudentId === studentId && t.feeType === 'admissionFees'
+        }) as unknown as TransactionDoc | undefined
+        return adm
+    }
+
     for (const s of allStudents) {
         const student = s as StudentDoc;
         const studentFees = feeMap.get(student.classId._id.toString()) || []
-        const admissionDate = new Date(student.admissionDate || student.createdAt)
+        const admissionDate = new Date(student.dateOfAdmission || student.createdAt)
         const admMonth = admissionDate.getMonth() + 1
         const admYear = admissionDate.getFullYear()
 
@@ -137,7 +159,7 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
                     let isPaid = hasPaidFee(student._id.toString(), 'monthly', m, y);
                     
                     if (m === 4 && !isPaid) {
-                        const paidAdm = hasPaidFee(student._id.toString(), 'admission', undefined, y) || hasPaidFee(student._id.toString(), 'admissionFees', undefined, y);
+                        const paidAdm = hasPaidFee(student._id.toString(), 'admissionFees', undefined, y);
                         const paidReg = hasPaidFee(student._id.toString(), 'registrationFees', undefined, y);
                         
                         if ((admIncludesApril && paidAdm) || (regIncludesApril && paidReg)) {
@@ -177,23 +199,32 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
         )
 
         if (isAdmissionInPeriod) {
-            // Check if ANY entrance fee has been paid (Admission or Registration)
-            const hasPaidAdmission = hasPaidFee(student._id.toString(), 'admission', undefined, admYear) || 
-                                    hasPaidFee(student._id.toString(), 'admissionFees', undefined, admYear);
-            const hasPaidRegistration = hasPaidFee(student._id.toString(), 'registrationFees', undefined, admYear);
+            const admissionFeeConfig = studentFees.find(f => f.type === 'admissionFees');
+            const registrationFeeConfig = studentFees.find(f => f.type === 'registrationFees');
 
-            if (!hasPaidAdmission && !hasPaidRegistration) {
-                // Not paid any. See what we should expect.
-                const admissionFeeConfig = studentFees.find(f => f.type === 'admission' || f.type === 'admissionFees');
-                const registrationFeeConfig = studentFees.find(f => f.type === 'registrationFees');
-                
-                // Only expect ONE (prefer Admission if both configured, or whichever exists)
-                const entranceConfig = admissionFeeConfig || registrationFeeConfig;
+            const entryTxn = getEntryTxn(student._id.toString())
+            const resolvedType =
+                entryTxn?.feeType === 'registrationFees'
+                    ? 'registrationFees'
+                    : entryTxn
+                        ? 'admissionFees'
+                        : admissionFeeConfig
+                            ? 'admissionFees'
+                            : 'registrationFees'
 
-                if (entranceConfig) {
-                    studentUnpaidAmount += entranceConfig.amount;
-                    studentUnpaidDetails.push(entranceConfig.type === 'registrationFees' ? 'Registration Fee' : 'Admission Fee');
-                }
+            const expected =
+                resolvedType === 'registrationFees'
+                    ? (registrationFeeConfig?.amount ?? 0)
+                    : (admissionFeeConfig?.amount ?? 0)
+
+            const paid = entryTxn?.amount ?? 0
+            const expectedFinal = expected > 0 ? expected : paid
+            const due = expectedFinal > 0 ? Math.max(0, expectedFinal - paid) : 0
+
+            if (due > 0) {
+                studentUnpaidAmount += due
+                const label = resolvedType === 'registrationFees' ? 'Registration Fee' : 'Admission Fee'
+                studentUnpaidDetails.push(paid > 0 ? `${label} (Remaining)` : label)
             }
         }
 

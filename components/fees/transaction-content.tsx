@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { getFeeTransactions, getTransactionStats } from "@/actions/fee-transactions"
+import { getFeeTransactions, getTransactionStats, normalizeLegacyEntryFeeTypes, reclassifyAdmissionConflictsToRegistration, scanAdmissionRegistrationConflicts } from "@/actions/fee-transactions"
 import { TransactionList } from "@/components/fees/transaction-list"
 import { TransactionFilters } from "@/components/fees/transaction-filters"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +11,16 @@ import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { getCurrentSessionRange } from "@/lib/utils"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 
 interface Transaction {
@@ -66,6 +76,28 @@ export function TransactionContent({
   const [stats, setStats] = useState<Stats>(initialStats)
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [conflictPreview, setConflictPreview] = useState<{
+    scanned: number
+    matched: number
+    conflicts: Array<{
+      transactionId: string
+      receiptNumber: string
+      studentName: string
+      studentRegNo: string
+      className: string
+      year: number
+      amount: number
+      admissionFee: number
+      registrationFee: number
+      transactionDate: Date | string
+      currentFeeType: string
+    }>
+  } | null>(null)
+  const [isScanning, setIsScanning] = useState(false)
+  const [isFixing, setIsFixing] = useState(false)
+  const [isNormalizing, setIsNormalizing] = useState(false)
+  const [confirmFixOpen, setConfirmFixOpen] = useState(false)
+  const [confirmNormalizeOpen, setConfirmNormalizeOpen] = useState(false)
   const router = useRouter()
 
   // Keep track of current filters to support pagination
@@ -208,6 +240,86 @@ export function TransactionContent({
     router.push(`/fees/receipt?${params.toString()}`)
   }
 
+  const handleScanConflicts = async () => {
+    if (!isAdmin) return
+    setIsScanning(true)
+    try {
+      const res = await scanAdmissionRegistrationConflicts({ limit: 2000 })
+      if (!res || !('success' in res) || !res.success) {
+        const err = res && 'error' in (res as unknown as { error?: string }) ? (res as unknown as { error?: string }).error : undefined
+        toast.error(err || "Failed to scan conflicts")
+        return
+      }
+      const conflicts = 'conflicts' in (res as unknown as { conflicts?: unknown[] }) ? ((res as unknown as { conflicts?: unknown[] }).conflicts || []) : []
+      const scanned = 'scanned' in (res as unknown as { scanned?: number }) ? ((res as unknown as { scanned?: number }).scanned || 0) : 0
+      const matched = 'matched' in (res as unknown as { matched?: number }) ? ((res as unknown as { matched?: number }).matched || conflicts.length) : conflicts.length
+      setConflictPreview({
+        scanned,
+        matched,
+        conflicts: (conflicts as Array<{ transactionDate: Date | string }>).map((c) => ({
+          ...(c as unknown as Record<string, unknown>),
+          transactionDate: new Date(c.transactionDate),
+        })) as unknown as NonNullable<typeof conflictPreview>["conflicts"],
+      })
+      if (matched === 0) {
+        toast.success("No conflicts found in the scanned range")
+      } else {
+        toast.success(`Found ${matched} conflict(s)`)
+      }
+    } catch {
+      toast.error("Failed to scan conflicts")
+    } finally {
+      setIsScanning(false)
+    }
+  }
+
+  const handleFixConflicts = async () => {
+    if (!isAdmin) return
+    if (!conflictPreview || conflictPreview.conflicts.length === 0) return
+    setIsFixing(true)
+    try {
+      const ids = conflictPreview.conflicts.map((c) => c.transactionId)
+      const res = await reclassifyAdmissionConflictsToRegistration(ids)
+      if (!res || !('success' in res) || !res.success) {
+        const err = res && 'error' in (res as unknown as { error?: string }) ? (res as unknown as { error?: string }).error : undefined
+        toast.error(err || "Failed to fix conflicts")
+        return
+      }
+      const updated = 'updated' in res ? (res.updated as number) : 0
+      const skipped = 'skipped' in res ? (res.skipped as number) : 0
+      toast.success(`Updated ${updated} transaction(s), skipped ${skipped}`)
+      setConflictPreview(null)
+      router.refresh()
+    } catch {
+      toast.error("Failed to fix conflicts")
+    } finally {
+      setIsFixing(false)
+      setConfirmFixOpen(false)
+    }
+  }
+
+  const handleNormalizeFeeTypes = async () => {
+    if (!isAdmin) return
+    setIsNormalizing(true)
+    try {
+      const res = await normalizeLegacyEntryFeeTypes()
+      if (!res || !('success' in res) || !res.success) {
+        const err = res && 'error' in (res as unknown as { error?: string }) ? (res as unknown as { error?: string }).error : undefined
+        toast.error(err || "Failed to normalize fee types")
+        return
+      }
+      const updatedTx = 'updatedFeeTransactions' in res ? (res.updatedFeeTransactions as number) : 0
+      const updatedFees = 'updatedClassFees' in res ? (res.updatedClassFees as number) : 0
+      toast.success(`Normalized: ${updatedTx} transactions, ${updatedFees} class fees`)
+      router.refresh()
+    } catch {
+      toast.error("Failed to normalize fee types")
+    } finally {
+      setIsNormalizing(false)
+      setConfirmNormalizeOpen(false)
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -225,6 +337,115 @@ export function TransactionContent({
         </div>
       </div>
       <BackButton />
+
+      {isAdmin && (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardHeader>
+            <CardTitle>Admission/Registration Conflict Fix</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-sm">
+              This tool reclassifies entry-fee transactions that are marked as Admission but look like Registration (amount is lower than configured Admission fee). Use only after confirming your fee settings are correct.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={handleScanConflicts} disabled={isScanning || isFixing}>
+                {isScanning ? "Scanning..." : "Preview Conflicts"}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => setConfirmFixOpen(true)}
+                disabled={isScanning || isFixing || !conflictPreview || conflictPreview.conflicts.length === 0}
+              >
+                {isFixing ? "Fixing..." : `Fix ${conflictPreview?.conflicts.length ?? 0} Conflicts`}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setConfirmNormalizeOpen(true)}
+                disabled={isScanning || isFixing || isNormalizing}
+              >
+                {isNormalizing ? "Normalizing..." : "Normalize Fee Types"}
+              </Button>
+              {conflictPreview && (
+                <Button variant="ghost" onClick={() => setConflictPreview(null)} disabled={isScanning || isFixing}>
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            {conflictPreview && (
+              <div className="text-sm">
+                Scanned: {conflictPreview.scanned} • Matched: {conflictPreview.matched} • Showing: {Math.min(conflictPreview.conflicts.length, 20)}
+              </div>
+            )}
+
+            {conflictPreview && conflictPreview.conflicts.length > 0 && (
+              <div className="rounded-md border bg-background overflow-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-2">Student</th>
+                      <th className="text-left p-2">Receipt</th>
+                      <th className="text-left p-2">Class</th>
+                      <th className="text-left p-2">Year</th>
+                      <th className="text-left p-2">Amount</th>
+                      <th className="text-left p-2">Admission</th>
+                      <th className="text-left p-2">Registration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {conflictPreview.conflicts.slice(0, 20).map((c) => (
+                      <tr key={c.transactionId} className="border-b last:border-0">
+                        <td className="p-2">{c.studentName} ({c.studentRegNo})</td>
+                        <td className="p-2 font-mono">{c.receiptNumber}</td>
+                        <td className="p-2">{c.className}</td>
+                        <td className="p-2">{c.year}</td>
+                        <td className="p-2">₹{Number(c.amount).toLocaleString()}</td>
+                        <td className="p-2">₹{Number(c.admissionFee).toLocaleString()}</td>
+                        <td className="p-2">₹{Number(c.registrationFee).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <AlertDialog open={confirmFixOpen} onOpenChange={setConfirmFixOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reclassify transactions?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will change feeType from Admission to Registration for the previewed transactions. This is a data correction and cannot be undone automatically.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isFixing}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleFixConflicts} disabled={isFixing}>
+                    Continue
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={confirmNormalizeOpen} onOpenChange={setConfirmNormalizeOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Normalize legacy fee types?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will convert legacy values to canonical ones (Admission → admissionFees, Registration → registrationFees) in transactions and class fee configuration.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isNormalizing}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleNormalizeFeeTypes} disabled={isNormalizing}>
+                    Continue
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
+        </Card>
+      )}
+
       <div className={`grid gap-4 md:grid-cols-3 ${isPending ? 'opacity-50' : ''}`}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
