@@ -83,6 +83,7 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
     summary: AttendanceSummary;
     dailyStats: DailyStat[];
     studentReport: StudentReport[];
+    timezone: string;
   }
 
   const [reportData, setReportData] = useState<ReportData | null>(null);
@@ -94,8 +95,8 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
     startTransition(async () => {
       try {
         const data = await getAttendanceReport({
-          startDate: date.from!,
-          endDate: date.to!,
+          startDate: format(date.from!, 'yyyy-MM-dd'),
+          endDate: format(date.to!, 'yyyy-MM-dd'),
           classId: classId === 'all' ? undefined : classId,
           section: section === 'all' ? undefined : section,
         });
@@ -366,6 +367,7 @@ export default function AttendanceReport({ classes }: AttendanceReportProps) {
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
+              <div className="text-xs text-muted-foreground mt-2">Timezone: {reportData.timezone}</div>
             </CardContent>
           </Card>
         </div>

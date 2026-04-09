@@ -43,7 +43,15 @@ export async function updateWhatsAppReceiptSetting(enabled: boolean) {
 export async function getTimezoneSetting() {
     await dbConnect()
     const setting = await Setting.findOne({ key: "school_timezone" }).lean()
-    return setting ? setting.value as string : "Asia/Kolkata"
+    const raw = (setting as { value?: unknown } | null)?.value
+    const tz = typeof raw === "string" ? raw.trim() : ""
+    if (!tz) return "Asia/Kolkata"
+    try {
+        Intl.DateTimeFormat("en-US", { timeZone: tz })
+        return tz
+    } catch {
+        return "Asia/Kolkata"
+    }
 }
 
 export async function updateTimezoneSetting(timezone: string) {

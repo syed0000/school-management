@@ -67,6 +67,7 @@ interface FeeReportData {
   summary: FeeSummary;
   trend: FeeTrend[];
   studentReport: StudentFeeReport[];
+  timezone: string;
 }
 
 interface FeeReportProps {
@@ -88,8 +89,8 @@ export default function FeeReport({ classes }: FeeReportProps) {
     startTransition(async () => {
       try {
         const data = await getFeeReport({
-          startDate: date.from!,
-          endDate: date.to!,
+          startDate: format(date.from!, 'yyyy-MM-dd'),
+          endDate: format(date.to!, 'yyyy-MM-dd'),
           classId: classId === 'all' ? undefined : classId,
           section: section === 'all' ? undefined : section,
         });
@@ -349,6 +350,7 @@ export default function FeeReport({ classes }: FeeReportProps) {
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
+              <div className="text-xs text-muted-foreground mt-2">Timezone: {reportData.timezone}</div>
             </CardContent>
           </Card>
         </div>

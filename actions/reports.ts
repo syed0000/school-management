@@ -9,7 +9,7 @@ import Setting from '@/models/Setting';
 import Holiday from '@/models/Holiday';
 import { format, eachDayOfInterval, isBefore, isAfter, startOfMonth, endOfMonth } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
-import { getSchoolDateBoundaries, getSchoolTimezone } from '@/lib/tz-utils';
+import { getSchoolDateBoundaries, getSchoolTimezone, listYmdRange } from '@/lib/tz-utils';
 import logger from "@/lib/logger";
 import { Types } from "mongoose";
 import { normalizeFeeType } from '@/lib/fee-type';
@@ -18,8 +18,8 @@ import { coerceBoolean } from '@/lib/setting-coerce';
 // --- Interfaces ---
 
 interface AttendanceReportParams {
-  startDate: Date;
-  endDate: Date;
+  startDate: Date | string;
+  endDate: Date | string;
   classId?: string;
   section?: string;
   studentId?: string;
@@ -55,8 +55,8 @@ interface AttendanceRecordDoc {
 }
 
 interface FeeReportParams {
-  startDate: Date;
-  endDate: Date;
+  startDate: Date | string;
+  endDate: Date | string;
   classId?: string;
   section?: string;
   studentId?: string;
@@ -102,8 +102,10 @@ export async function getAttendanceReport({
 
   try {
     const tz = await getSchoolTimezone();
-    const { startUtc: startOfStartDate } = await getSchoolDateBoundaries(startDate);
-    const { endUtc: endOfEndDate } = await getSchoolDateBoundaries(endDate);
+    const startYmd = typeof startDate === "string" ? startDate : formatInTimeZone(startDate, tz, "yyyy-MM-dd")
+    const endYmd = typeof endDate === "string" ? endDate : formatInTimeZone(endDate, tz, "yyyy-MM-dd")
+    const { startUtc: startOfStartDate } = await getSchoolDateBoundaries(startYmd);
+    const { endUtc: endOfEndDate } = await getSchoolDateBoundaries(endYmd);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {
@@ -152,7 +154,10 @@ export async function getAttendanceReport({
     });
 
     // 1. Get all days in the interval
-    const daysInterval = eachDayOfInterval({ start: startDate, end: endDate });
+    const daysInterval = eachDayOfInterval({
+      start: typeof startDate === "string" ? new Date(`${startDate}T00:00:00.000Z`) : startDate,
+      end: typeof endDate === "string" ? new Date(`${endDate}T00:00:00.000Z`) : endDate,
+    });
     const totalCalendarDays = daysInterval.length;
 
     // 2. Get holidays from DB
@@ -284,6 +289,7 @@ export async function getAttendanceReport({
       },
       dailyStats,
       studentReport,
+      timezone: tz,
     };
 
   } catch (error) {
@@ -325,15 +331,17 @@ export async function getFeeReport({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const studentIds = students.map((s: any) => s._id);
 
+    const startYmd = typeof startDate === "string" ? startDate : formatInTimeZone(startDate, tz, "yyyy-MM-dd")
+    const endYmd = typeof endDate === "string" ? endDate : formatInTimeZone(endDate, tz, "yyyy-MM-dd")
     const { startUtc: startOfStartDate, endUtc: endOfEndDate } = await Promise.all([
-      getSchoolDateBoundaries(startDate).then(res => ({ startUtc: res.startUtc })),
-      getSchoolDateBoundaries(endDate).then(res => ({ endUtc: res.endUtc }))
+      getSchoolDateBoundaries(startYmd).then(res => ({ startUtc: res.startUtc })),
+      getSchoolDateBoundaries(endYmd).then(res => ({ endUtc: res.endUtc }))
     ]).then(res => ({ ...res[0], ...res[1] }));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const transactionQuery: any = {
       studentId: { $in: studentIds },
-      status: 'verified',
+      status: { $in: ['verified', 'pending'] },
       transactionDate: {
         $gte: startOfStartDate,
         $lte: endOfEndDate,
@@ -344,7 +352,7 @@ export async function getFeeReport({
 
     const allTransactions = await FeeTransaction.find({
       studentId: { $in: studentIds },
-      status: 'verified',
+      status: { $in: ['verified', 'pending'] },
     }).lean() as unknown as FeeTransactionDoc[];
 
     const classFees = await ClassFee.find({ isActive: true }).lean() as unknown as ClassFeeDoc[];
@@ -366,7 +374,7 @@ export async function getFeeReport({
       return months.indexOf(monthName.toLowerCase());
     };
 
-    let totalCollectedPeriod = 0;
+    const totalCollectedPeriod = transactions.reduce((s, t) => s + t.amount, 0);
     let totalExpectedPeriod = 0;
     let totalDuePeriod = 0;
 
@@ -395,7 +403,7 @@ export async function getFeeReport({
       const currentIterDate = startOfMonth(startDate);
       const endIterDate = endOfMonth(endDate);
 
-      const admissionDate = student.dateOfAdmission ? new Date(student.dateOfAdmission) : new Date();
+    const admissionDate = student.dateOfAdmission ? new Date(student.dateOfAdmission) : new Date(0);
       const effectiveStart = isAfter(admissionDate, currentIterDate) ? startOfMonth(admissionDate) : currentIterDate;
 
       const tempIterDate = new Date(effectiveStart);
@@ -517,7 +525,6 @@ export async function getFeeReport({
 
       const dueAmount = expectedAmount - paidAmount > 0 ? expectedAmount - paidAmount : 0;
 
-      totalCollectedPeriod += paidAmount;
       totalExpectedPeriod += expectedAmount;
       totalDuePeriod += dueAmount;
 
@@ -559,14 +566,13 @@ export async function getFeeReport({
     // Chart Data
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const collectionTrend: any[] = [];
-    const days = eachDayOfInterval({ start: startDate, end: endDate });
+    const days = listYmdRange(startYmd, endYmd);
     const txnsByDate: Record<string, number> = {};
     transactions.forEach((txn) => {
       const d = formatInTimeZone(new Date(txn.transactionDate), tz, 'yyyy-MM-dd');
       txnsByDate[d] = (txnsByDate[d] || 0) + txn.amount;
     });
-    days.forEach((day) => {
-      const d = formatInTimeZone(day, tz, 'yyyy-MM-dd');
+    days.forEach((d) => {
       collectionTrend.push({ date: d, amount: txnsByDate[d] || 0 });
     });
 
@@ -579,6 +585,7 @@ export async function getFeeReport({
       },
       trend: collectionTrend,
       studentReport,
+      timezone: tz,
     };
 
   } catch (error) {
