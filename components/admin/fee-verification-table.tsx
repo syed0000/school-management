@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Check, X } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
+import { formatInTimeZone } from "date-fns-tz"
+import { getSchoolTimezone } from "@/lib/tz-utils"
 
 interface Transaction {
   id: string;
@@ -63,6 +65,7 @@ export function FeeVerificationTable({ initialTransactions }: FeeVerificationTab
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead>SN</TableHead>
           <TableHead>Date</TableHead>
           <TableHead>Student</TableHead>
           <TableHead>Amount</TableHead>
@@ -72,8 +75,9 @@ export function FeeVerificationTable({ initialTransactions }: FeeVerificationTab
         </TableRow>
       </TableHeader>
       <TableBody>
-        {transactions.map((tx) => (
+        {transactions.map((tx, index) => (
           <TableRow key={tx.id}>
+            <TableCell>{index + 1}</TableCell>
             <TableCell>{format(new Date(tx.date), 'dd MMM yyyy')}</TableCell>
             <TableCell>
               <div>
