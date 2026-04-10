@@ -196,10 +196,14 @@ export async function getClassGroups(): Promise<ClassGroupInfo[]> {
         startFrom: number
     }>
 
+    const counterIds = groups.map((g) => `classGroup_${g._id.toString()}`)
+    const counters = await Counter.find({ _id: { $in: counterIds } }).lean() as Array<{ _id: string; seq?: number }>
+    const counterById = new Map(counters.map((c) => [c._id, c]))
+
     const result: ClassGroupInfo[] = []
     for (const g of groups) {
         const counterId = `classGroup_${g._id.toString()}`
-        const counter = await Counter.findById(counterId).lean() as { seq?: number } | null
+        const counter = counterById.get(counterId) as { seq?: number } | undefined
         const currentSeq = counter?.seq ?? (g.startFrom - 1)
         result.push({
             id: g._id.toString(),

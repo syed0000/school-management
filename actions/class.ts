@@ -350,35 +350,50 @@ interface ClassDoc {
 export async function getClassesWithFees() {
   await dbConnect();
   const classes = await Class.find({ isActive: true }).lean();
-  
-  const result = await Promise.all(classes.map(async (c: unknown) => {
-    const cls = c as ClassDoc;
-    // Get latest fees for this class
-    const fees = await ClassFee.find({ 
-        classId: cls._id, 
-        isActive: true 
-    }).sort({ effectiveFrom: -1 }).lean();
 
-    const latestFees: Record<string, { amount: number, effectiveFrom?: Date }> = {};
-    const latestExamFees: Record<string, { title: string, month: string, amount: number, effectiveFrom?: Date }> = {};
+  const classIds = classes.map((c: unknown) => (c as ClassDoc)._id);
+  const fees = await ClassFee.find({
+    classId: { $in: classIds },
+    isActive: true
+  }).sort({ classId: 1, effectiveFrom: -1 }).lean() as Array<{
+    classId: { toString: () => string }
+    type: string
+    amount: number
+    effectiveFrom?: Date
+    title?: string
+    month?: string
+  }>;
 
-    // Iterate and pick latest for each type
-    for (const f of fees) {
-        if (f.type === 'examination' && f.title) {
-             // For examination, we need to distinguish by title (exam name)
-             if (!latestExamFees[f.title]) {
-                 latestExamFees[f.title] = {
-                     title: f.title,
-                     month: f.month || '',
-                     amount: f.amount,
-                     effectiveFrom: f.effectiveFrom
-                 };
-             }
-        } else if (latestFees[f.type] === undefined) {
-            latestFees[f.type] = { amount: f.amount, effectiveFrom: f.effectiveFrom };
-        }
+  const latestFeesByClass = new Map<string, Record<string, { amount: number, effectiveFrom?: Date }>>();
+  const latestExamFeesByClass = new Map<string, Record<string, { title: string, month: string, amount: number, effectiveFrom?: Date }>>();
+
+  for (const f of fees) {
+    const classId = f.classId.toString();
+    if (!latestFeesByClass.has(classId)) latestFeesByClass.set(classId, {});
+    if (!latestExamFeesByClass.has(classId)) latestExamFeesByClass.set(classId, {});
+
+    const latestFees = latestFeesByClass.get(classId)!;
+    const latestExamFees = latestExamFeesByClass.get(classId)!;
+
+    if (f.type === 'examination' && f.title) {
+      if (!latestExamFees[f.title]) {
+        latestExamFees[f.title] = {
+          title: f.title,
+          month: f.month || '',
+          amount: f.amount,
+          effectiveFrom: f.effectiveFrom
+        };
+      }
+    } else if (latestFees[f.type] === undefined) {
+      latestFees[f.type] = { amount: f.amount, effectiveFrom: f.effectiveFrom };
     }
-    
+  }
+
+  return classes.map((c: unknown) => {
+    const cls = c as ClassDoc;
+    const latestFees = latestFeesByClass.get(cls._id.toString()) || {};
+    const latestExamFees = latestExamFeesByClass.get(cls._id.toString()) || {};
+
     return {
       id: cls._id.toString(),
       name: cls.name,
@@ -391,9 +406,7 @@ export async function getClassesWithFees() {
       registrationFee: latestFees['registrationFees']?.amount || 0,
       registrationFeeEffectiveFrom: latestFees['registrationFees']?.effectiveFrom,
     };
-  }));
-  
-  return result;
+  });
 }
 
 export async function getClasses() {

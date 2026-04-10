@@ -554,13 +554,12 @@ export const getDashboardStats = unstable_cache(
             };
         }
 
-        const expenseResult = await Expense.aggregate([
-            { $match: expenseQuery },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-
-        const totalExpenses = expenseResult[0]?.total || 0;
-        const netProfit = collected - totalExpenses;
+        const expenseFacets: Record<string, any[]> = {
+            totalForFilter: [
+                { $match: expenseQuery },
+                { $group: { _id: null, total: { $sum: "$amount" } } }
+            ]
+        }
 
         // Calculate Revenue Change (Current vs Last Week)
         // For simplicity, we compare "current period" vs "previous period of same duration"
@@ -578,46 +577,26 @@ export const getDashboardStats = unstable_cache(
         const { startUtc: twoWeeksAgoStartUtc } = await getSchoolDateBoundaries(twoWeeksAgoStart);
         const { endUtc: lastWeekEndUtc } = await getSchoolDateBoundaries(subDays(today, 7));
 
-        const revenueThisWeekResult = await FeeTransaction.aggregate([
-            { $match: { transactionDate: { $gte: lastWeekStartUtc, $lte: todayEndUtc }, status: 'verified' } },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-        const revenueLastWeekResult = await FeeTransaction.aggregate([
-            { $match: { transactionDate: { $gte: twoWeeksAgoStartUtc, $lte: lastWeekEndUtc }, status: 'verified' } },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-
-        const revenueThisWeek = revenueThisWeekResult[0]?.total || 0;
-        const revenueLastWeek = revenueLastWeekResult[0]?.total || 0;
-
-        let revenueChange = 0;
-        if (revenueLastWeek > 0) {
-            revenueChange = Math.round(((revenueThisWeek - revenueLastWeek) / revenueLastWeek) * 100);
-        } else if (revenueThisWeek > 0) {
-            revenueChange = 100;
-        } else if (revenueLastWeek === 0 && revenueThisWeek === 0) {
-            revenueChange = 0;
+        const txnFacets: Record<string, any[]> = {
+            revenueThisWeek: [
+                { $match: { transactionDate: { $gte: lastWeekStartUtc, $lte: todayEndUtc }, status: 'verified' } },
+                { $group: { _id: null, total: { $sum: "$amount" } } }
+            ],
+            revenueLastWeek: [
+                { $match: { transactionDate: { $gte: twoWeeksAgoStartUtc, $lte: lastWeekEndUtc }, status: 'verified' } },
+                { $group: { _id: null, total: { $sum: "$amount" } } }
+            ]
         }
 
         // Calculate Expense Change (Current vs Last Week)
-        const expenseThisWeekResult = await Expense.aggregate([
+        expenseFacets.expenseThisWeek = [
             { $match: { expenseDate: { $gte: lastWeekStartUtc, $lte: todayEndUtc }, status: 'active' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-        const expenseLastWeekResult = await Expense.aggregate([
+        ]
+        expenseFacets.expenseLastWeek = [
             { $match: { expenseDate: { $gte: twoWeeksAgoStartUtc, $lte: lastWeekEndUtc }, status: 'active' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-
-        const expenseThisWeek = expenseThisWeekResult[0]?.total || 0;
-        const expenseLastWeek = expenseLastWeekResult[0]?.total || 0;
-
-        let expenseChange = 0;
-        if (expenseLastWeek > 0) {
-            expenseChange = Math.round(((expenseThisWeek - expenseLastWeek) / expenseLastWeek) * 100);
-        } else if (expenseThisWeek > 0) {
-            expenseChange = 100;
-        }
+        ]
 
         // Calculate Pending Change (Current Month vs Last Month)
         const thisMonthStart = startOfMonth(today);
@@ -628,17 +607,47 @@ export const getDashboardStats = unstable_cache(
         const { startUtc: lastMonthStartUtc } = await getSchoolDateBoundaries(lastMonthStart);
         const { endUtc: lastMonthEndUtc } = await getSchoolDateBoundaries(lastMonthEnd);
 
-        const pendingThisMonthResult = await FeeTransaction.aggregate([
+        txnFacets.pendingThisMonth = [
             { $match: { transactionDate: { $gte: thisMonthStartUtc, $lte: todayEndUtc }, status: 'pending' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-        const pendingLastMonthResult = await FeeTransaction.aggregate([
+        ]
+        txnFacets.pendingLastMonth = [
             { $match: { transactionDate: { $gte: lastMonthStartUtc, $lte: lastMonthEndUtc }, status: 'pending' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
+        ]
 
-        const pendingThisMonth = pendingThisMonthResult[0]?.total || 0;
-        const pendingLastMonth = pendingLastMonthResult[0]?.total || 0;
+        const [[txnFacetResult], [expenseFacetResult]] = await Promise.all([
+            FeeTransaction.aggregate([{ $facet: txnFacets as any }] as any) as any,
+            Expense.aggregate([{ $facet: expenseFacets as any }] as any) as any,
+        ])
+
+        const revenueThisWeek = txnFacetResult?.revenueThisWeek?.[0]?.total || 0;
+        const revenueLastWeek = txnFacetResult?.revenueLastWeek?.[0]?.total || 0;
+
+        let revenueChange = 0;
+        if (revenueLastWeek > 0) {
+            revenueChange = Math.round(((revenueThisWeek - revenueLastWeek) / revenueLastWeek) * 100);
+        } else if (revenueThisWeek > 0) {
+            revenueChange = 100;
+        } else if (revenueLastWeek === 0 && revenueThisWeek === 0) {
+            revenueChange = 0;
+        }
+
+        const expenseThisWeek = expenseFacetResult?.expenseThisWeek?.[0]?.total || 0;
+        const expenseLastWeek = expenseFacetResult?.expenseLastWeek?.[0]?.total || 0;
+
+        let expenseChange = 0;
+        if (expenseLastWeek > 0) {
+            expenseChange = Math.round(((expenseThisWeek - expenseLastWeek) / expenseLastWeek) * 100);
+        } else if (expenseThisWeek > 0) {
+            expenseChange = 100;
+        }
+
+        const pendingThisMonth = txnFacetResult?.pendingThisMonth?.[0]?.total || 0;
+        const pendingLastMonth = txnFacetResult?.pendingLastMonth?.[0]?.total || 0;
+
+        const totalExpenses = expenseFacetResult?.totalForFilter?.[0]?.total || 0;
+        const netProfit = collected - totalExpenses;
 
         let pendingChange = 0;
         if (pendingLastMonth > 0) {
@@ -780,25 +789,50 @@ export const getStaffDashboardStats = unstable_cache(async (userId: string) => {
     const { startUtc: monthStart } = await getSchoolDateBoundaries(startOfMonth(new Date()));
     const { endUtc: monthEnd } = await getSchoolDateBoundaries(endOfMonth(new Date()));
 
-    // 1. My Collection Today
-    const collectionTodayResult = await FeeTransaction.aggregate([
-        { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: todayStart, $lte: todayEnd }, status: 'verified' } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
-    ]);
-    const myCollectionToday = collectionTodayResult[0]?.total || 0;
+    const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
+    const lastMonthEnd = endOfMonth(subMonths(new Date(), 1));
+    const { startUtc: yesterdayStart, endUtc: yesterdayEnd } = await getSchoolDateBoundaries(subDays(new Date(), 1));
 
-    // 2. My Collection This Month
-    const collectionMonthResult = await FeeTransaction.aggregate([
-        { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: monthStart, $lte: monthEnd }, status: 'verified' } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
-    ]);
-    const myCollectionMonth = collectionMonthResult[0]?.total || 0;
+    const staffFacets: Record<string, any[]> = {
+        myCollectionToday: [
+            { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: todayStart, $lte: todayEnd }, status: 'verified' } },
+            { $group: { _id: null, total: { $sum: "$amount" } } }
+        ],
+        myCollectionMonth: [
+            { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: monthStart, $lte: monthEnd }, status: 'verified' } },
+            { $group: { _id: null, total: { $sum: "$amount" } } }
+        ],
+        myCollectionLastMonth: [
+            { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: lastMonthStart, $lte: lastMonthEnd }, status: 'verified' } },
+            { $group: { _id: null, total: { $sum: "$amount" } } }
+        ],
+        myCollectionYesterday: [
+            { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: yesterdayStart, $lte: yesterdayEnd }, status: 'verified' } },
+            { $group: { _id: null, total: { $sum: "$amount" } } }
+        ],
+        myPendingCount: [
+            { $match: { collectedBy: new Types.ObjectId(userId), status: 'pending' } },
+            { $count: "count" }
+        ],
+        totalStats: [
+            { $match: { collectedBy: new Types.ObjectId(userId) } },
+            {
+                $group: {
+                    _id: "$status",
+                    total: { $sum: "$amount" },
+                    count: { $sum: 1 }
+                }
+            }
+        ]
+    }
 
-    // 3. My Pending Count
-    const myPendingCount = await FeeTransaction.countDocuments({
-        collectedBy: userId,
-        status: 'pending'
-    });
+    const [staffFacetResult] = await FeeTransaction.aggregate([{ $facet: staffFacets as any }] as any) as Array<Record<string, any[]>>
+
+    const myCollectionToday = (staffFacetResult?.myCollectionToday?.[0] as { total?: number } | undefined)?.total || 0;
+    const myCollectionMonth = (staffFacetResult?.myCollectionMonth?.[0] as { total?: number } | undefined)?.total || 0;
+    const myCollectionLastMonth = (staffFacetResult?.myCollectionLastMonth?.[0] as { total?: number } | undefined)?.total || 0;
+    const myCollectionYesterday = (staffFacetResult?.myCollectionYesterday?.[0] as { total?: number } | undefined)?.total || 0;
+    const myPendingCount = (staffFacetResult?.myPendingCount?.[0] as { count?: number } | undefined)?.count || 0;
 
     // 4. Students Admitted Today (Global)
     const studentsAdmittedToday = await Student.countDocuments({
@@ -817,65 +851,37 @@ export const getStaffDashboardStats = unstable_cache(async (userId: string) => {
     const start = subMonths(new Date(), 11);
     const monthsToCheck = eachMonthOfInterval({ start, end });
 
-    const monthlyCollections = await Promise.all(monthsToCheck.map(async (date) => {
+    const facets: Record<string, any[]> = {}
+    for (let i = 0; i < monthsToCheck.length; i++) {
+        const date = monthsToCheck[i]
         const s = startOfMonth(date);
         const e = endOfMonth(date);
-        const result = await FeeTransaction.aggregate([
+        facets[`my_${i}`] = [
             { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: s, $lte: e }, status: 'verified' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-        return {
-            name: format(date, 'MMM'),
-            value: result[0]?.total || 0
-        };
-    }));
-
-    // 7. Global Pending Trend (Last 12 Months) for Line Chart
-    // NOTE: This is GLOBAL pending, not just for this user, as requested layout shows "Global Pending Fees"
-    const globalPendingTrend = await Promise.all(monthsToCheck.map(async (date) => {
-        const s = startOfMonth(date);
-        const e = endOfMonth(date);
-        const result = await FeeTransaction.aggregate([
+        ]
+        facets[`pending_${i}`] = [
             { $match: { transactionDate: { $gte: s, $lte: e }, status: 'pending' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-        return {
-            name: format(date, 'MMM'),
-            value: result[0]?.total || 0
-        };
+        ]
+    }
+
+    const [facetResult] = await FeeTransaction.aggregate([{ $facet: facets as any }] as any) as Array<Record<string, Array<{ total?: number }>>>
+
+    const monthlyCollections = monthsToCheck.map((date, i) => ({
+        name: format(date, 'MMM'),
+        value: facetResult?.[`my_${i}`]?.[0]?.total || 0
     }));
 
-    // 8. Total Stats for User (Lifetime)
-    const totalStats = await FeeTransaction.aggregate([
-        { $match: { collectedBy: new Types.ObjectId(userId) } },
-        {
-            $group: {
-                _id: "$status",
-                total: { $sum: "$amount" },
-                count: { $sum: 1 }
-            }
-        }
-    ]);
+    const globalPendingTrend = monthsToCheck.map((date, i) => ({
+        name: format(date, 'MMM'),
+        value: facetResult?.[`pending_${i}`]?.[0]?.total || 0
+    }));
 
-    const totalCollected = totalStats.find(s => s._id === 'verified')?.total || 0;
-    const totalPending = totalStats.find(s => s._id === 'pending')?.total || 0;
-    const totalRejected = totalStats.find(s => s._id === 'rejected')?.total || 0;
-
-    // Comparisons for Staff
-    const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
-    const lastMonthEnd = endOfMonth(subMonths(new Date(), 1));
-    const collectionLastMonthResult = await FeeTransaction.aggregate([
-        { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: lastMonthStart, $lte: lastMonthEnd }, status: 'verified' } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
-    ]);
-    const myCollectionLastMonth = collectionLastMonthResult[0]?.total || 0;
-
-    const { startUtc: yesterdayStart, endUtc: yesterdayEnd } = await getSchoolDateBoundaries(subDays(new Date(), 1));
-    const collectionYesterdayResult = await FeeTransaction.aggregate([
-        { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: yesterdayStart, $lte: yesterdayEnd }, status: 'verified' } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
-    ]);
-    const myCollectionYesterday = collectionYesterdayResult[0]?.total || 0;
+    const totalStats = staffFacetResult?.totalStats as Array<{ _id: string; total?: number; count?: number }> | undefined
+    const totalCollected = totalStats?.find(s => s._id === 'verified')?.total || 0;
+    const totalPending = totalStats?.find(s => s._id === 'pending')?.total || 0;
+    const totalRejected = totalStats?.find(s => s._id === 'rejected')?.total || 0;
 
     // 9. Unpaid Students (For Staff Dashboard)
     // Using current year as default range for unpaid calculation

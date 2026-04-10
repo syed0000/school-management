@@ -190,37 +190,32 @@ export async function getTransactionStats(filter: TransactionFilter) {
   }
 
   if (filter.classId && filter.classId !== 'all') {
-    const students = await Student.find({ classId: filter.classId }).select('_id')
-    query.studentId = { $in: students.map(s => s._id) }
+    const studentIds = await Student.distinct('_id', { classId: filter.classId })
+    query.studentId = { $in: studentIds }
   }
 
-  const [verified, pending, rejected] = await Promise.all([
-    FeeTransaction.aggregate([
-      { $match: { ...query, status: 'verified' } },
-      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } }
-    ]),
-    FeeTransaction.aggregate([
-      { $match: { ...query, status: 'pending' } },
-      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } }
-    ]),
-    FeeTransaction.aggregate([
-      { $match: { ...query, status: 'rejected' } },
-      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } }
-    ])
-  ])
+  const stats = await FeeTransaction.aggregate([
+    { $match: query },
+    { $group: { _id: "$status", total: { $sum: '$amount' }, count: { $sum: 1 } } }
+  ]) as Array<{ _id: string; total?: number; count?: number }>
+
+  const statByStatus = new Map(stats.map((s) => [s._id, s]))
+  const verified = statByStatus.get('verified')
+  const pending = statByStatus.get('pending')
+  const rejected = statByStatus.get('rejected')
 
   return {
     verified: {
-      amount: verified[0]?.total || 0,
-      count: verified[0]?.count || 0
+      amount: verified?.total || 0,
+      count: verified?.count || 0
     },
     pending: {
-      amount: pending[0]?.total || 0,
-      count: pending[0]?.count || 0
+      amount: pending?.total || 0,
+      count: pending?.count || 0
     },
     rejected: {
-      amount: rejected[0]?.total || 0,
-      count: rejected[0]?.count || 0
+      amount: rejected?.total || 0,
+      count: rejected?.count || 0
     }
   }
 }

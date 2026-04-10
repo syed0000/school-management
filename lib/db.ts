@@ -1,42 +1,45 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
-}
-
-/**
- * Global is used here to maintain a cached connection across hot reloads
- * in development. This prevents connections growing exponentially
- * during API Route usage.
- */
-interface MongooseCache {
+type MongooseCache = {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
+};
+
+declare global {
+  // eslint-disable-next-line no-var
+  var mongoose: MongooseCache | undefined;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let cached: MongooseCache = (global as any).mongoose;
+const cached: MongooseCache = globalThis.mongoose ?? { conn: null, promise: null };
+globalThis.mongoose = cached;
 
-if (!cached) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  cached = (global as any).mongoose = { conn: null, promise: null };
+function getMongoUri(): string {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    throw new Error("Please define the MONGODB_URI environment variable");
+  }
+  return uri;
+}
+
+function getMaxPoolSize(): number | undefined {
+  const raw = process.env.MONGODB_MAX_POOL_SIZE || 20;
+  if (!raw) return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return Math.floor(n);
 }
 
 async function dbConnect(): Promise<typeof mongoose> {
-  if (cached.conn) {
-    return cached.conn;
-  }
+  if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-    };
-
-    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
-      return mongoose;
-    });
+    const maxPoolSize = getMaxPoolSize();
+    cached.promise = mongoose
+      .connect(getMongoUri(), {
+        bufferCommands: false,
+        ...(maxPoolSize ? { maxPoolSize } : {}),
+      })
+      .then((m) => m);
   }
 
   try {

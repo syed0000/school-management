@@ -6,6 +6,7 @@ import ClassFee from "@/models/ClassFee"
 import Student from "@/models/Student"
 import Class from "@/models/Class"
 import Counter from "@/models/Counter"
+import Setting from "@/models/Setting"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { getYearForMonth } from "@/lib/utils"
@@ -153,6 +154,13 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
     const student = await Student.findById(data.studentId).populate('classId', 'name').lean();
     if (!student) throw new Error("Student not found");
 
+    const [admSetting, regSetting] = await Promise.all([
+      Setting.findOne({ key: "admission_fee_includes_april" }).lean(),
+      Setting.findOne({ key: "registration_fee_includes_april" }).lean()
+    ])
+    const admIncludesApril = coerceBoolean((admSetting as { value?: unknown } | null)?.value, true)
+    const regIncludesApril = coerceBoolean((regSetting as { value?: unknown } | null)?.value, true)
+
     const submissionDate = data.transactionDate ? new Date(data.transactionDate) : new Date();
 
     const submissionUser = await User.findById(userId).lean();
@@ -172,49 +180,49 @@ export async function collectFees(data: z.infer<typeof collectFeesSchema>, userI
       // Validation logic for monthly fees
       const monthsToProcess = feeItem.months ? feeItem.months : [];
       if (normalizedFeeType === 'monthly' && monthsToProcess.length > 0) {
-        // Validate duplicates
-        for (const m of monthsToProcess) {
-          const dbMonth = m + 1;
-          const actualYear = getYearForMonth(m, feeItem.year);
-          const existing = await FeeTransaction.findOne({
+        const monthPairs = monthsToProcess.map((m) => {
+          const dbMonth = m + 1
+          const actualYear = getYearForMonth(m, feeItem.year)
+          return { m, dbMonth, actualYear }
+        })
+
+        const existingMonthly = await FeeTransaction.find({
+          studentId: data.studentId,
+          feeType: 'monthly',
+          status: { $ne: 'rejected' },
+          $or: monthPairs.map((p) => ({ month: p.dbMonth, year: p.actualYear }))
+        }).select('month year').lean() as Array<{ month?: number; year: number }>
+        const existingMonthlySet = new Set(existingMonthly.map((t) => `${t.year}:${t.month ?? ''}`))
+
+        const aprilPairs = monthPairs.filter((p) => p.dbMonth === 4)
+        const aprilYears = Array.from(new Set(aprilPairs.map((p) => p.actualYear)))
+        const hasAdmByYear = new Set<number>()
+        const hasRegByYear = new Set<number>()
+        if (aprilYears.length > 0 && (admIncludesApril || regIncludesApril)) {
+          const entryTxns = await FeeTransaction.find({
             studentId: data.studentId,
-            feeType: 'monthly',
-            month: dbMonth,
-            year: actualYear,
+            feeType: { $in: ['admissionFees', 'registrationFees'] },
+            year: { $in: aprilYears },
             status: { $ne: 'rejected' }
-          });
-          if (existing) {
-            return { success: false, error: `Fee for month ${dbMonth}/${actualYear} already paid/pending.` };
+          }).select('feeType year').lean() as Array<{ feeType: string; year: number }>
+          for (const t of entryTxns) {
+            if (t.feeType === 'admissionFees') hasAdmByYear.add(t.year)
+            if (t.feeType === 'registrationFees') hasRegByYear.add(t.year)
+          }
+        }
+
+        for (const p of monthPairs) {
+          if (existingMonthlySet.has(`${p.actualYear}:${p.dbMonth}`)) {
+            return { success: false, error: `Fee for month ${p.dbMonth}/${p.actualYear} already paid/pending.` }
           }
 
-          // Check if it's April and covered by Admission/Registration
-          if (dbMonth === 4) {
-            const [admSetting, regSetting] = await Promise.all([
-              import('@/models/Setting').then(m => m.default.findOne({ key: "admission_fee_includes_april" }).lean()),
-              import('@/models/Setting').then(m => m.default.findOne({ key: "registration_fee_includes_april" }).lean())
-            ]);
-            const admIncludesApril = coerceBoolean((admSetting as { value?: unknown } | null)?.value, true)
-            const regIncludesApril = coerceBoolean((regSetting as { value?: unknown } | null)?.value, true)
-
-            if (admIncludesApril || regIncludesApril) {
-              const paidAdm = await FeeTransaction.findOne({
-                studentId: data.studentId,
-                feeType: 'admissionFees',
-                year: actualYear,
-                status: { $ne: 'rejected' }
-              });
-              const paidReg = await FeeTransaction.findOne({
-                studentId: data.studentId,
-                feeType: 'registrationFees',
-                year: actualYear,
-                status: { $ne: 'rejected' }
-              });
-
-              if ((admIncludesApril && paidAdm) || (regIncludesApril && paidReg)) {
-                return {
-                  success: false,
-                  error: `April ${actualYear} fee is already included in ${paidAdm ? 'Admission' : 'Registration'} fee payment.`
-                };
+          if (p.dbMonth === 4 && (admIncludesApril || regIncludesApril)) {
+            const paidAdm = admIncludesApril && hasAdmByYear.has(p.actualYear)
+            const paidReg = regIncludesApril && hasRegByYear.has(p.actualYear)
+            if (paidAdm || paidReg) {
+              return {
+                success: false,
+                error: `April ${p.actualYear} fee is already included in ${paidAdm ? 'Admission' : 'Registration'} fee payment.`
               }
             }
           }
