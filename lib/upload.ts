@@ -72,9 +72,13 @@ export async function saveFile(file: File, folder: string): Promise<string> {
 
   const contaboCfg = getContaboStorageConfig()
   if (contaboCfg) {
-    const key = `${rootFolder}/${normalizedFolder}/${filename}`
-    const contentType = file.type.startsWith("image/") ? "image/webp" : (file.type || "application/octet-stream")
-    return await putToContabo({ cfg: contaboCfg, key, body: buffer, contentType })
+    try {
+      const key = `${rootFolder}/${normalizedFolder}/${filename}`
+      const contentType = file.type.startsWith("image/") ? "image/webp" : (file.type || "application/octet-stream")
+      return await putToContabo({ cfg: contaboCfg, key, body: buffer, contentType })
+    } catch (error) {
+      logger.error({ err: error }, "Contabo upload failed")
+    }
   }
 
   // If Cloudinary env vars are present, upload to Cloudinary (legacy)

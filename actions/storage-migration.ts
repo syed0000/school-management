@@ -255,7 +255,9 @@ async function collectCloudinaryRefs(limit: number): Promise<CloudinaryRef[]> {
 async function migrateSingleUrl(params: { cfg: NonNullable<ReturnType<typeof getContaboStorageConfig>>; oldUrl: string }): Promise<string> {
   const { cfg, oldUrl } = params
 
-  const res = await fetch(oldUrl)
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000)
+  const res = await fetch(oldUrl, { signal: controller.signal }).finally(() => clearTimeout(timeoutId))
   if (!res.ok) throw new Error(`Failed to download source file: ${res.status} ${res.statusText}`)
   const contentType = res.headers.get("content-type") || "application/octet-stream"
   const buf = Buffer.from(await res.arrayBuffer())
