@@ -10,7 +10,7 @@ import Expense from "@/models/Expense"
 import Attendance from "@/models/Attendance"
 import Setting from "@/models/Setting"
 import { startOfMonth, endOfMonth, eachMonthOfInterval, format, subMonths, subWeeks, subDays } from "date-fns"
-import { Types } from "mongoose"
+import { Types, type PipelineStage } from "mongoose"
 import logger from "@/lib/logger"
 import { unstable_cache } from "next/cache"
 import { getCurrentSessionRange } from "@/lib/utils"
@@ -117,6 +117,36 @@ interface ClassWiseDoc {
     collected: number;
     pending: number;
 }
+
+type TotalFacetRow = { _id: null; total: number }
+type CountFacetRow = { count: number }
+type TotalStatsRow = { _id: string; total?: number; count?: number }
+
+type FacetDefinition = Record<string, PipelineStage.FacetPipelineStage[]>
+
+type TxnFacetResult = {
+    revenueThisWeek?: TotalFacetRow[];
+    revenueLastWeek?: TotalFacetRow[];
+    pendingThisMonth?: TotalFacetRow[];
+    pendingLastMonth?: TotalFacetRow[];
+}
+
+type ExpenseFacetResult = {
+    totalForFilter?: TotalFacetRow[];
+    expenseThisWeek?: TotalFacetRow[];
+    expenseLastWeek?: TotalFacetRow[];
+}
+
+type StaffFacetResult = {
+    myCollectionToday?: TotalFacetRow[];
+    myCollectionMonth?: TotalFacetRow[];
+    myCollectionLastMonth?: TotalFacetRow[];
+    myCollectionYesterday?: TotalFacetRow[];
+    myPendingCount?: CountFacetRow[];
+    totalStats?: TotalStatsRow[];
+}
+
+type MonthlyFacetResult = Record<string, TotalFacetRow[]>
 
 interface SaleDocExtended extends SaleDoc {
     feeType: string;
@@ -554,7 +584,7 @@ export const getDashboardStats = unstable_cache(
             };
         }
 
-        const expenseFacets: Record<string, any[]> = {
+        const expenseFacets: FacetDefinition = {
             totalForFilter: [
                 { $match: expenseQuery },
                 { $group: { _id: null, total: { $sum: "$amount" } } }
@@ -577,7 +607,7 @@ export const getDashboardStats = unstable_cache(
         const { startUtc: twoWeeksAgoStartUtc } = await getSchoolDateBoundaries(twoWeeksAgoStart);
         const { endUtc: lastWeekEndUtc } = await getSchoolDateBoundaries(subDays(today, 7));
 
-        const txnFacets: Record<string, any[]> = {
+        const txnFacets: FacetDefinition = {
             revenueThisWeek: [
                 { $match: { transactionDate: { $gte: lastWeekStartUtc, $lte: todayEndUtc }, status: 'verified' } },
                 { $group: { _id: null, total: { $sum: "$amount" } } }
@@ -617,8 +647,8 @@ export const getDashboardStats = unstable_cache(
         ]
 
         const [[txnFacetResult], [expenseFacetResult]] = await Promise.all([
-            FeeTransaction.aggregate([{ $facet: txnFacets as any }] as any) as any,
-            Expense.aggregate([{ $facet: expenseFacets as any }] as any) as any,
+            FeeTransaction.aggregate<TxnFacetResult>([{ $facet: txnFacets }]),
+            Expense.aggregate<ExpenseFacetResult>([{ $facet: expenseFacets }]),
         ])
 
         const revenueThisWeek = txnFacetResult?.revenueThisWeek?.[0]?.total || 0;
@@ -793,7 +823,7 @@ export const getStaffDashboardStats = unstable_cache(async (userId: string) => {
     const lastMonthEnd = endOfMonth(subMonths(new Date(), 1));
     const { startUtc: yesterdayStart, endUtc: yesterdayEnd } = await getSchoolDateBoundaries(subDays(new Date(), 1));
 
-    const staffFacets: Record<string, any[]> = {
+    const staffFacets: FacetDefinition = {
         myCollectionToday: [
             { $match: { collectedBy: new Types.ObjectId(userId), transactionDate: { $gte: todayStart, $lte: todayEnd }, status: 'verified' } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
@@ -826,7 +856,7 @@ export const getStaffDashboardStats = unstable_cache(async (userId: string) => {
         ]
     }
 
-    const [staffFacetResult] = await FeeTransaction.aggregate([{ $facet: staffFacets as any }] as any) as Array<Record<string, any[]>>
+    const [staffFacetResult] = await FeeTransaction.aggregate<StaffFacetResult>([{ $facet: staffFacets }])
 
     const myCollectionToday = (staffFacetResult?.myCollectionToday?.[0] as { total?: number } | undefined)?.total || 0;
     const myCollectionMonth = (staffFacetResult?.myCollectionMonth?.[0] as { total?: number } | undefined)?.total || 0;
@@ -851,7 +881,7 @@ export const getStaffDashboardStats = unstable_cache(async (userId: string) => {
     const start = subMonths(new Date(), 11);
     const monthsToCheck = eachMonthOfInterval({ start, end });
 
-    const facets: Record<string, any[]> = {}
+    const facets: FacetDefinition = {}
     for (let i = 0; i < monthsToCheck.length; i++) {
         const date = monthsToCheck[i]
         const s = startOfMonth(date);
@@ -866,7 +896,7 @@ export const getStaffDashboardStats = unstable_cache(async (userId: string) => {
         ]
     }
 
-    const [facetResult] = await FeeTransaction.aggregate([{ $facet: facets as any }] as any) as Array<Record<string, Array<{ total?: number }>>>
+    const [facetResult] = await FeeTransaction.aggregate<MonthlyFacetResult>([{ $facet: facets }])
 
     const monthlyCollections = monthsToCheck.map((date, i) => ({
         name: format(date, 'MMM'),
@@ -878,7 +908,7 @@ export const getStaffDashboardStats = unstable_cache(async (userId: string) => {
         value: facetResult?.[`pending_${i}`]?.[0]?.total || 0
     }));
 
-    const totalStats = staffFacetResult?.totalStats as Array<{ _id: string; total?: number; count?: number }> | undefined
+    const totalStats = staffFacetResult?.totalStats
     const totalCollected = totalStats?.find(s => s._id === 'verified')?.total || 0;
     const totalPending = totalStats?.find(s => s._id === 'pending')?.total || 0;
     const totalRejected = totalStats?.find(s => s._id === 'rejected')?.total || 0;

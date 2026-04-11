@@ -126,8 +126,7 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
   async function onDemoLogin() {
     setIsLoading(true)
     try {
-      const email =
-        type === "staff" ? (form.getValues("email") || "").trim() : demoEmail.trim()
+      const email = demoEmail.trim()
       if (!email) {
         toast.error(t("auth.enterDemoEmail", "Enter demo email"))
         return
@@ -232,17 +231,15 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
             </Button>
             {allowDemo && (
               <>
-                {type === "admin" && (
-                  <div className="space-y-2">
-                    <FormLabel>{t("auth.demoEmail", "Demo Email")}</FormLabel>
-                    <Input
-                      placeholder={t("auth.demoEmailPlaceholder", "demo@example.com")}
-                      value={demoEmail}
-                      onChange={(e) => setDemoEmail(e.target.value)}
-                      disabled={isLoading}
-                    />
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <FormLabel>{t("auth.demoEmail", "Demo Email")}</FormLabel>
+                  <Input
+                    placeholder={t("auth.demoEmailPlaceholder", "demo@example.com")}
+                    value={demoEmail}
+                    onChange={(e) => setDemoEmail(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
                 <Button type="button" variant="outline" className="w-full" disabled={isLoading} onClick={onDemoLogin}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {t("auth.demoLogin", "Demo Login")}
@@ -267,16 +264,6 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
                             whatsappConfig.enableTeacherLogin || 
                             process.env.NEXT_PUBLIC_ENABLE_PARENT_LOGIN === 'true' ||
                             process.env.NEXT_PUBLIC_ENABLE_TEACHER_LOGIN === 'true';
-          
-          if (process.env.NODE_ENV === 'development') {
-            console.log('WhatsApp Button Check:', { 
-              configParent: whatsappConfig.enableParentLogin,
-              configTeacher: whatsappConfig.enableTeacherLogin,
-              envParent: process.env.NEXT_PUBLIC_ENABLE_PARENT_LOGIN,
-              envTeacher: process.env.NEXT_PUBLIC_ENABLE_TEACHER_LOGIN,
-              finalResult: isEnabled
-            });
-          }
 
           if (!isEnabled) return null;
 
@@ -285,9 +272,16 @@ export function LoginForm({ type, allowDemo = false }: LoginFormProps) {
               <p className="text-xs text-muted-foreground text-center">
                 {t("auth.parentOrTeacher", "Parent or Teacher?")}
               </p>
-              <Button variant="outline" className="w-full" asChild>
-                <Link href={withLocale(lang, "/login/otp")}>{t("auth.loginWithWhatsappOtp", "Login with WhatsApp OTP")}</Link>
-              </Button>
+              {whatsappConfig.enableParentLogin && (
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href={withLocale(lang, "/parents/login")}>{t("auth.parentLogin", "Parent Login")}</Link>
+                </Button>
+              )}
+              {whatsappConfig.enableTeacherLogin && (
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href={withLocale(lang, "/teachers/login")}>{t("auth.teacherLogin", "Teacher Login")}</Link>
+                </Button>
+              )}
             </div>
           );
         })()}

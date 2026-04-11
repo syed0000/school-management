@@ -25,21 +25,25 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
-import { deleteNotification } from "@/actions/notification"
+import { deleteNotification, getNotificationHistoryPage } from "@/actions/notification"
 
 interface NotificationHistoryProps {
-  notifications: Record<string, unknown>[]
+  initialNotifications: Record<string, unknown>[]
+  initialNextCursor: string | null
 }
 
-export function NotificationHistoryList({ notifications }: NotificationHistoryProps) {
+export function NotificationHistoryList({ initialNotifications, initialNextCursor }: NotificationHistoryProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  console.log(deletingId) // Use the variable to satisfy linting without breaking functionality
+  const [notifications, setNotifications] = useState<Record<string, unknown>[]>(initialNotifications)
+  const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   const handleDelete = async (id: string) => {
     setDeletingId(id)
     try {
       const res = await deleteNotification(id)
       if (res.success) {
+        setNotifications((prev) => prev.filter((n) => String(n._id) !== id))
         toast.success("Notification deleted permanently.")
       } else {
         toast.error("Failed to delete notification.")
@@ -48,6 +52,20 @@ export function NotificationHistoryList({ notifications }: NotificationHistoryPr
       toast.error("An error occurred.")
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const loadMore = async () => {
+    if (!nextCursor) return
+    setLoadingMore(true)
+    try {
+      const res = await getNotificationHistoryPage(nextCursor, 20)
+      setNotifications((prev) => [...prev, ...res.items])
+      setNextCursor(res.nextCursor)
+    } catch {
+      toast.error("Failed to load more notifications.")
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -64,7 +82,7 @@ export function NotificationHistoryList({ notifications }: NotificationHistoryPr
   }
 
   return (
-    <div className="rounded-md border bg-card/50 backdrop-blur-sm overflow-hidden">
+    <div className="rounded-md border bg-card/50 backdrop-blur-sm overflow-hidden space-y-3">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50 hover:bg-muted/50">
@@ -131,6 +149,7 @@ export function NotificationHistoryList({ notifications }: NotificationHistoryPr
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction 
                          onClick={() => handleDelete(String(notif._id))}
+                         disabled={deletingId === String(notif._id)}
                          className="bg-red-500 hover:bg-red-600 focus:ring-red-500"
                       >
                          Delete Permamently
@@ -143,6 +162,20 @@ export function NotificationHistoryList({ notifications }: NotificationHistoryPr
           ))}
         </TableBody>
       </Table>
+
+      {nextCursor && (
+        <div className="p-4 border-t bg-muted/20">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={loadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Loading..." : "Load More"}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

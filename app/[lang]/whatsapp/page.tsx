@@ -7,7 +7,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { getTeachers } from "@/actions/teacher"
-import { getNotificationHistory } from "@/actions/notification"
+import { getNotificationHistoryPage } from "@/actions/notification"
 import { NotificationComposer } from "@/components/notifications/notification-composer"
 import { NotificationHistoryList } from "@/components/notifications/notification-history-list"
 import { MessageSquare, Bell } from "lucide-react"
@@ -30,7 +30,7 @@ export default async function WhatsAppPage({
     getTeachers(),
     getWhatsAppHistory(1, 20),
     getWhatsAppSummary(),
-    getNotificationHistory(),
+    getNotificationHistoryPage(undefined, 20),
   ]);
 
   const { history, totalPages, currentPage } = historyData;
@@ -66,7 +66,7 @@ export default async function WhatsAppPage({
                 />
              </TabsContent>
              <TabsContent value="history">
-                <NotificationHistoryList notifications={appNotifications} />
+                <NotificationHistoryList initialNotifications={appNotifications.items} initialNextCursor={appNotifications.nextCursor} />
              </TabsContent>
            </Tabs>
         </TabsContent>

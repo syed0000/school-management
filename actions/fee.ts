@@ -79,7 +79,7 @@ export async function verifyFee(transactionId: string, action: 'approve' | 'reje
       status,
       verifiedAt: new Date(),
       verifiedBy: session.user.id
-    }, { new: true }).populate({
+    }, { returnDocument: "after" }).populate({
       path: 'studentId',
       populate: { path: 'classId' }
     }).lean();

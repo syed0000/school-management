@@ -17,7 +17,7 @@ export default async function TeacherProfilePage({
   const session = await getServerSession(authOptions);
 
   if (!session) {
-    redirect(withLocale(lang, "/login/otp"));
+    redirect(withLocale(lang, "/teachers/login"));
   }
 
   // Ensure only 'teacher' users can view this (admins can view their own but they use the admin dashboard)

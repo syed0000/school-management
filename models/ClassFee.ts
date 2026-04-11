@@ -12,4 +12,6 @@ const ClassFeeSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+ClassFeeSchema.index({ classId: 1, isActive: 1, type: 1, effectiveFrom: -1 })
+
 export default mongoose.models.ClassFee || mongoose.model('ClassFee', ClassFeeSchema);

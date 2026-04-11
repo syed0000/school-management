@@ -106,7 +106,7 @@ export async function saveSignature(formData: FormData, config: { x: number, y: 
         ...config
       } 
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 
   return { success: true, url: signatureUrl };

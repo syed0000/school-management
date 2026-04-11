@@ -80,6 +80,9 @@ const StudentSchema = new mongoose.Schema({
 StudentSchema.index({ classId: 1, section: 1, rollNumber: 1 }, { unique: true, partialFilterExpression: { rollNumber: { $exists: true } } });
 
 StudentSchema.index({ classId: 1, isActive: 1 });
+StudentSchema.index({ isActive: 1, createdAt: -1 });
+StudentSchema.index({ dateOfAdmission: 1 });
+StudentSchema.index({ "contacts.mobile": 1, isActive: 1 });
 StudentSchema.index({ name: 'text', 'parents.father.name': 'text', 'parents.mother.name': 'text' });
 
 export default mongoose.models.Student || mongoose.model('Student', StudentSchema);

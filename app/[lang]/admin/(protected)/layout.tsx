@@ -4,9 +4,10 @@ import { redirect } from "next/navigation";
 import { UserNav } from "@/components/dashboard/user-nav";
 import { MainNav } from "@/components/dashboard/main-nav";
 import { AppLogo } from "@/components/ui/app-logo";
+import { FeeEaseWordmark } from "@/components/ui/fee-ease-wordmark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { getDictionary } from "@/lib/dictionaries";
+import { dictString, getDictionary } from "@/lib/dictionaries";
 import type { Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/locale-path";
 
@@ -36,22 +37,23 @@ export default async function AdminLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-        <div className="flex h-16 items-center px-4 justify-between">
+        <div className="grid h-16 grid-cols-3 items-center px-4">
           <div className="flex items-center gap-3">
-             {/* Mobile Menu Trigger inside Header */}
-             <div className="lg:hidden">
-               <MainNav role={session.user.role as "admin" | "staff"} mobileOnly />
-             </div>
-
-             <AppLogo href={withLocale(lang, "/admin/dashboard")} />
+            <div className="lg:hidden">
+              <MainNav role={session.user.role as "admin" | "staff"} mobileOnly />
+            </div>
+            <FeeEaseWordmark href={withLocale(lang, "/admin/dashboard")} />
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="justify-self-center">
+            <AppLogo href={withLocale(lang, "/admin/dashboard")} />
+          </div>
+          <div className="flex items-center space-x-4 justify-self-end">
             <LanguageSwitcher
               currentLocale={lang}
               languageNames={{
-                en: dict?.language?.en ?? "English",
-                hi: dict?.language?.hi ?? "Hindi",
-                ur: dict?.language?.ur ?? "Urdu",
+                en: dictString(dict, "language.en", "English"),
+                hi: dictString(dict, "language.hi", "Hindi"),
+                ur: dictString(dict, "language.ur", "Urdu"),
               }}
             />
             <ThemeToggle />

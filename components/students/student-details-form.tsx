@@ -19,8 +19,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, Plus, Trash, Save, Printer } from "lucide-react"
 import { updateStudent } from "@/actions/student"
+import { updateStudentPhoto } from "@/actions/student"
 import { useParams, useRouter } from "next/navigation"
 import { FileUploader } from "@/components/ui/file-uploader"
+import { FileUploader as FileUploaderNew } from "@/components/ui/file-uploader-new"
 import { AdmissionPrintDocument, type AdmissionPrintDocumentData } from "@/components/students/admission-print-document"
 import { defaultLocale, hasLocale } from "@/lib/i18n"
 
@@ -401,7 +403,8 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
   const schema = useMemo(() => createSchema(c), [c])
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
-  const [photo, setPhoto] = useState<string | null>(student.photo || null)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(student.photo || null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [printData, setPrintData] = useState<AdmissionPrintDocumentData | null>(null)
 
   const form = useForm<FormValues>({
@@ -465,13 +468,24 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
         ...values,
         mobile: values.mobile.map(m => m.value),
         email: values.email?.map(e => e.value),
-        photo: photo || undefined,
+        photo: photoUrl || undefined,
         // Documents are in values.documents
       }
       
       const result = await updateStudent(student._id || student.id, payload)
       
       if (result.success) {
+        if (photoFile) {
+          const fd = new FormData()
+          fd.append("photo", photoFile)
+          const uploaded = await updateStudentPhoto(student._id || student.id, fd)
+          if (uploaded.success && uploaded.photoUrl) {
+            setPhotoUrl(uploaded.photoUrl)
+            setPhotoFile(null)
+          } else {
+            toast.error(uploaded.error || c.toast.updateFailedPrefix)
+          }
+        }
         toast.success(c.toast.updated)
         router.refresh()
       } else {
@@ -509,7 +523,7 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
         fatherAadhaar: values.parents.father.aadhaarNumber,
         motherName: values.parents.mother.name,
         motherAadhaar: values.parents.mother.aadhaarNumber,
-        photoSrc: photo || undefined,
+        photoSrc: photoUrl || undefined,
         documents: (values.documents || []).map((d) => ({
           type: d.type,
           documentNumber: d.documentNumber,
@@ -895,10 +909,11 @@ export function StudentDetailsForm({ student, classes }: StudentDetailsFormProps
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-2">
                         <FormLabel>{c.fields.studentPhoto}</FormLabel>
-                        <FileUploader 
-                            value={photo} 
-                            onChange={setPhoto} 
-                            label={c.fields.uploadPhoto} 
+                        <FileUploaderNew
+                          previewUrl={photoUrl}
+                          onFileSelect={setPhotoFile}
+                          label={c.fields.uploadPhoto}
+                          accept="image/*"
                         />
                     </div>
 

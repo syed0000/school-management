@@ -4,12 +4,13 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { UserNav } from "@/components/dashboard/user-nav";
 import { AppLogo } from "@/components/ui/app-logo";
+import { FeeEaseWordmark } from "@/components/ui/fee-ease-wordmark";
 import { getCurrentParentStudents } from "@/actions/parent";
 import { StudentSwitcher } from "@/components/parent/student-switcher";
 import { BottomNav } from "@/components/parent/bottom-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { getDictionary } from "@/lib/dictionaries";
+import { dictString, getDictionary } from "@/lib/dictionaries";
 import type { Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/locale-path";
 
@@ -28,7 +29,7 @@ export default async function ParentLayout({
   const session = await getServerSession(authOptions);
 
   if (!session) {
-    redirect(withLocale(lang, "/login/otp"));
+    redirect(withLocale(lang, "/parents/login"));
   }
 
   if (session.user.role !== 'parent' && session.user.role !== 'admin') {
@@ -49,19 +50,23 @@ export default async function ParentLayout({
   return (
     <div className="flex min-h-screen flex-col bg-muted/40">
       <header className="sticky top-0 z-20 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-        <div className="flex h-16 items-center px-4 justify-between max-w-7xl mx-auto w-full gap-4">
-          <AppLogo href={withLocale(lang, "/parent/dashboard")} />
-
-          <div className="flex items-center gap-3">
+        <div className="grid h-16 grid-cols-3 items-center px-4 max-w-7xl mx-auto w-full gap-4">
+          <div className="justify-self-start">
+            <FeeEaseWordmark href={withLocale(lang, "/parent/dashboard")} />
+          </div>
+          <div className="justify-self-center">
+            <AppLogo href={withLocale(lang, "/parent/dashboard")} />
+          </div>
+          <div className="flex items-center gap-3 justify-self-end">
             {students.length > 0 && (
               <StudentSwitcher students={students} activeStudentId={activeStudentId} />
             )}
             <LanguageSwitcher
               currentLocale={lang}
               languageNames={{
-                en: dict?.language?.en ?? "English",
-                hi: dict?.language?.hi ?? "Hindi",
-                ur: dict?.language?.ur ?? "Urdu",
+                en: dictString(dict, "language.en", "English"),
+                hi: dictString(dict, "language.hi", "Hindi"),
+                ur: dictString(dict, "language.ur", "Urdu"),
               }}
             />
             <ThemeToggle />

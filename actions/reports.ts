@@ -14,6 +14,9 @@ import logger from "@/lib/logger";
 import { Types } from "mongoose";
 import { normalizeFeeType } from '@/lib/fee-type';
 import { coerceBoolean } from '@/lib/setting-coerce';
+import { unstable_cache } from "next/cache";
+import { withConcurrencyLimit } from "@/lib/backpressure";
+import { getEnvInt } from "@/lib/env";
 
 // --- Interfaces ---
 
@@ -62,6 +65,9 @@ interface FeeReportParams {
   studentId?: string;
 }
 
+const REPORT_CACHE_SECONDS = getEnvInt("REPORT_CACHE_SECONDS", 60)
+const REPORT_CONCURRENCY = getEnvInt("REPORT_CONCURRENCY", 2)
+
 interface StudentReportDoc {
   _id: Types.ObjectId;
   name: string;
@@ -91,7 +97,7 @@ interface ClassFeeDoc {
 
 // --- Attendance Reporting ---
 
-export async function getAttendanceReport({
+async function getAttendanceReportImpl({
   startDate,
   endDate,
   classId,
@@ -119,8 +125,8 @@ export async function getAttendanceReport({
     if (section && section !== 'all') query.section = section;
 
     const attendanceRecords = await Attendance.find(query)
-      .populate('classId', 'name')
-      .populate('records.studentId', 'name rollNumber')
+      .populate({ path: 'classId', select: 'name', options: { lean: true } })
+      .populate({ path: 'records.studentId', select: 'name rollNumber', options: { lean: true } })
       .lean() as unknown as AttendanceRecordDoc[];
 
     let totalPresent = 0;
@@ -133,7 +139,7 @@ export async function getAttendanceReport({
     if (studentId) studentQuery._id = studentId;
 
     const students = await Student.find(studentQuery)
-      .populate('classId', 'name')
+      .populate({ path: 'classId', select: 'name', options: { lean: true } })
       .select('name rollNumber classId section')
       .lean();
 
@@ -243,15 +249,24 @@ export async function getAttendanceReport({
     
     const dailyStats: DailyStat[] = [];
     const attendanceByDate: Record<string, AttendanceRecordDoc[]> = {};
+    const presentByDate: Record<string, Set<string>> = {};
     attendanceRecords.forEach((record) => {
       const d = formatInTimeZone(new Date(record.date), tz, 'yyyy-MM-dd');
       if (!attendanceByDate[d]) attendanceByDate[d] = [];
       attendanceByDate[d].push(record);
+
+      if (!presentByDate[d]) presentByDate[d] = new Set<string>();
+      const set = presentByDate[d];
+      record.records.forEach((r) => {
+        const sid = r.studentId?._id?.toString();
+        if (!sid) return;
+        if (r.status === 'Present') set.add(sid);
+      });
     });
 
     daysInterval.forEach((day) => {
       const dateStr = formatInTimeZone(day, tz, 'yyyy-MM-dd');
-      const recordsForDay = attendanceByDate[dateStr];
+      const presentSet = presentByDate[dateStr];
       
       let dayPresent = 0;
       let dayTotal = 0;
@@ -260,8 +275,8 @@ export async function getAttendanceReport({
          const stats = getStatsForClass(s.classId?._id?.toString() || 'unknown');
          if (stats.isWorkingDate(day)) {
             dayTotal++;
-            const studentAttendance = recordsForDay?.flatMap(r => r.records).find(rec => rec.studentId?._id.toString() === s._id?.toString());
-            if (studentAttendance?.status === 'Present') dayPresent++;
+            const sid = s._id?.toString();
+            if (sid && presentSet?.has(sid)) dayPresent++;
          }
       });
 
@@ -298,9 +313,20 @@ export async function getAttendanceReport({
   }
 }
 
+export const getAttendanceReport =
+  REPORT_CACHE_SECONDS > 0
+    ? unstable_cache(
+        async (params: AttendanceReportParams) =>
+          withConcurrencyLimit("report:attendance", REPORT_CONCURRENCY, () => getAttendanceReportImpl(params)),
+        ["report-attendance"],
+        { revalidate: REPORT_CACHE_SECONDS, tags: ["reports", "attendance-report"] },
+      )
+    : async (params: AttendanceReportParams) =>
+        withConcurrencyLimit("report:attendance", REPORT_CONCURRENCY, () => getAttendanceReportImpl(params))
+
 // --- Fee Reporting ---
 
-export async function getFeeReport({
+async function getFeeReportImpl({
   startDate,
   endDate,
   classId,
@@ -324,7 +350,7 @@ export async function getFeeReport({
     if (studentId) studentQuery._id = studentId;
 
     const students = await Student.find(studentQuery)
-      .populate('classId', 'name')
+      .populate({ path: 'classId', select: 'name', options: { lean: true } })
       .select('name rollNumber classId section dateOfAdmission')
       .lean();
 
@@ -389,6 +415,28 @@ export async function getFeeReport({
         feeType: normalizeFeeType(t.feeType),
       })) as unknown as FeeTransactionDoc[];
 
+      const monthlyTxnByKey = new Map<string, FeeTransactionDoc>();
+      const admTxnByYear = new Map<number, FeeTransactionDoc>();
+      const regTxnByYear = new Map<number, FeeTransactionDoc>();
+      const examTxnByYear = new Map<number, FeeTransactionDoc>();
+      for (const t of normalizedStudentTxns) {
+        if (t.feeType === 'monthly') {
+          if (typeof t.year !== "number") continue;
+          if (typeof t.month !== "number") continue;
+          const key = `${t.year}:${t.month}`;
+          if (!monthlyTxnByKey.has(key)) monthlyTxnByKey.set(key, t);
+        } else if (t.feeType === 'admissionFees') {
+          if (typeof t.year !== "number") continue;
+          if (!admTxnByYear.has(t.year)) admTxnByYear.set(t.year, t);
+        } else if (t.feeType === 'registrationFees') {
+          if (typeof t.year !== "number") continue;
+          if (!regTxnByYear.has(t.year)) regTxnByYear.set(t.year, t);
+        } else if (t.feeType === 'examination') {
+          if (typeof t.year !== "number") continue;
+          if (!examTxnByYear.has(t.year)) examTxnByYear.set(t.year, t);
+        }
+      }
+
       let expectedAmount = 0;
       let paidAmount = 0;
       const monthlyFee = getFeeForClass(cId, 'monthly');
@@ -412,12 +460,12 @@ export async function getFeeReport({
         const m = tempIterDate.getMonth() + 1; // 1-12
         const monthHeader = tempIterDate.toLocaleString('default', { month: 'short' }) + " " + y;
 
-        const paidTxn = normalizedStudentTxns.find(t => t.feeType === 'monthly' && t.month === m && t.year === y);
+        const paidTxn = monthlyTxnByKey.get(`${y}:${m}`);
         
         const isAprilIncluded = (() => {
           if (m === 4) {
-            const admTxn = normalizedStudentTxns.find(t => t.feeType === 'admissionFees' && t.year === y);
-            const regTxn = normalizedStudentTxns.find(t => t.feeType === 'registrationFees' && t.year === y);
+            const admTxn = admTxnByYear.get(y);
+            const regTxn = regTxnByYear.get(y);
             if ((admIncludesApril && admTxn) || (regIncludesApril && regTxn)) {
               return admTxn || regTxn;
             }
@@ -501,11 +549,7 @@ export async function getFeeReport({
               const headerName = exam.title || "Exam";
               expectedAmount += exam.amount;
 
-              const paidExamTxn = normalizedStudentTxns.find(t =>
-                t.feeType === 'examination' &&
-                t.year === y &&
-                (t.examType === exam.title || t.feeType === 'examination') // Fallback check
-              );
+              const paidExamTxn = examTxnByYear.get(y);
 
               if (paidExamTxn) {
                 paidAmount += paidExamTxn.amount;
@@ -593,3 +637,14 @@ export async function getFeeReport({
     throw new Error('Failed to fetch fee report');
   }
 }
+
+export const getFeeReport =
+  REPORT_CACHE_SECONDS > 0
+    ? unstable_cache(
+        async (params: FeeReportParams) =>
+          withConcurrencyLimit("report:fees", REPORT_CONCURRENCY, () => getFeeReportImpl(params)),
+        ["report-fees"],
+        { revalidate: REPORT_CACHE_SECONDS, tags: ["reports", "fee-report"] },
+      )
+    : async (params: FeeReportParams) =>
+        withConcurrencyLimit("report:fees", REPORT_CONCURRENCY, () => getFeeReportImpl(params))

@@ -4,7 +4,7 @@ import { createContext, useContext } from "react"
 
 import type { Locale } from "@/lib/i18n"
 
-type Dict = Record<string, any>
+type Dict = Record<string, unknown>
 
 type I18nContextValue = {
   locale: Locale
@@ -37,9 +37,14 @@ export function useI18n() {
 
   const t = (key: string, fallback?: string) => {
     const parts = key.split(".")
-    let cur: any = ctx.dict
+    let cur: unknown = ctx.dict
     for (const p of parts) {
-      cur = cur?.[p]
+      if (cur && typeof cur === "object") {
+        cur = (cur as Record<string, unknown>)[p]
+      } else {
+        cur = undefined
+        break
+      }
     }
     if (typeof cur === "string") return cur
     return fallback ?? key
@@ -47,4 +52,3 @@ export function useI18n() {
 
   return { ...ctx, t }
 }
-

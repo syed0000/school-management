@@ -37,13 +37,14 @@ function formatCountdown(seconds: number) {
   return `${s}s`
 }
 
-export function OtpLoginForm() {
+ export function OtpLoginForm(props: { forcedRole?: "teacher" | "parent" } = {}) {
   const { t } = useI18n()
   const params = useParams<{ lang?: string }>()
   const lang = hasLocale(params.lang ?? "") ? (params.lang as string) : defaultLocale
   const { enableParentLogin, enableTeacherLogin } = whatsappConfig
+  const forcedRole = props.forcedRole
 
-  const defaultRole = enableParentLogin ? "parent" : "teacher"
+  const defaultRole = forcedRole || (enableParentLogin ? "parent" : "teacher")
 
   const [step, setStep] = useState<"phone" | "otp">("phone")
   const [loading, setLoading] = useState(false)
@@ -55,6 +56,12 @@ export function OtpLoginForm() {
     searchParams.get("callbackUrl") ||
     (defaultRole === "teacher" ? "/teacher/dashboard" : "/parent/dashboard")
   const callbackUrl = callbackUrlRaw.startsWith("/") ? withLocale(lang, callbackUrlRaw) : callbackUrlRaw
+
+  useEffect(() => {
+    if (forcedRole) {
+      setRole(forcedRole)
+    }
+  }, [forcedRole])
 
   // Resend cooldown state
   // countdown = seconds remaining before resend is allowed
@@ -195,7 +202,7 @@ export function OtpLoginForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {enableParentLogin && enableTeacherLogin && (
+        {!forcedRole && enableParentLogin && enableTeacherLogin && (
           <Tabs value={role} onValueChange={(v) => setRole(v as "parent" | "teacher")} className="mb-6">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="parent">{t("authOtp.parentTab", "Parent")}</TabsTrigger>
@@ -210,7 +217,7 @@ export function OtpLoginForm() {
           </div>
         )}
 
-        {(enableParentLogin || enableTeacherLogin) && (
+        {(enableParentLogin || enableTeacherLogin) && (!forcedRole || (forcedRole === "parent" ? enableParentLogin : enableTeacherLogin)) && (
           <>
             {step === "phone" ? (
               <Form {...phoneForm}>

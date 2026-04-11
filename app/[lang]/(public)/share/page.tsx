@@ -11,6 +11,7 @@ import { useParams } from "next/navigation"
 import { defaultLocale, hasLocale } from "@/lib/i18n"
 import { withLocale } from "@/lib/locale-path"
 import { useI18n } from "@/components/i18n-provider"
+import { whatsappConfig } from "@/lib/whatsapp-config"
 
 export default function SharePage() {
   const { Canvas } = useQRCode()
@@ -19,8 +20,12 @@ export default function SharePage() {
   const { t } = useI18n()
   const params = useParams<{ lang?: string }>()
   const lang = hasLocale(params.lang ?? "") ? (params.lang as string) : defaultLocale
-  const otpPath = withLocale(lang, "/login/otp")
-  const otpUrl = `${origin}${otpPath}`
+  const loginPath = whatsappConfig.enableParentLogin
+    ? withLocale(lang, "/parents/login")
+    : whatsappConfig.enableTeacherLogin
+      ? withLocale(lang, "/teachers/login")
+      : withLocale(lang, "/login")
+  const otpUrl = `${origin}${loginPath}`
 
   useEffect(() => {
     let mounted = true

@@ -11,6 +11,9 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import logger from "@/lib/logger"
 import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard"
+import { unstable_cache } from "next/cache"
+import { withConcurrencyLimit } from "@/lib/backpressure"
+import { getEnvInt } from "@/lib/env"
 
 interface TransactionFilter {
   startDate?: Date | string
@@ -24,8 +27,12 @@ interface TransactionFilter {
   year?: number
 }
 
+const TXN_LIST_CONCURRENCY = getEnvInt("TXN_LIST_CONCURRENCY", 10)
+const TXN_STATS_CACHE_SECONDS = getEnvInt("TXN_STATS_CACHE_SECONDS", 60)
+
 export async function getFeeTransactions(filter: TransactionFilter, page: number = 1, limit: number = 20) {
-  await dbConnect()
+  return withConcurrencyLimit("list:fee-transactions", TXN_LIST_CONCURRENCY, async () => {
+    await dbConnect()
 
   const query: Record<string, unknown> = {}
 
@@ -115,12 +122,14 @@ export async function getFeeTransactions(filter: TransactionFilter, page: number
       .populate({
         path: 'studentId',
         select: 'name registrationNumber photo classId section',
+        options: { lean: true },
         populate: {
           path: 'classId',
-          select: 'name'
+          select: 'name',
+          options: { lean: true },
         }
       })
-      .populate('collectedBy', 'name')
+      .populate({ path: 'collectedBy', select: 'name', options: { lean: true } })
       .sort({ transactionDate: -1 })
       //.skip(skip) // Skip/Limit on raw documents won't work well with grouping if we want to page by receipts.
       // But if we return all transactions and group on client, we fetch too much.
@@ -173,9 +182,10 @@ export async function getFeeTransactions(filter: TransactionFilter, page: number
       hasPrev: page > 1
     }
   }
+  })
 }
 
-export async function getTransactionStats(filter: TransactionFilter) {
+async function getTransactionStatsImpl(filter: TransactionFilter) {
   await dbConnect()
 
   const query: Record<string, unknown> = {}
@@ -219,6 +229,15 @@ export async function getTransactionStats(filter: TransactionFilter) {
     }
   }
 }
+
+export const getTransactionStats =
+  TXN_STATS_CACHE_SECONDS > 0
+    ? unstable_cache(
+        async (filter: TransactionFilter) => getTransactionStatsImpl(filter),
+        ["fee-transaction-stats"],
+        { revalidate: TXN_STATS_CACHE_SECONDS, tags: ["reports", "fee-transaction-stats"] },
+      )
+    : async (filter: TransactionFilter) => getTransactionStatsImpl(filter)
 
 export async function deleteFeeTransaction(transactionId: string) {
   try {

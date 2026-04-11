@@ -289,7 +289,7 @@ export async function updateTeacher(id: string, formData: FormData) {
       updateData.assignedClasses = JSON.parse(assignedClassesStr) as { classId: string; section: string; attendanceAccess: boolean }[];
     }
 
-    const teacher = await Teacher.findByIdAndUpdate(id, updateData, { new: true })
+    const teacher = await Teacher.findByIdAndUpdate(id, updateData, { returnDocument: "after" })
     
     if (!teacher) {
       return { success: false, error: "Teacher not found" }

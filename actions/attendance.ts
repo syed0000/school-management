@@ -179,7 +179,7 @@ export async function saveAttendance({
         date: { $gte: start, $lte: end }
       },
       updateData,
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     )
 
     revalidatePath("/attendance/dashboard")

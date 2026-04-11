@@ -1,6 +1,6 @@
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LanguageSwitcher } from "@/components/language-switcher"
-import { getDictionary } from "@/lib/dictionaries"
+import { dictString, getDictionary } from "@/lib/dictionaries"
 import { hasLocale, type Locale } from "@/lib/i18n"
 import { notFound } from "next/navigation"
 
@@ -19,14 +19,14 @@ export default async function PublicLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+      <div className="w-full border-b bg-background/80 backdrop-blur-md supports-backdrop-filter:bg-background/60">
         <div className="container mx-auto px-4 h-14 flex items-center justify-end gap-2">
           <LanguageSwitcher
             currentLocale={locale}
             languageNames={{
-              en: dict?.language?.en ?? "English",
-              hi: dict?.language?.hi ?? "Hindi",
-              ur: dict?.language?.ur ?? "Urdu",
+              en: dictString(dict, "language.en", "English"),
+              hi: dictString(dict, "language.hi", "Hindi"),
+              ur: dictString(dict, "language.ur", "Urdu"),
             }}
           />
           <ThemeToggle />

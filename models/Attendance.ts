@@ -20,5 +20,8 @@ const AttendanceSchema = new mongoose.Schema({
 
 // Compound unique index to prevent duplicate entries for same class/section/date
 AttendanceSchema.index({ date: 1, classId: 1, section: 1 }, { unique: true });
+AttendanceSchema.index({ date: 1 });
+AttendanceSchema.index({ classId: 1, section: 1, date: 1 });
+AttendanceSchema.index({ "records.studentId": 1, date: 1 });
 
 export default mongoose.models.Attendance || mongoose.model('Attendance', AttendanceSchema);

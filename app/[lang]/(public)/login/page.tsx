@@ -7,7 +7,7 @@ import { redirect } from "next/navigation"
 import { demoConfig } from "@/lib/demo-config"
 import type { Locale } from "@/lib/i18n"
 import { withLocale } from "@/lib/locale-path"
-import { getDictionary } from "@/lib/dictionaries"
+import { dictString, getDictionary } from "@/lib/dictionaries"
 
 export const dynamic = 'force-dynamic'
 
@@ -34,8 +34,8 @@ export default async function StaffLoginPage({
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/50 p-4">
       <div className="w-full max-w-md space-y-6">
-        <AuthBranding subtitle={dict?.auth?.staffPortal ?? "Staff Portal"} />
-        <Suspense fallback={<div>{dict?.common?.loading ?? "Loading..."}</div>}>
+        <AuthBranding subtitle={dictString(dict, "auth.staffPortal", "Staff Portal")} />
+        <Suspense fallback={<div>{dictString(dict, "common.loading", "Loading...")}</div>}>
           <LoginForm type="staff" allowDemo={demoConfig.adminInstitute} />
         </Suspense>
       </div>

@@ -1,6 +1,10 @@
 import { v2 as cloudinary } from 'cloudinary';
 import logger from "@/lib/logger";
 import sharp from 'sharp';
+import { contaboKeyFromPublicUrl, deleteFromContabo, getContaboStorageConfig, putToContabo } from "@/lib/contabo-storage";
+import { getStorageRootFolder } from "@/lib/storage-root";
+
+const LEGACY_STORAGE_ROOT = "modern-nursery"
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -55,12 +59,30 @@ export async function saveFile(file: File, folder: string): Promise<string> {
     }
   }
 
-  // If Cloudinary env vars are present, upload to Cloudinary
+  const normalizedFolder = folder.replace(/^\/+|\/+$/g, "")
+  let safeName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+  
+  // If we converted to webp, ensure extension matches
+  if (file.type.startsWith('image/')) {
+    safeName = safeName.replace(/\.[^/.]+$/, "") + ".webp";
+  }
+  
+  const filename = `${Date.now()}-${safeName}`;
+  const rootFolder = getStorageRootFolder()
+
+  const contaboCfg = getContaboStorageConfig()
+  if (contaboCfg) {
+    const key = `${rootFolder}/${normalizedFolder}/${filename}`
+    const contentType = file.type.startsWith("image/") ? "image/webp" : (file.type || "application/octet-stream")
+    return await putToContabo({ cfg: contaboCfg, key, body: buffer, contentType })
+  }
+
+  // If Cloudinary env vars are present, upload to Cloudinary (legacy)
   if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: `modern-nursery/${folder}`,
+          folder: `${rootFolder}/${normalizedFolder}`,
           resource_type: 'auto',
         },
         (error, result) => {
@@ -81,27 +103,18 @@ export async function saveFile(file: File, folder: string): Promise<string> {
 
   // Fallback to local filesystem (only for dev)
   if (process.env.NODE_ENV === 'production') {
-    logger.error("Local file upload attempted in production. This will fail on serverless platforms like Vercel. Please configure Cloudinary.");
-    throw new Error("File upload failed: Cloudinary not configured in production.");
+    logger.error("Local file upload attempted in production. Configure Contabo Object Storage (recommended) or Cloudinary.");
+    throw new Error("File upload failed: no remote storage configured in production.");
   }
 
   const fs = await import('node:fs/promises');
   const path = await import('node:path');
 
-  let safeName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-  
-  // If we converted to webp, ensure extension matches
-  if (file.type.startsWith('image/')) {
-    safeName = safeName.replace(/\.[^/.]+$/, "") + ".webp";
-  }
-  
-  const filename = `${Date.now()}-${safeName}`;
-
   // Use /tmp for ephemeral storage in serverless if needed, or public/uploads for local dev
   const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
   const baseDir = isServerless ? '/tmp' : path.join(process.cwd(), 'public');
 
-  const uploadDir = path.join(baseDir, 'uploads', folder);
+  const uploadDir = path.join(baseDir, 'uploads', normalizedFolder);
 
   try {
     await fs.access(uploadDir);
@@ -114,7 +127,7 @@ export async function saveFile(file: File, folder: string): Promise<string> {
 
   // If serverless, we can't serve from /tmp directly via URL, so this is just a placeholder
   // Realistically, you MUST use Cloudinary or S3 for Vercel
-  return `/uploads/${folder}/${filename}`;
+  return `/uploads/${normalizedFolder}/${filename}`;
 }
 
 /**
@@ -125,14 +138,31 @@ export async function saveFile(file: File, folder: string): Promise<string> {
 export async function deleteFile(fileUrl: string): Promise<void> {
   if (!fileUrl) return;
 
+  const rootFolder = getStorageRootFolder()
+
+  const contaboCfg = getContaboStorageConfig()
+  if (contaboCfg) {
+    const key = contaboKeyFromPublicUrl(contaboCfg, fileUrl)
+    if (key) {
+      try {
+        await deleteFromContabo({ cfg: contaboCfg, key })
+      } catch (error) {
+        logger.error({ err: error }, `Failed to delete file from Contabo Object Storage: ${fileUrl}`)
+      }
+      return
+    }
+  }
+
   // Check if it's a Cloudinary URL
   if (fileUrl.includes('cloudinary.com')) {
     try {
       // Extract public_id from URL
-      // Example: https://res.cloudinary.com/demo/image/upload/v1234567890/modern-nursery/students/my_photo.jpg
+      // Example: https://res.cloudinary.com/<cloud>/image/upload/v123/<root>/students/my_photo.jpg
       const parts = fileUrl.split('/');
       const filenameWithExt = parts[parts.length - 1];
-      const folderPath = parts.slice(parts.indexOf('modern-nursery')).join('/').replace('/' + filenameWithExt, '');
+      const rootIndex = parts.findIndex((p) => p === rootFolder || p === LEGACY_STORAGE_ROOT)
+      if (rootIndex === -1) return
+      const folderPath = parts.slice(rootIndex).join('/').replace('/' + filenameWithExt, '');
       const publicId = `${folderPath}/${filenameWithExt.split('.')[0]}`; // Remove extension
 
       await cloudinary.uploader.destroy(publicId);

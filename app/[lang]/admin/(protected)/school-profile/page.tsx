@@ -8,6 +8,8 @@ import { TimezoneEditor } from "@/components/admin/school-profile/timezone-picke
 import { getWhatsAppReceiptSetting, getCounters, getFeePolicySettings, getClassGroups, getTimezoneSetting } from "@/actions/school-settings"
 import { getClasses } from "@/actions/class"
 import { FeePolicyEditor } from "@/components/admin/school-profile/fee-policy-editor"
+import { getStorageMigrationStatus } from "@/actions/storage-migration"
+import { StorageMigration } from "@/components/admin/school-profile/storage-migration"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ExternalLink, Settings, MessageSquare, AlertCircle, Hash, Layers } from "lucide-react"
@@ -28,13 +30,14 @@ export default async function SchoolProfilePage({
     redirect(withLocale(lang, "/admin/dashboard"))
   }
 
-  const [initialWhatsAppSetting, counters, feePolicy, classGroups, allClasses, initialTimezone] = await Promise.all([
+  const [initialWhatsAppSetting, counters, feePolicy, classGroups, allClasses, initialTimezone, storageMigration] = await Promise.all([
     getWhatsAppReceiptSetting(),
     getCounters(),
     getFeePolicySettings(),
     getClassGroups(),
     getClasses(),
     getTimezoneSetting(),
+    getStorageMigrationStatus(),
   ])
 
   const externalSchoolProfileUrl = `${process.env.NEXT_PUBLIC_FEEEASE_URL || 'https://feeease.com'}/school/profile`
@@ -98,6 +101,27 @@ export default async function SchoolProfilePage({
             />
           </CardContent>
         </Card>
+
+        {storageMigration.hasCloudinaryFiles && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-primary" />
+                <CardTitle>Object Storage Migration</CardTitle>
+              </div>
+              <CardDescription>
+                Migrate existing Cloudinary files to Contabo Object Storage. This option is shown only while Cloudinary files exist.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <StorageMigration
+                contaboConfigured={storageMigration.contaboConfigured}
+                hasCloudinaryFiles={storageMigration.hasCloudinaryFiles}
+                status={storageMigration.status}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Current School Profile Link */}
         <Card>

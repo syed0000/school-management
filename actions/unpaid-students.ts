@@ -8,6 +8,10 @@ import Setting from "@/models/Setting"
 import { startOfMonth, endOfMonth, eachMonthOfInterval, format } from "date-fns"
 import { normalizeFeeType } from "@/lib/fee-type"
 import { coerceBoolean } from "@/lib/setting-coerce"
+import { unstable_cache } from "next/cache"
+import { withConcurrencyLimit } from "@/lib/backpressure"
+import { getEnvInt } from "@/lib/env"
+import { escapeRegExp } from "@/lib/regex"
 
 interface UnpaidFilter {
     classId?: string
@@ -27,7 +31,10 @@ export interface UnpaidStudent {
     contactNumber: string;
 }
 
-export async function getUnpaidStudents(filter: UnpaidFilter) {
+const UNPAID_CACHE_SECONDS = getEnvInt("UNPAID_CACHE_SECONDS", 60)
+const UNPAID_CONCURRENCY = getEnvInt("UNPAID_CONCURRENCY", 2)
+
+async function getUnpaidStudentsImpl(filter: UnpaidFilter) {
     await dbConnect()
 
     // Use provided dates or default to current year
@@ -50,6 +57,13 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
     if (filter.classId && filter.classId !== "all") {
         studentQuery.classId = filter.classId
     }
+    if (filter.searchQuery) {
+        const q = filter.searchQuery.trim()
+        if (q) {
+            const rx = new RegExp(escapeRegExp(q), "i")
+            studentQuery.$or = [{ name: rx }, { registrationNumber: rx }]
+        }
+    }
 
     interface StudentDoc {
         _id: { toString: () => string };
@@ -62,16 +76,7 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
         contacts?: { mobile?: string[] };
     }
 
-    let allStudents = await Student.find(studentQuery).populate('classId', 'name').lean()
-
-    if (filter.searchQuery) {
-        const searchLower = filter.searchQuery.toLowerCase()
-        allStudents = allStudents.filter((s: unknown) => {
-            const student = s as StudentDoc;
-            return student.name.toLowerCase().includes(searchLower) ||
-            student.registrationNumber?.toLowerCase().includes(searchLower)
-        })
-    }
+    const allStudents = await Student.find(studentQuery).populate({ path: 'classId', select: 'name', options: { lean: true } }).lean()
 
     const activeStudentIds = allStudents.map((s: unknown) => (s as StudentDoc)._id.toString())
 
@@ -113,32 +118,39 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
 
     const unpaidList: UnpaidStudent[] = []
 
-    const hasPaidFee = (studentId: string, type: string, month: number | undefined, year: number) => {
-        return allTransactions.some((tx: unknown) => {
-            const transaction = tx as TransactionDoc;
-            const txStudentId = transaction.studentId?.toString() || transaction.studentId
-            if (txStudentId !== studentId) return false
-            if (transaction.feeType !== type) return false
-            if (transaction.year !== year) return false
-            if (type === 'monthly') return transaction.month === month
-            return true
-        })
+    const paidKeysByStudent = new Map<string, Set<string>>()
+    const entryTxnByStudent = new Map<string, TransactionDoc>()
+    for (const tx of allTransactions) {
+        const t = tx as unknown as TransactionDoc
+        const sid = t.studentId?.toString() || (t.studentId as string)
+        if (!paidKeysByStudent.has(sid)) paidKeysByStudent.set(sid, new Set())
+        const set = paidKeysByStudent.get(sid)!
+        if (t.feeType === 'monthly') {
+            set.add(`monthly:${t.year}:${t.month ?? ''}`)
+        } else {
+            set.add(`${t.feeType}:${t.year}`)
+        }
+
+        const existingEntry = entryTxnByStudent.get(sid)
+        if (t.feeType === 'registrationFees') {
+            if (!existingEntry || existingEntry.feeType !== 'registrationFees') {
+                entryTxnByStudent.set(sid, t)
+            }
+        } else if (t.feeType === 'admissionFees') {
+            if (!existingEntry) {
+                entryTxnByStudent.set(sid, t)
+            }
+        }
     }
 
-    const getEntryTxn = (studentId: string) => {
-        const reg = allTransactions.find((tx: unknown) => {
-            const t = tx as TransactionDoc;
-            const txStudentId = t.studentId?.toString() || t.studentId
-            return txStudentId === studentId && t.feeType === 'registrationFees'
-        }) as unknown as TransactionDoc | undefined
-        if (reg) return reg
-        const adm = allTransactions.find((tx: unknown) => {
-            const t = tx as TransactionDoc;
-            const txStudentId = t.studentId?.toString() || t.studentId
-            return txStudentId === studentId && t.feeType === 'admissionFees'
-        }) as unknown as TransactionDoc | undefined
-        return adm
+    const hasPaidFee = (studentId: string, type: string, month: number | undefined, year: number) => {
+        const set = paidKeysByStudent.get(studentId)
+        if (!set) return false
+        if (type === 'monthly') return set.has(`monthly:${year}:${month ?? ''}`)
+        return set.has(`${type}:${year}`)
     }
+
+    const getEntryTxn = (studentId: string) => entryTxnByStudent.get(studentId)
 
     for (const s of allStudents) {
         const student = s as StudentDoc;
@@ -161,11 +173,11 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
 
                 if (isAfterAdmission) {
                     let isPaid = hasPaidFee(student._id.toString(), 'monthly', m, y);
-                    
+
                     if (m === 4 && !isPaid) {
                         const paidAdm = hasPaidFee(student._id.toString(), 'admissionFees', undefined, y);
                         const paidReg = hasPaidFee(student._id.toString(), 'registrationFees', undefined, y);
-                        
+
                         if ((admIncludesApril && paidAdm) || (regIncludesApril && paidReg)) {
                             isPaid = true;
                         }
@@ -248,3 +260,14 @@ export async function getUnpaidStudents(filter: UnpaidFilter) {
 
     return unpaidList.sort((a, b) => b.amount - a.amount)
 }
+
+export const getUnpaidStudents =
+    UNPAID_CACHE_SECONDS > 0
+        ? unstable_cache(
+              async (filter: UnpaidFilter) =>
+                  withConcurrencyLimit("report:unpaid", UNPAID_CONCURRENCY, () => getUnpaidStudentsImpl(filter)),
+              ["report-unpaid"],
+              { revalidate: UNPAID_CACHE_SECONDS, tags: ["reports", "unpaid-students"] },
+          )
+        : async (filter: UnpaidFilter) =>
+              withConcurrencyLimit("report:unpaid", UNPAID_CONCURRENCY, () => getUnpaidStudentsImpl(filter))

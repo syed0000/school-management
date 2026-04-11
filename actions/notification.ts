@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { demoWriteSuccess, isDemoSession } from "@/lib/demo-guard";
+import { Types } from "mongoose";
 
 export interface CreateNotificationPayload {
   title: string;
@@ -24,18 +25,7 @@ export async function sendAppNotification(payload: CreateNotificationPayload) {
     if (isDemoSession(session)) return demoWriteSuccess();
     await dbConnect();
 
-    // 1. Save to Persistent DB
-    const newNotification = new Notification({
-      title: payload.title,
-      body: payload.body,
-      type: payload.targetClassIds?.length ? 'class' : (payload.targetStudentIds?.length ? 'individual' : (payload.targetTeacherIds?.length || payload.targetAllTeachers ? 'teacher' : 'broadcast')),
-      targetClasses: payload.targetClassIds,
-      targetTeachers: payload.targetTeacherIds,
-      targetStudents: payload.targetStudentIds,
-    });
-    await newNotification.save();
-
-    // 2. Fetch push tokens
+    // 1. Fetch push tokens
     let tokens: string[] = [];
 
     // Add student/parent tokens based on class
@@ -85,34 +75,48 @@ export async function sendAppNotification(payload: CreateNotificationPayload) {
     const { default: License } = await import("@/models/License");
     const license = await License.findOne().sort({ createdAt: -1 }).lean();
     
-    if (license && license.schoolId && license.key && tokens.length > 0) {
-      const uniqueTokens = [...new Set(tokens)];
-      // Group by single target for efficiency or by individual. Let's just do a broad reach if broad.
-      // But the worker expects objects with studentId or teacherId.
-      const pushTargets = [{ 
-        studentId: "broadcast", 
-        tokens: uniqueTokens 
-      }];
-
-      try {
-        await fetch(`${whatsappConfig.worker.url}/api/v1/app-notification`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-license-key': license.key
-          },
-          body: JSON.stringify({
-            schoolId: license.schoolId,
-            licenseKey: license.key,
-            title: payload.title,
-            body: payload.body,
-            pushTargets
-          }),
-        });
-      } catch (e) {
-        console.error("Worker push error:", e);
-      }
+    if (!license || !license.schoolId || !license.key) {
+      return { success: false, error: "Worker configuration missing (Could not find License in DB)" };
     }
+    if (tokens.length === 0) {
+      return { success: false, error: "No recipients have push notifications enabled." };
+    }
+
+    const uniqueTokens = [...new Set(tokens)];
+    const pushTargets = [{
+      studentId: "broadcast",
+      tokens: uniqueTokens
+    }];
+
+    const workerRes = await fetch(`${whatsappConfig.worker.url}/api/v1/app-notification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-license-key': license.key
+      },
+      body: JSON.stringify({
+        schoolId: license.schoolId,
+        licenseKey: license.key,
+        title: payload.title,
+        body: payload.body,
+        pushTargets
+      }),
+    });
+
+    if (!workerRes.ok) {
+      return { success: false, error: "Failed to dispatch notification." };
+    }
+
+    // 2. Save to Persistent DB only after successful dispatch
+    const newNotification = new Notification({
+      title: payload.title,
+      body: payload.body,
+      type: payload.targetClassIds?.length ? 'class' : (payload.targetStudentIds?.length ? 'individual' : (payload.targetTeacherIds?.length || payload.targetAllTeachers ? 'teacher' : 'broadcast')),
+      targetClasses: payload.targetClassIds,
+      targetTeachers: payload.targetTeacherIds,
+      targetStudents: payload.targetStudentIds,
+    });
+    await newNotification.save();
 
     revalidatePath("/whatsapp");
 
@@ -123,17 +127,38 @@ export async function sendAppNotification(payload: CreateNotificationPayload) {
   }
 }
 
-export async function getNotificationHistory() {
+type NotificationHistoryItem = {
+  _id: { toString: () => string }
+  title: string
+  body: string
+  type: string
+  targetClasses?: Array<{ toString: () => string }>
+  targetTeachers?: Array<{ toString: () => string }>
+  targetStudents?: Array<{ toString: () => string }>
+  sentAt?: Date
+}
+
+export async function getNotificationHistoryPage(cursor?: string, limit = 20) {
   try {
     await dbConnect();
-    return await Notification.find({})
-      .sort({ sentAt: -1 })
-      .populate('targetClasses', 'name')
-      .populate('targetTeachers', 'name')
-      .lean();
+    const q: Record<string, unknown> = {}
+    if (cursor && Types.ObjectId.isValid(cursor)) {
+      q._id = { $lt: new Types.ObjectId(cursor) }
+    }
+
+    const rows = await Notification.find(q)
+      .sort({ _id: -1 })
+      .limit(limit + 1)
+      .lean() as NotificationHistoryItem[]
+
+    const hasMore = rows.length > limit
+    const items = hasMore ? rows.slice(0, limit) : rows
+    const nextCursor = hasMore ? items[items.length - 1]?._id?.toString() : null
+
+    return { items, nextCursor }
   } catch (error) {
     console.error("Error fetching notification history:", error);
-    return [];
+    return { items: [], nextCursor: null }
   }
 }
 
@@ -148,6 +173,90 @@ export async function deleteNotification(id: string) {
   } catch {
     return { success: false, error: "Failed to delete notification" };
   }
+}
+
+type FeedItem = {
+  _id: { toString: () => string }
+  title: string
+  body: string
+  sentAt?: Date
+  type: string
+}
+
+export async function getTeacherNotificationFeed(cursor?: string, limit = 20) {
+  const session = await getServerSession(authOptions)
+  if (!session || (session.user.role !== "teacher" && session.user.role !== "admin")) {
+    return { items: [], nextCursor: null }
+  }
+
+  await dbConnect()
+  const teacherId = session.user.id
+
+  const baseQuery: Record<string, unknown> = {
+    $or: [
+      { type: "broadcast" },
+      { type: "teacher", $or: [{ targetTeachers: teacherId }, { targetTeachers: { $exists: false } }, { targetTeachers: { $size: 0 } }] },
+    ],
+  }
+
+  if (cursor && Types.ObjectId.isValid(cursor)) {
+    baseQuery._id = { $lt: new Types.ObjectId(cursor) }
+  }
+
+  const rows = await Notification.find(baseQuery)
+    .sort({ _id: -1 })
+    .limit(limit + 1)
+    .lean() as FeedItem[]
+
+  const hasMore = rows.length > limit
+  const items = hasMore ? rows.slice(0, limit) : rows
+  const nextCursor = hasMore ? items[items.length - 1]?._id?.toString() : null
+  return { items, nextCursor }
+}
+
+export async function getParentNotificationFeed(studentId: string, cursor?: string, limit = 20) {
+  const session = await getServerSession(authOptions)
+  if (!session || (session.user.role !== "parent" && session.user.role !== "admin")) {
+    return { items: [], nextCursor: null }
+  }
+
+  await dbConnect()
+
+  if (!Types.ObjectId.isValid(studentId)) return { items: [], nextCursor: null }
+
+  if (session.user.role === "parent") {
+    const sessionStudent = await Student.findById(session.user.id).select("contacts.mobile").lean() as { contacts?: { mobile?: string[] } } | null
+    const phone = sessionStudent?.contacts?.mobile?.[0] ?? ""
+    if (!phone) return { items: [], nextCursor: null }
+    const hasAccess = await Student.exists({ _id: studentId, "contacts.mobile": phone, isActive: true })
+    if (!hasAccess) return { items: [], nextCursor: null }
+  }
+
+  const student = await Student.findById(studentId).select("classId").lean() as { classId?: Types.ObjectId } | null
+  const classId = student?.classId?.toString()
+
+  const baseOr: Record<string, unknown>[] = [
+    { type: "broadcast" },
+    { type: "individual", targetStudents: studentId },
+  ]
+  if (classId) {
+    baseOr.push({ type: "class", targetClasses: classId })
+  }
+
+  const q: Record<string, unknown> = { $or: baseOr }
+  if (cursor && Types.ObjectId.isValid(cursor)) {
+    q._id = { $lt: new Types.ObjectId(cursor) }
+  }
+
+  const rows = await Notification.find(q)
+    .sort({ _id: -1 })
+    .limit(limit + 1)
+    .lean() as FeedItem[]
+
+  const hasMore = rows.length > limit
+  const items = hasMore ? rows.slice(0, limit) : rows
+  const nextCursor = hasMore ? items[items.length - 1]?._id?.toString() : null
+  return { items, nextCursor }
 }
 
 export async function updatePushToken(userId: string, role: 'teacher' | 'parent', token: string, enable: boolean) {

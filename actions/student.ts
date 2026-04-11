@@ -110,7 +110,7 @@ export async function getNextRegistrationNumber(classId?: string) {
   let attempts = 0;
   while (attempts < 100 && await Student.exists({ registrationNumber: nextRegNo })) {
       if (!isDemo) {
-        await Counter.findByIdAndUpdate(counterId, { $set: { seq: nextSeq } }, { new: true });
+        await Counter.findByIdAndUpdate(counterId, { $set: { seq: nextSeq } }, { returnDocument: "after" });
       }
       nextSeq++;
       nextRegNo = String(nextSeq).padStart(4, '0');
@@ -145,7 +145,11 @@ async function incrementRegistrationNumber(classId?: string) {
     return String(seq).padStart(4, "0");
   }
 
-  const counter = await Counter.findByIdAndUpdate(counterId, { $inc: { seq: 1 } }, { new: true, upsert: true, setDefaultsOnInsert: true });
+  const counter = await Counter.findByIdAndUpdate(
+    counterId,
+    { $inc: { seq: 1 } },
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true },
+  );
   return String(counter.seq).padStart(4, "0");
 }
 
@@ -246,7 +250,7 @@ export async function registerStudent(formData: FormData) {
                  await Counter.findOneAndUpdate(
                     { _id: 'registrationNumber' },
                     { $set: { seq: regNumInt } },
-                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
                  );
              }
         }
@@ -432,6 +436,42 @@ export async function updateStudent(id: string, data: z.infer<typeof registerStu
       const message = error instanceof Error ? error.message : "An unknown error occurred";
       return { success: false, error: message };
     }
+}
+
+export async function updateStudentPhoto(
+  studentId: string,
+  formData: FormData,
+): Promise<{ success: boolean; error?: string; photoUrl?: string }> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== "admin") {
+      return { success: false, error: "Unauthorized" };
+    }
+    if (isDemoSession(session)) {
+      await dbConnect();
+      const existing = await Student.findById(studentId).select("photo").lean() as { photo?: string } | null;
+      return demoWriteSuccess({ photoUrl: existing?.photo || "" }) as unknown as { success: boolean; error?: string; photoUrl?: string };
+    }
+
+    await dbConnect();
+
+    const photoFile = formData.get("photo") as File;
+    if (!photoFile || photoFile.size === 0) {
+      return { success: false, error: "No photo provided" };
+    }
+
+    const photoUrl = await saveFile(photoFile, "students/photos");
+
+    await Student.findByIdAndUpdate(studentId, { photo: photoUrl, updatedAt: new Date() });
+
+    revalidatePath("/students/list");
+    revalidatePath(`/students/${studentId}`);
+    revalidatePath("/admin/school-profile");
+    return { success: true, photoUrl };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to update photo";
+    return { success: false, error: message };
+  }
 }
 
 export async function deleteStudent(id: string) {

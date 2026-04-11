@@ -1,27 +1,27 @@
 import Image from "next/image";
-import { X } from "lucide-react";
 import { schoolConfig } from "@/lib/config";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 interface AppLogoProps {
   href?: string;
+  className?: string;
 }
 
-export function AppLogo({ href }: AppLogoProps) {
+export function AppLogo({ href, className }: AppLogoProps) {
   const content = (
-    <div className="flex items-center gap-2 sm:gap-3 transition-opacity hover:opacity-90">
-      <div className="relative h-8 w-24 md:h-10 md:w-32 flex items-center justify-center rounded-md overflow-hidden bg-background">
+    <div className={cn("hidden md:flex items-center gap-3 transition-opacity hover:opacity-90", className)}>
+      <div className="relative h-10 w-10 md:h-12 md:w-12 flex items-center justify-center rounded-full overflow-hidden bg-background">
         <Image
-          src="/images/assets/logo-horizontal.png"
-          alt="FeeEase"
-          width={100}
-          height={100}
-          className="object-contain p-1"
+          src="/android-chrome-512x512.png"
+          alt={schoolConfig.name || "Institute"}
+          width={64}
+          height={64}
+          className="object-contain"
           priority
         />
       </div>
-      <X className="h-4 w-4 md:h-5 md:w-5 text-foreground hidden sm:block" strokeWidth={3} />
-      <div className="font-bold text-base md:text-lg tracking-tight hidden sm:block text-foreground truncate max-w-[150px] md:max-w-xs">
+      <div className="font-bold text-base md:text-lg tracking-tight text-foreground truncate max-w-[220px] md:max-w-md">
         {schoolConfig.name || "Institute Name"}
       </div>
     </div>

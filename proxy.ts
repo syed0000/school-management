@@ -145,7 +145,14 @@ export async function proxy(req: NextRequest) {
     }
 
     // Handle root path and login pages redirect
-    if (normalizedPathname === "/" || normalizedPathname === "/login" || normalizedPathname === "/admin/login" || normalizedPathname === "/login/otp") {
+    if (
+      normalizedPathname === "/" ||
+      normalizedPathname === "/login" ||
+      normalizedPathname === "/admin/login" ||
+      normalizedPathname === "/login/otp" ||
+      normalizedPathname === "/parents/login" ||
+      normalizedPathname === "/teachers/login"
+    ) {
       if (!token) {
         if (normalizedPathname === "/") {
           return NextResponse.redirect(new URL(withLocale(locale, "/login"), req.url));
@@ -219,7 +226,7 @@ export async function proxy(req: NextRequest) {
         return NextResponse.next();
       }
       if (!token || (effectiveRole !== "parent" && effectiveRole !== "admin")) {
-        return NextResponse.redirect(new URL(withLocale(locale, "/login/otp"), req.url));
+        return NextResponse.redirect(new URL(withLocale(locale, "/parents/login"), req.url));
       }
     }
 
@@ -231,7 +238,7 @@ export async function proxy(req: NextRequest) {
         return NextResponse.next();
       }
       if (!token || (effectiveRole !== "teacher" && effectiveRole !== "admin")) {
-        return NextResponse.redirect(new URL(withLocale(locale, "/login/otp"), req.url));
+        return NextResponse.redirect(new URL(withLocale(locale, "/teachers/login"), req.url));
       }
     }
 

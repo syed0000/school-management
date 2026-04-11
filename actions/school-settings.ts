@@ -32,7 +32,7 @@ export async function updateWhatsAppReceiptSetting(enabled: boolean) {
     await Setting.findOneAndUpdate(
         { key: "whatsapp_receipt_alert" },
         { value: enabled },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: "after" }
     )
     revalidatePath("/admin/school-profile")
     return { success: true }
@@ -67,7 +67,7 @@ export async function updateTimezoneSetting(timezone: string) {
     await Setting.findOneAndUpdate(
         { key: "school_timezone" },
         { value: timezone },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: "after" }
     )
     revalidatePath("/", "layout")
     return { success: true }
@@ -101,12 +101,12 @@ export async function updateFeePolicySettings(admission: boolean, registration: 
         Setting.findOneAndUpdate(
             { key: "admission_fee_includes_april" },
             { value: admission },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: "after" }
         ),
         Setting.findOneAndUpdate(
             { key: "registration_fee_includes_april" },
             { value: registration },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: "after" }
         )
     ])
 
@@ -170,7 +170,7 @@ export async function updateCounter(id: string, seq: number) {
     }
 
     await dbConnect()
-    await Counter.findByIdAndUpdate(id, { seq }, { upsert: true, new: true })
+    await Counter.findByIdAndUpdate(id, { seq }, { upsert: true, returnDocument: "after" })
 
     revalidatePath("/admin/school-profile")
     return { success: true }
@@ -247,7 +247,7 @@ export async function createClassGroup(name: string, classIds: string[], startFr
     await Counter.findByIdAndUpdate(
         counterId,
         { seq: startFrom - 1 },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: "after" }
     )
 
     revalidatePath("/admin/school-profile")
@@ -288,7 +288,7 @@ export async function updateClassGroup(
         await Counter.findByIdAndUpdate(
             counterId,
             { seq: startFrom - 1 },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: "after" }
         )
     }
 

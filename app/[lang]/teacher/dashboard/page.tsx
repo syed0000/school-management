@@ -17,7 +17,7 @@ export default async function TeacherDashboard({
   const session = await getServerSession(authOptions);
 
   if (!session) {
-    redirect(withLocale(lang, "/login/otp"));
+    redirect(withLocale(lang, "/teachers/login"));
   }
 
   if (session.user.role !== 'teacher' && session.user.role !== 'admin') {

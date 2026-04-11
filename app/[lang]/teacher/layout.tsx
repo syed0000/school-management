@@ -4,10 +4,11 @@ import { redirect } from "next/navigation";
 import { UserNav } from "@/components/dashboard/user-nav";
 import Link from "next/link";
 import { AppLogo } from "@/components/ui/app-logo";
-import { LayoutDashboard, UserCheck, Share2 } from "lucide-react";
+import { FeeEaseWordmark } from "@/components/ui/fee-ease-wordmark";
+import { LayoutDashboard, UserCheck, Share2, Bell } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { getDictionary } from "@/lib/dictionaries";
+import { dictString, getDictionary } from "@/lib/dictionaries";
 import type { Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/locale-path";
 
@@ -27,7 +28,7 @@ export default async function TeacherLayout({
   const session = await getServerSession(authOptions);
 
   if (!session) {
-    redirect(withLocale(lang, "/login/otp"));
+    redirect(withLocale(lang, "/teachers/login"));
   }
 
   if (session.user.role !== 'teacher' && session.user.role !== 'admin') {
@@ -35,23 +36,29 @@ export default async function TeacherLayout({
   }
 
   const navItems = [
-    { name: dict?.common?.dashboard ?? "Dashboard", href: withLocale(lang, "/teacher/dashboard"), icon: LayoutDashboard },
-    { name: dict?.common?.profile ?? "Profile", href: withLocale(lang, "/teacher/profile"), icon: UserCheck },
-    { name: dict?.nav?.shareApp ?? "Share App", href: withLocale(lang, "/share"), icon: Share2 },
+    { name: dictString(dict, "common.dashboard", "Dashboard"), href: withLocale(lang, "/teacher/dashboard"), icon: LayoutDashboard },
+    { name: dictString(dict, "common.profile", "Profile"), href: withLocale(lang, "/teacher/profile"), icon: UserCheck },
+    { name: dictString(dict, "common.notifications", "Notifications"), href: withLocale(lang, "/teacher/notifications"), icon: Bell },
+    { name: dictString(dict, "nav.shareApp", "Share App"), href: withLocale(lang, "/share"), icon: Share2 },
   ];
 
   return (
     <div className="flex min-h-screen flex-col bg-muted/40">
       <header className="sticky top-0 z-20 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-        <div className="flex h-16 items-center px-4 justify-between max-w-7xl mx-auto w-full">
-          <AppLogo href={withLocale(lang, "/teacher/dashboard")} />
-          <div className="flex items-center space-x-4">
+        <div className="grid h-16 grid-cols-3 items-center px-4 max-w-7xl mx-auto w-full">
+          <div className="justify-self-start">
+            <FeeEaseWordmark href={withLocale(lang, "/teacher/dashboard")} />
+          </div>
+          <div className="justify-self-center">
+            <AppLogo href={withLocale(lang, "/teacher/dashboard")} />
+          </div>
+          <div className="flex items-center space-x-4 justify-self-end">
             <LanguageSwitcher
               currentLocale={lang}
               languageNames={{
-                en: dict?.language?.en ?? "English",
-                hi: dict?.language?.hi ?? "Hindi",
-                ur: dict?.language?.ur ?? "Urdu",
+                en: dictString(dict, "language.en", "English"),
+                hi: dictString(dict, "language.hi", "Hindi"),
+                ur: dictString(dict, "language.ur", "Urdu"),
               }}
             />
             <ThemeToggle />

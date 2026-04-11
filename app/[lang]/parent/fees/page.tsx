@@ -15,7 +15,7 @@ export default async function ParentFeesPage({
 }) {
   const { lang } = await params;
   const session = await getServerSession(authOptions);
-  if (!session) redirect(withLocale(lang, "/login/otp"));
+  if (!session) redirect(withLocale(lang, "/parents/login"));
   if (session.user.role !== 'parent' && session.user.role !== 'admin') redirect(withLocale(lang, "/dashboard"));
 
   const cookieStore = await cookies();

@@ -8,4 +8,6 @@ const ClassSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+ClassSchema.index({ isActive: 1, name: 1 });
+
 export default mongoose.models.Class || mongoose.model('Class', ClassSchema);

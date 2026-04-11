@@ -131,7 +131,7 @@ export function AttendanceForm({ initialClasses }: AttendanceFormProps) {
     } finally {
       setLoading(false)
     }
-  }, [selectedClass, selectedSection, selectedDate])
+  }, [selectedClass, selectedSection, selectedDate, t])
 
   // Initial fetch on mount if params are present
   useEffect(() => {

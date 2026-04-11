@@ -7,6 +7,7 @@ import Student from "@/models/Student";
 import Otp from "@/models/Otp";
 import bcrypt from "bcryptjs";
 import { demoConfig } from "@/lib/demo-config";
+import { escapeRegExp } from "@/lib/regex";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET, // Ensure secret is explicitly passed
@@ -31,7 +32,6 @@ export const authOptions: NextAuthOptions = {
             throw new Error("Demo login is not enabled");
           }
 
-          const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
           const email = (credentials.email || "").trim();
           if (!email) {
             throw new Error("Demo email is required");

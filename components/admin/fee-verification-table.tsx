@@ -5,9 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Check, X } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
-import { format, parseISO } from "date-fns"
-import { formatInTimeZone } from "date-fns-tz"
-import { getSchoolTimezone } from "@/lib/tz-utils"
+import { format } from "date-fns"
 
 interface Transaction {
   id: string;
@@ -30,10 +28,11 @@ interface FeeVerificationTableProps {
 
 export function FeeVerificationTable({ initialTransactions }: FeeVerificationTableProps) {
   const [transactions, setTransactions] = useState(initialTransactions)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoading, setIsLoading] = useState(false)
 
   const handleVerify = async (id: string, action: 'approve' | 'reject') => {
+    if (isLoading) return
+    setIsLoading(true)
     try {
         // Optimistic update
         setTransactions(prev => prev.filter(t => t.id !== id));
@@ -54,6 +53,8 @@ export function FeeVerificationTable({ initialTransactions }: FeeVerificationTab
     } catch (error) {
         console.error(error);
         toast.error("An error occurred");
+    } finally {
+        setIsLoading(false)
     }
   }
 
@@ -94,6 +95,7 @@ export function FeeVerificationTable({ initialTransactions }: FeeVerificationTab
                     size="sm" 
                     variant="default"
                     className="bg-green-600 hover:bg-green-700"
+                    disabled={isLoading}
                     onClick={() => handleVerify(tx.id, 'approve')}
                 >
                     <Check className="h-4 w-4" />
@@ -101,6 +103,7 @@ export function FeeVerificationTable({ initialTransactions }: FeeVerificationTab
                 <Button 
                     size="sm" 
                     variant="destructive"
+                    disabled={isLoading}
                     onClick={() => handleVerify(tx.id, 'reject')}
                 >
                     <X className="h-4 w-4" />

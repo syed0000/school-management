@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
           completedAt: new Date(),
         },
       },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!updated) {

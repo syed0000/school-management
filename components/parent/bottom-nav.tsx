@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { Home, UserCircle, CalendarDays, CreditCard, Share2 } from "lucide-react";
+import { Home, UserCircle, CalendarDays, CreditCard, Share2, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { defaultLocale, hasLocale, type Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/locale-path";
@@ -12,6 +12,7 @@ const navItems = [
   { nameKey: "nav.home", fallback: "Home", href: "/parent/dashboard", icon: Home },
   { nameKey: "nav.attendance", fallback: "Attendance", href: "/parent/attendance", icon: CalendarDays },
   { nameKey: "nav.fees", fallback: "Fees", href: "/parent/fees", icon: CreditCard },
+  { nameKey: "nav.notifications", fallback: "Notifications", href: "/parent/notifications", icon: Bell },
   { nameKey: "nav.profile", fallback: "Profile", href: "/parent/profile", icon: UserCircle },
   { nameKey: "nav.share", fallback: "Share", href: "/share", icon: Share2 },
 ];

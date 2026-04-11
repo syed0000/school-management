@@ -1,4 +1,5 @@
 import { schoolConfig } from "@/lib/config"
+import Image from "next/image"
 
 export function AuthBranding({
   subtitle,
@@ -10,9 +11,11 @@ export function AuthBranding({
   return (
     <div className="flex flex-col items-center text-center">
       <div className="relative h-20 w-20">
-        <img
+        <Image
           src="/logo.jpeg"
           alt={name}
+          fill
+          sizes="80px"
           className="object-contain rounded-full"
         />
       </div>
@@ -25,4 +28,3 @@ export function AuthBranding({
     </div>
   )
 }
-

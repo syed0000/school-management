@@ -131,6 +131,13 @@ This system solves these by enforcing a **Maker-Checker** workflow for finances,
    MONGODB_URI=mongodb://localhost:27017/modern-nursery
    NEXTAUTH_SECRET=your-super-secret-key
    NEXTAUTH_URL=http://localhost:3000
+
+   # Contabo Object Storage (S3 compatible)
+   CONTABO_ACCESS_KEY=...
+   CONTABO_SECRET_KEY=...
+   CONTABO_PUBLIC_URL=https://<region>.contabostorage.com/<tenant-or-bucket-segment>
+   # Optional
+   CONTABO_REGION=us-east-1
    ```
 
 4. **Seed Database (Optional)**

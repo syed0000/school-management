@@ -9,7 +9,7 @@ import License from "@/models/License";
 import User from "@/models/User";
 import type { Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/locale-path";
-import { getDictionary } from "@/lib/dictionaries";
+import { dictString, getDictionary } from "@/lib/dictionaries";
 
 export const dynamic = 'force-dynamic';
 
@@ -58,13 +58,13 @@ export default async function Home({
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-24 gap-4">
       <h1 className="text-4xl font-bold tracking-tight">{schoolConfig.name}</h1>
-      <p className="text-muted-foreground">{dict?.landing?.managementSystem ?? "Management System"}</p>
+      <p className="text-muted-foreground">{dictString(dict, "landing.managementSystem", "Management System")}</p>
       <div className="flex gap-4 mt-8">
         <Button asChild variant="default">
-          <Link href={withLocale(lang, "/login")}>{dict?.auth?.staffLogin ?? "Staff Login"}</Link>
+          <Link href={withLocale(lang, "/login")}>{dictString(dict, "auth.staffLogin", "Staff Login")}</Link>
         </Button>
         <Button asChild variant="outline">
-          <Link href={withLocale(lang, "/admin/login")}>{dict?.auth?.adminLogin ?? "Admin Login"}</Link>
+          <Link href={withLocale(lang, "/admin/login")}>{dictString(dict, "auth.adminLogin", "Admin Login")}</Link>
         </Button>
       </div>
     </div>

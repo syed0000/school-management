@@ -20,5 +20,7 @@ FeeTransactionSchema.index({ studentId: 1, month: 1, year: 1 });
 FeeTransactionSchema.index({ status: 1, transactionDate: -1 });
 FeeTransactionSchema.index({ collectedBy: 1, transactionDate: -1 });
 FeeTransactionSchema.index({ status: 1, studentId: 1 });
+FeeTransactionSchema.index({ collectedBy: 1, status: 1, transactionDate: -1 });
+FeeTransactionSchema.index({ studentId: 1, feeType: 1, year: 1, month: 1, status: 1 });
 
 export default mongoose.models.FeeTransaction || mongoose.model('FeeTransaction', FeeTransactionSchema);

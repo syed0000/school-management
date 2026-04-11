@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     const counter = await Counter.findByIdAndUpdate(
       'registrationNumber',
       { seq },
-      { new: true, upsert: true }
+      { returnDocument: "after", upsert: true }
     );
 
     return NextResponse.json({ success: true, counter });

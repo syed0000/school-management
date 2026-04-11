@@ -5,8 +5,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { InstallPrompt } from "@/components/install-prompt";
 import { notFound } from "next/navigation";
-import { hasLocale, isRtlLocale, locales, type Locale } from "@/lib/i18n";
-import { getDictionary } from "@/lib/dictionaries";
+import { hasLocale, isRtlLocale, locales } from "@/lib/i18n";
+import { dictString, getDictionary } from "@/lib/dictionaries";
 import { I18nProvider } from "@/components/i18n-provider";
 
 export function generateStaticParams() {
@@ -21,8 +21,8 @@ export async function generateMetadata({
   const { lang } = await params;
   if (!hasLocale(lang)) notFound();
   const dict = await getDictionary(lang);
-  const title = dict?.meta?.title ?? "Institute Management";
-  const description = dict?.meta?.description ?? "Efficient nursery school management system";
+  const title = dictString(dict, "meta.title", "Institute Management");
+  const description = dictString(dict, "meta.description", "Efficient nursery school management system");
   const metadataBase = process.env.NEXT_PUBLIC_APP_URL ? new URL(process.env.NEXT_PUBLIC_APP_URL) : undefined;
 
   return {
