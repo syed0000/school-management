@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { hasLocale, isRtlLocale, locales } from "@/lib/i18n";
 import { dictString, getDictionary } from "@/lib/dictionaries";
 import { I18nProvider } from "@/components/i18n-provider";
+import { redirect } from "next/navigation";
 
 export function generateStaticParams() {
   return locales.map((lang) => ({ lang }));
@@ -19,6 +20,9 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const { lang } = await params;
+  if (!hasLocale(lang)) {
+    redirect("https://mns.feeease.com");
+  }
   if (!hasLocale(lang)) notFound();
   const dict = await getDictionary(lang);
   const title = dictString(dict, "meta.title", "Institute Management");
